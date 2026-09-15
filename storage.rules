@@ -1,0 +1,22 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /chat_audio/{chatId}/{senderId}/{messageId}/{fileName} {
+      function member() {
+        return request.auth != null
+          && request.auth.uid in firestore.get(
+            /databases/(default)/documents/chats/$(chatId)).data.members;
+      }
+      // Private downloads through the authenticated SDK; no public URLs.
+      allow read: if member();
+      allow create, update: if member()
+        && request.auth.uid == senderId
+        && messageId.matches('[A-Za-z0-9]{20}')
+        && fileName == 'voice.wav'
+        && request.resource.size > 44
+        && request.resource.size <= 12582912
+        && request.resource.contentType == 'audio/wav'
+        && !firestore.exists(/databases/(default)/documents/chats/$(chatId)/messages/$(messageId));
+    }
+  }
+}
