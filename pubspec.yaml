@@ -1,47 +1,34 @@
 name: flutter_application_1
-
 description: VIBE social application
-
-publish_to: 'none'
-
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.10.0 <4.0.0"
+  sdk: ">=3.9.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-
-  cupertino_icons: ^1.0.8
-
-  flutter_localizations:
-    sdk: flutter
-
-  supabase_flutter: ^2.17.2
-  shared_preferences: ^2.5.4
-  firebase_core: ^4.14.0
-  firebase_auth: ^6.6.1
-  cloud_firestore: ^6.9.0
-  image_picker: ^1.2.3
-  firebase_storage: ^13.5.0
-  flutter_webrtc: ^1.6.2+hotfix.1
-  record: ^7.1.1
-  just_audio: ^0.10.6
-  cross_file: ^0.3.5+2
-  path_provider: ^2.1.6
-  web: ^1.1.1
-  video_player: ^2.14.0
+  cupertino_icons: any
+  firebase_core: any
+  firebase_auth: any
+  cloud_firestore: any
+  firebase_storage: any
+  shared_preferences: any
+  image_picker: any
+  supabase_flutter: any
+  flutter_webrtc: any
+  just_audio: any
+  video_player: any
+  record: any
+  cross_file: any
+  path_provider: any
+  web: any
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-  flutter_lints: ^6.0.0
-  fake_cloud_firestore: ^4.2.0
+  flutter_lints: any
 
 flutter:
   uses-material-design: true
-
-  assets:
-    - lib/data/assets/image.png

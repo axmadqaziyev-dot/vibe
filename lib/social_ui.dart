@@ -1,36 +1,52 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:video_player/video_player.dart';
-import 'main.dart' show UserProfile, RealChatPage, PersonPage, isReallyOnline;
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'main.dart' show RealChatPage, PersonPage, isReallyOnline;
+import 'user_profile.dart';
 import 'preferences.dart';
+import 'admin_panel.dart';
+import 'party_rooms.dart';
+import 'instant_match.dart';
+import 'notifications_center.dart';
+import 'game_center.dart';
+import 'vibe_levels.dart';
 
-const ink = Color(0xff302e38);
-const mutedInk = Color(0xff99969f);
+const ink = Color(0xfff7f3ff);
+const mutedInk = Color(0xffa89fbd);
+const vibePink = Color(0xffff2bd6);
+const vibePurple = Color(0xff8b5cff);
+const vibeBlue = Color(0xff22a7ff);
+const vibeBg = Color(0xff070510);
+const vibePanel = Color(0xff121020);
 
 class SocialSurface extends StatelessWidget {
   const SocialSurface({
     super.key,
     required this.child,
-    this.color = const Color(0xffe7dfff),
+    this.color = const Color(0xff120b22),
   });
   final Widget child;
   final Color color;
+
   @override
   Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
+    decoration: const BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        stops: const [0, .32, 1],
-        colors: [color, const Color(0xfffafafa), const Color(0xfffafafa)],
+        colors: [Color(0xff140827), Color(0xff090611), Color(0xff05040b)],
       ),
     ),
-    child: Material(type: MaterialType.transparency, child: SafeArea(bottom: false, child: child)),
+    child: Material(
+      type: MaterialType.transparency,
+      child: SafeArea(bottom: false, child: child),
+    ),
   );
 }
 
@@ -42,13 +58,18 @@ class SoftCard extends StatelessWidget {
   });
   final Widget child;
   final EdgeInsets padding;
+
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(bottom: 14),
     padding: padding,
     decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(26),
+      color: vibePanel.withValues(alpha: .92),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: const Color(0xff2d2540)),
+      boxShadow: const [
+        BoxShadow(color: Color(0x331c0b34), blurRadius: 24, offset: Offset(0, 10)),
+      ],
     ),
     child: Material(type: MaterialType.transparency, child: child),
   );
@@ -61,20 +82,14 @@ class SocialAvatar extends StatelessWidget {
     this.size = 64,
     this.online = false,
     this.symbol = '',
+    this.imageUrl = '',
   });
-  final String name, symbol;
+  final String name, symbol, imageUrl;
   final double size;
   final bool online;
+
   @override
   Widget build(BuildContext context) {
-    const colors = [
-      Color(0xffe7dfff),
-      Color(0xffffdfeb),
-      Color(0xffd8f4e7),
-      Color(0xffffedc7),
-    ];
-    final color =
-        colors[name.runes.fold<int>(0, (a, b) => a + b) % colors.length];
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -84,35 +99,57 @@ class SocialAvatar extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [color, color.withValues(alpha: .45)],
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xffff3bd4), Color(0xff814dff), Color(0xff1d9fff)],
             ),
-            border: Border.all(color: Colors.white, width: 3),
+            border: Border.all(color: Colors.white.withValues(alpha: .8), width: 2),
+            boxShadow: const [BoxShadow(color: Color(0x66ff2bd6), blurRadius: 16)],
           ),
-          child: Text(
-            symbol.isNotEmpty
-                ? symbol
-                : (name.isEmpty
-                      ? '?'
-                      : String.fromCharCode(name.runes.first).toUpperCase()),
-            style: TextStyle(
-              fontSize: size * .37,
-              fontWeight: FontWeight.w800,
-              color: ink,
-            ),
+          child: Container(
+            margin: const EdgeInsets.all(3),
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(color: Color(0xff171323), shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: imageUrl.trim().isNotEmpty
+                ? Image.network(
+                    imageUrl,
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Text(
+                        symbol.isNotEmpty
+                            ? symbol
+                            : (name.isEmpty ? '?' : String.fromCharCode(name.runes.first).toUpperCase()),
+                        style: TextStyle(fontSize: size * .36, fontWeight: FontWeight.w900, color: Colors.white),
+                      ),
+                    ),
+                  )
+                : Text(
+                    symbol.isNotEmpty
+                        ? symbol
+                        : (name.isEmpty ? '?' : String.fromCharCode(name.runes.first).toUpperCase()),
+                    style: TextStyle(
+                      fontSize: size * .36,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ),
         if (online)
           Positioned(
             right: 1,
-            top: 4,
+            bottom: 4,
             child: Container(
-              width: 15,
-              height: 15,
+              width: 16,
+              height: 16,
               decoration: BoxDecoration(
-                color: const Color(0xff3ed47b),
+                color: const Color(0xff2de28a),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
+                border: Border.all(color: vibeBg, width: 3),
               ),
             ),
           ),
@@ -126,30 +163,33 @@ class PageHeading extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget? action;
+
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(22, 20, 16, 18),
+    padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
     child: Row(
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -.8,
-                  color: ink,
+              ShaderMask(
+                shaderCallback: (r) => const LinearGradient(
+                  colors: [Color(0xffff4bdb), Color(0xff9b62ff), Color(0xff32a8ff)],
+                ).createShader(r),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 29,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -.8,
+                    color: Colors.white,
+                  ),
                 ),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 5),
-                Text(
-                  subtitle!,
-                  style: const TextStyle(color: mutedInk, fontSize: 13),
-                ),
+                Text(subtitle!, style: const TextStyle(color: mutedInk, fontSize: 13)),
               ],
             ],
           ),
@@ -169,28 +209,26 @@ class EmptySocial extends StatelessWidget {
   });
   final String title, description;
   final IconData icon;
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
     child: Column(
       children: [
-        CircleAvatar(
-          radius: 38,
-          backgroundColor: const Color(0xffeee8ff),
-          child: Icon(icon, size: 34, color: const Color(0xff8b70f8)),
+        Container(
+          width: 76,
+          height: 76,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(colors: [Color(0xff8b5cff), Color(0xffff2bd6)]),
+            boxShadow: const [BoxShadow(color: Color(0x55ff2bd6), blurRadius: 20)],
+          ),
+          child: Icon(icon, size: 34, color: Colors.white),
         ),
         const SizedBox(height: 20),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 19),
-        ),
+        Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19, color: Colors.white)),
         const SizedBox(height: 8),
-        Text(
-          description,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: mutedInk, height: 1.5),
-        ),
+        Text(description, textAlign: TextAlign.center, style: const TextStyle(color: mutedInk, height: 1.5)),
       ],
     ),
   );
@@ -200,21 +238,29 @@ class SocialHome extends StatefulWidget {
   const SocialHome({super.key, required this.profile, this.database});
   final FirebaseFirestore? database;
   final UserProfile profile;
+
   @override
   State<SocialHome> createState() => _SocialHomeState();
 }
 
 class _SocialHomeState extends State<SocialHome> {
   String query = '';
-  int filter = 0;
+  int topTab = 0;
+  int category = 0;
   bool searching = false;
   Timer? timer;
+  final Set<String> favorites = <String>{};
+  final Set<String> blockedIds = <String>{};
+
   late final stream = (widget.database ?? FirebaseFirestore.instance)
       .collection('users')
       .snapshots();
+
   @override
   void initState() {
     super.initState();
+    _loadFavorites();
+    _loadBlocked();
     timer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted) setState(() {});
     });
@@ -230,228 +276,84 @@ class _SocialHomeState extends State<SocialHome> {
   Widget build(BuildContext context) => SocialSurface(
     child: Column(
       children: [
-        PageHeading(
-          'Kəşf et',
-          subtitle: 'Sənin insanlarını tap ✨',
-          action: IconButton(
-            tooltip: 'İnsan axtar',
-            onPressed: () => setState(() => searching = !searching),
-            icon: const Icon(Icons.search_rounded, size: 29),
-          ),
-        ),
-        if (searching)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-            child: TextField(
-              autofocus: true,
-              onChanged: (v) => setState(() => query = v.toLowerCase().trim()),
-              decoration: const InputDecoration(
-                hintText: 'Ad və ya şəhər axtar',
-                prefixIcon: Icon(Icons.search),
-              ),
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-          child: Wrap(
-            children: [
-              for (final item in ['Tövsiyə', 'Aktiv', 'Yeni'])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(item),
-                    selected:
-                        filter == ['Tövsiyə', 'Aktiv', 'Yeni'].indexOf(item),
-                    onSelected: (_) => setState(
-                      () => filter = ['Tövsiyə', 'Aktiv', 'Yeni'].indexOf(item),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+        _topBar(),
+        _tabs(),
+        if (searching) _searchBox(),
         Expanded(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: stream,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                return const EmptySocial(
-                  'İnsanlar yüklənmədi',
-                  'Bağlantını yoxlayıb yenidən aç.',
-                );
+                return const EmptySocial('İnsanlar yüklənmədi', 'Bağlantını yoxlayıb yenidən aç.');
               }
               if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(child: CircularProgressIndicator(color: vibePink));
               }
+
               final users = snapshot.data!.docs.where((doc) {
                 final d = doc.data();
-                return doc.id != widget.profile.uid &&
-                    (filter != 1 || isReallyOnline(d)) &&
-                    '${d['name']} ${d['city']}'.toLowerCase().contains(query);
-              }).toList();
-              users.sort((a, b) {
-                if (filter == 2) {
-                  return ((b.data()['createdAt'] as Timestamp?)?.seconds ?? 0)
-                      .compareTo(
-                        (a.data()['createdAt'] as Timestamp?)?.seconds ?? 0,
-                      );
+                if (doc.id == widget.profile.uid) return false;
+                if (blockedIds.contains(doc.id)) return false;
+                final q = '${d['name']} ${d['city']} ${d['about']}'.toLowerCase();
+                if (!q.contains(query)) return false;
+                if (topTab == 1 && widget.profile.city.trim().isNotEmpty) {
+                  if ('${d['city'] ?? ''}'.trim().toLowerCase() != widget.profile.city.trim().toLowerCase()) return false;
                 }
-                return (isReallyOnline(b.data()) ? 1 : 0).compareTo(
-                  isReallyOnline(a.data()) ? 1 : 0,
-                );
+                if (topTab == 2 && !isReallyOnline(d)) return false;
+                if (topTab == 3) {
+                  final created = d['createdAt'];
+                  if (created is! Timestamp) return false;
+                  if (DateTime.now().difference(created.toDate()).inDays > 30) return false;
+                }
+                final gender = '${d['gender'] ?? d['sex'] ?? ''}'.toLowerCase();
+                if (category == 1 && !(gender.contains('qız') || gender.contains('qadin') || gender.contains('female') || gender == 'f')) return false;
+                if (category == 2 && !(gender.contains('oğlan') || gender.contains('kisi') || gender.contains('male') || gender == 'm')) return false;
+                if (category == 3 && !isReallyOnline(d)) return false;
+                if (category == 4 && !(d['vip'] == true || d['isVip'] == true || d['premium'] == true)) return false;
+                return true;
+              }).toList();
+
+              users.sort((a, b) {
+                final ao = isReallyOnline(a.data());
+                final bo = isReallyOnline(b.data());
+                if (ao != bo) return ao ? -1 : 1;
+                return '${a.data()['name'] ?? ''}'.compareTo('${b.data()['name'] ?? ''}');
               });
-              return ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: users.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Column(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 18),
-                          padding: const EdgeInsets.all(22),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(26),
-                            gradient: const LinearGradient(
-                              colors: [Color(0xffffeaa1), Color(0xffffe1cd)],
-                            ),
+
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 26),
+                children: [
+                  _hero(),
+                  const SizedBox(height: 18),
+                  _categories(),
+                  const SizedBox(height: 22),
+                  _sectionTitle('Sənin üçün ✨', '${users.length} profil'),
+                  const SizedBox(height: 12),
+                  if (users.isEmpty)
+                    const EmptySocial('Hələ heç kim görünmür', 'Axtarışı və ya filtri dəyiş, sonra yenidən bax.')
+                  else
+                    LayoutBuilder(
+                      builder: (context, c) {
+                        final count = c.maxWidth >= 900 ? 4 : (c.maxWidth >= 620 ? 3 : 2);
+                        final ratio = c.maxWidth >= 620 ? .78 : .72;
+                        return GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: users.length,
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: count,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: ratio,
                           ),
-                          child: const Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Bir salamla başlasın',
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xff85552b),
-                                      ),
-                                    ),
-                                    SizedBox(height: 6),
-                                    Text(
-                                      'Yeni dostlar, səmimi söhbətlər',
-                                      style: TextStyle(
-                                        color: Color(0xff9d744e),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Icon(
-                                Icons.waving_hand_rounded,
-                                size: 44,
-                                color: Color(0xffefb840),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (users.isEmpty)
-                          const EmptySocial(
-                            'Hələ heç kim görünmür',
-                            'Dostunu dəvət et və ya axtarış filtrini dəyiş.',
-                          ),
-                      ],
-                    );
-                  }
-                  final doc = users[index - 1];
-                  final d = doc.data();
-                  final name = '${d['name'] ?? 'İstifadəçi'}';
-                  return SoftCard(
-                    padding: const EdgeInsets.all(16),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PersonPage(
-                            currentProfile: widget.profile,
-                            targetUid: doc.id,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          SocialAvatar(
-                            name: name,
-                            online: isReallyOnline(d),
-                            symbol: '${d['avatarEmoji'] ?? ''}',
-                          ),
-                          const SizedBox(width: 13),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xffffe7f3),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    '${d['age'] ?? ''} · ${d['city'] ?? ''}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xffd770a9),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '${d['about'] ?? ''}'.isEmpty
-                                      ? 'Tanış olmağa hazıram ✨'
-                                      : '${d['about']}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: mutedInk,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              backgroundColor: const Color(0xffffeaf5),
-                              foregroundColor: const Color(0xffe96cb2),
-                              minimumSize: const Size(60, 38),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 13,
-                              ),
-                            ),
-                            onPressed: () =>
-                                openChat(context, widget.profile, doc.id, name),
-                            child: const Text(
-                              '♥ Salam',
-                              style: TextStyle(fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                        ],
-                      ),
+                          itemBuilder: (context, index) {
+                            final doc = users[index];
+                            return _profileCard(doc.id, doc.data());
+                          },
+                        );
+                      },
                     ),
-                  );
-                },
+                ],
               );
             },
           ),
@@ -459,6 +361,315 @@ class _SocialHomeState extends State<SocialHome> {
       ],
     ),
   );
+
+  Future<void> _loadBlocked() async {
+    try {
+      final snap = await (widget.database ?? FirebaseFirestore.instance)
+          .collection('users')
+          .doc(widget.profile.uid)
+          .collection('blocked')
+          .get();
+      if (!mounted) return;
+      setState(() {
+        blockedIds
+          ..clear()
+          ..addAll(snap.docs.map((e) => e.id));
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    final values = prefs.getStringList('vibe_favorites_${widget.profile.uid}') ?? const <String>[];
+    if (!mounted) return;
+    setState(() {
+      favorites
+        ..clear()
+        ..addAll(values);
+    });
+  }
+
+  Future<void> _toggleFavorite(String uid) async {
+    setState(() => favorites.contains(uid) ? favorites.remove(uid) : favorites.add(uid));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('vibe_favorites_${widget.profile.uid}', favorites.toList());
+  }
+
+  void _openNotifications() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NotificationCenterPage(profile: widget.profile),
+      ),
+    );
+  }
+
+  Widget _topBar() => Padding(
+    padding: const EdgeInsets.fromLTRB(18, 12, 12, 8),
+    child: Row(
+      children: [
+        ShaderMask(
+          shaderCallback: (r) => const LinearGradient(colors: [vibeBlue, vibePurple, vibePink]).createShader(r),
+          child: const Text('VIBE', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900, letterSpacing: -1.4)),
+        ),
+        const SizedBox(width: 9),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xffffd458), Color(0xffff8a3d)]),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.workspace_premium_rounded, size: 14, color: Color(0xff4c2600)),
+            SizedBox(width: 3),
+            Text('VIP', style: TextStyle(color: Color(0xff4c2600), fontSize: 11, fontWeight: FontWeight.w900)),
+          ]),
+        ),
+        const Spacer(),
+        IconButton(
+          tooltip: 'Axtar',
+          onPressed: () => setState(() => searching = !searching),
+          icon: const Icon(Icons.search_rounded, color: Colors.white, size: 28),
+        ),
+        NotificationBadge(
+          profile: widget.profile,
+          onPressed: _openNotifications,
+        ),
+      ],
+    ),
+  );
+
+  Widget _tabs() {
+    const labels = ['Kəşf et', 'Şəhərim', 'Online', 'Yeni'];
+    return SizedBox(
+      height: 43,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        scrollDirection: Axis.horizontal,
+        itemCount: labels.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 20),
+        itemBuilder: (_, i) => InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => setState(() => topTab = i),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(labels[i], style: TextStyle(color: topTab == i ? Colors.white : mutedInk, fontWeight: topTab == i ? FontWeight.w800 : FontWeight.w500)),
+                const SizedBox(height: 6),
+                Container(
+                  height: 2,
+                  width: 44,
+                  decoration: BoxDecoration(
+                    color: topTab == i ? vibePink : Colors.transparent,
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: topTab == i ? const [BoxShadow(color: Color(0xaaff2bd6), blurRadius: 8)] : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _searchBox() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 5, 16, 10),
+    child: TextField(
+      autofocus: true,
+      onChanged: (v) => setState(() => query = v.toLowerCase().trim()),
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        hintText: 'Ad, şəhər və ya maraq axtar',
+        hintStyle: const TextStyle(color: mutedInk),
+        prefixIcon: const Icon(Icons.search, color: vibePurple),
+        filled: true,
+        fillColor: vibePanel,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+      ),
+    ),
+  );
+
+  Widget _hero() => Container(
+    height: 165,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(26),
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xff24104a), Color(0xff4b1764), Color(0xff9b1d86)],
+      ),
+      border: Border.all(color: const Color(0xff6f3e87)),
+      boxShadow: const [BoxShadow(color: Color(0x44ff2bd6), blurRadius: 28, offset: Offset(0, 10))],
+    ),
+    child: Stack(
+      children: [
+        Positioned(right: -20, top: -28, child: Icon(Icons.favorite_rounded, color: Colors.white.withValues(alpha: .07), size: 180)),
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Real insanlar\nReal söhbətlər\nReal VIBE 💜', style: TextStyle(color: Colors.white, fontSize: 23, height: 1.12, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 12),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [vibeBlue, vibePurple, vibePink]),
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextButton(
+                            onPressed: () => setState(() => topTab = 2),
+                            child: const Text('Kəşf et', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                          ),
+                          Container(width: 1, height: 22, color: Colors.white24),
+                          TextButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => InstantMatchPage(profile: widget.profile),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.bolt_rounded, color: Colors.white, size: 18),
+                            label: const Text('Instant Match', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(Icons.auto_awesome_rounded, color: Color(0xffffb8ef), size: 74),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _categories() {
+    final items = <(String, IconData)>[
+      ('Hamısı', Icons.grid_view_rounded),
+      ('Qızlar', Icons.female_rounded),
+      ('Oğlanlar', Icons.male_rounded),
+      ('Online', Icons.circle),
+      ('VIP', Icons.workspace_premium_rounded),
+    ];
+    return SizedBox(
+      height: 78,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 15),
+        itemBuilder: (_, i) => GestureDetector(
+          onTap: () => setState(() => category = i),
+          child: SizedBox(
+            width: 64,
+            child: Column(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: category == i ? const LinearGradient(colors: [vibePurple, vibePink]) : null,
+                    color: category == i ? null : const Color(0xff191426),
+                    border: Border.all(color: category == i ? const Color(0xffff83e8) : const Color(0xff302742)),
+                    boxShadow: category == i ? const [BoxShadow(color: Color(0x66ff2bd6), blurRadius: 14)] : null,
+                  ),
+                  child: Icon(items[i].$2, color: Colors.white, size: i == 3 ? 14 : 23),
+                ),
+                const SizedBox(height: 6),
+                Text(items[i].$1, overflow: TextOverflow.ellipsis, style: TextStyle(color: category == i ? Colors.white : mutedInk, fontSize: 11, fontWeight: category == i ? FontWeight.w700 : FontWeight.w500)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title, String right) => Row(
+    children: [
+      Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900))),
+      Text(right, style: const TextStyle(color: vibePink, fontSize: 12, fontWeight: FontWeight.w700)),
+    ],
+  );
+
+  Widget _profileCard(String uid, Map<String, dynamic> d) {
+    final name = '${d['name'] ?? 'İstifadəçi'}';
+    final city = '${d['city'] ?? ''}';
+    final age = '${d['age'] ?? ''}';
+    final online = isReallyOnline(d);
+    final symbol = '${d['avatarEmoji'] ?? ''}';
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => PersonPage(currentProfile: widget.profile, targetUid: uid)),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: vibePanel,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: online ? const Color(0xff6a4b88) : const Color(0xff2d2638)),
+          boxShadow: online ? const [BoxShadow(color: Color(0x332de28a), blurRadius: 14)] : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                SocialAvatar(name: name, symbol: symbol, imageUrl: '${d['photoUrl'] ?? ''}', online: online, size: 76),
+                Positioned(
+                  right: -15,
+                  top: -12,
+                  child: IconButton.filledTonal(
+                    tooltip: favorites.contains(uid) ? 'Favoridən çıxar' : 'Favoriyə əlavə et',
+                    onPressed: () => _toggleFavorite(uid),
+                    icon: Icon(favorites.contains(uid) ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: favorites.contains(uid) ? vibePink : Colors.white70, size: 19),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 11),
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text([age, city].where((e) => e.isNotEmpty).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: mutedInk, fontSize: 11)),
+            const SizedBox(height: 9),
+            SizedBox(
+              width: double.infinity,
+              height: 34,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xff6d50ff), Color(0xffff2bd6)]),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: TextButton(
+                  onPressed: () => openChat(context, widget.profile, uid, name),
+                  child: const Text('Salam 💜', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 void openChat(
@@ -498,6 +709,7 @@ class _SocialMessagesState extends State<SocialMessages> {
   String query = '';
   bool searching = false;
   Timer? timer;
+  final Set<String> blockedIds = <String>{};
   late final users = (widget.database ?? FirebaseFirestore.instance)
       .collection('users')
       .snapshots();
@@ -508,6 +720,7 @@ class _SocialMessagesState extends State<SocialMessages> {
   @override
   void initState() {
     super.initState();
+    _loadBlocked();
     timer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted) setState(() {});
     });
@@ -519,14 +732,30 @@ class _SocialMessagesState extends State<SocialMessages> {
     super.dispose();
   }
 
+  Future<void> _loadBlocked() async {
+    try {
+      final snap = await (widget.database ?? FirebaseFirestore.instance)
+          .collection('users')
+          .doc(widget.profile.uid)
+          .collection('blocked')
+          .get();
+      if (!mounted) return;
+      setState(() {
+        blockedIds
+          ..clear()
+          ..addAll(snap.docs.map((e) => e.id));
+      });
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) => SocialSurface(
-    color: const Color(0xffffe6d3),
+    color: const Color(0xff150a26),
     child: Column(
       children: [
         PageHeading(
           'Mesajlar',
-          subtitle: 'Yaxşı söhbət həmişə yaxındadır',
+          subtitle: 'Online dostlar, yeni mesajlar və real söhbətlər',
           action: IconButton(
             tooltip: 'Mesaj axtar',
             onPressed: () => setState(() => searching = !searching),
@@ -596,6 +825,7 @@ class _SocialMessagesState extends State<SocialMessages> {
                       final peer = (List<String>.from(
                         d['members'] ?? [],
                       )..remove(widget.profile.uid)).firstOrNull;
+                      if (peer != null && blockedIds.contains(peer)) return false;
                       final p = profiles[peer] ?? {};
                       final unread = isUnread(d, widget.profile.uid);
                       return (filter != 1 || isReallyOnline(p)) &&
@@ -612,14 +842,14 @@ class _SocialMessagesState extends State<SocialMessages> {
                           'Mövzunu seç, söhbətə qoşul',
                           Icons.meeting_room_outlined,
                           const Color(0xff55cf89),
-                          () => widget.navigate(2),
+                          () => widget.navigate(3),
                         ),
                         _shortcut(
                           'Anlar',
                           'Dostların nə paylaşır?',
                           Icons.auto_awesome_outlined,
                           const Color(0xffbd85f4),
-                          () => widget.navigate(1),
+                          () => widget.navigate(2),
                         ),
                         const SizedBox(height: 12),
                         if (visible.isEmpty)
@@ -649,6 +879,7 @@ class _SocialMessagesState extends State<SocialMessages> {
                                     size: 58,
                                     online: isReallyOnline(p),
                                     symbol: '${p['avatarEmoji'] ?? ''}',
+                                    imageUrl: '${p['photoUrl'] ?? ''}',
                                   ),
                                   title: Text(
                                     name,
@@ -736,6 +967,347 @@ bool isUnread(Map<String, dynamic> data, String uid) {
       (read is! Timestamp || updated.compareTo(read) > 0);
 }
 
+
+class VibeWalletCard extends StatelessWidget {
+  const VibeWalletCard({super.key, required this.profile});
+  final UserProfile profile;
+
+  String _todayKey() {
+    final n = DateTime.now();
+    return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _dailyGift(BuildContext context) async {
+    final ref = FirebaseFirestore.instance.collection('users').doc(profile.uid);
+    try {
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        final data = snap.data() ?? <String, dynamic>{};
+        final today = _todayKey();
+        if ('${data['lastDailyGift'] ?? ''}' == today) {
+          throw StateError('already');
+        }
+        tx.set(ref, {
+          'coins': FieldValue.increment(25),
+          'lastDailyGift': today,
+        }, SetOptions(merge: true));
+      });
+      if (context.mounted) notifySocial(context, '+25 VIBE Coin hesabına əlavə olundu ✨');
+    } on StateError {
+      if (context.mounted) notifySocial(context, 'Bugünkü hədiyyəni artıq götürmüsən.');
+    } catch (_) {
+      if (context.mounted) notifySocial(context, 'Coin hədiyyəsi alınmadı. Yenidən sına.');
+    }
+  }
+
+  Future<void> _buyVip(BuildContext context, int coins) async {
+    if (coins < 200) {
+      notifySocial(context, 'VIP üçün 200 coin lazımdır.');
+      return;
+    }
+    final ref = FirebaseFirestore.instance.collection('users').doc(profile.uid);
+    try {
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        final data = snap.data() ?? <String, dynamic>{};
+        final current = (data['coins'] as num?)?.toInt() ?? 0;
+        if (current < 200) throw StateError('coins');
+        final now = DateTime.now();
+        final existing = data['vipUntil'];
+        final base = existing is Timestamp && existing.toDate().isAfter(now)
+            ? existing.toDate()
+            : now;
+        tx.set(ref, {
+          'coins': current - 200,
+          'vip': true,
+          'vipUntil': Timestamp.fromDate(base.add(const Duration(days: 30))),
+        }, SetOptions(merge: true));
+      });
+      if (context.mounted) notifySocial(context, 'VIP 30 gün aktiv edildi 👑');
+    } on StateError {
+      if (context.mounted) notifySocial(context, 'Coin balansı kifayət deyil.');
+    } catch (_) {
+      if (context.mounted) notifySocial(context, 'VIP aktiv edilmədi. Yenidən sına.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('users').doc(profile.uid).snapshots(),
+      builder: (context, snap) {
+        final d = snap.data?.data() ?? {};
+        final coins = (d['coins'] as num?)?.toInt() ?? 0;
+        final vipUntil = d['vipUntil'];
+        final vipActive = d['vip'] == true &&
+            vipUntil is Timestamp &&
+            vipUntil.toDate().isAfter(DateTime.now());
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xff21103a), Color(0xff151020), Color(0xff30112c)],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xff4b2b66)),
+            boxShadow: const [BoxShadow(color: Color(0x332f0b54), blurRadius: 24)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: [vibePurple, vibePink]),
+                    ),
+                    child: const Icon(Icons.workspace_premium_rounded, color: Colors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          const Text('VIBE Wallet', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                          if (vipActive) ...[
+                            const SizedBox(width: 7),
+                            const Text('VIP', style: TextStyle(color: Color(0xffffd76b), fontWeight: FontWeight.w900)),
+                          ],
+                        ]),
+                        const SizedBox(height: 3),
+                        Text('$coins coin', style: const TextStyle(color: Color(0xffc9bdd9), fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.diamond_rounded, color: Color(0xffffd76b)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _dailyGift(context),
+                      icon: const Icon(Icons.card_giftcard_rounded),
+                      label: const Text('Gündəlik +25'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xff6f4cff),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(0, 46),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: vipActive ? null : () => _buyVip(context, coins),
+                      icon: const Icon(Icons.workspace_premium_rounded),
+                      label: Text(vipActive ? 'VIP aktivdir' : 'VIP · 200'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xffffd76b),
+                        side: const BorderSide(color: Color(0xff6b4c72)),
+                        minimumSize: const Size(0, 46),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class ProfileGalleryCard extends StatefulWidget {
+  const ProfileGalleryCard({super.key, required this.profile});
+  final UserProfile profile;
+
+  @override
+  State<ProfileGalleryCard> createState() => _ProfileGalleryCardState();
+}
+
+class _ProfileGalleryCardState extends State<ProfileGalleryCard> {
+  bool uploading = false;
+
+  Future<void> _addPhoto() async {
+    if (uploading) return;
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 82,
+      maxWidth: 1600,
+    );
+    if (picked == null) return;
+
+    setState(() => uploading = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_media/${widget.profile.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg');
+      await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+      final url = await ref.getDownloadURL();
+      await FirebaseFirestore.instance.collection('users').doc(widget.profile.uid).set({
+        'gallery': FieldValue.arrayUnion([url]),
+      }, SetOptions(merge: true));
+      if (mounted) notifySocial(context, 'Şəkil qalereyaya əlavə olundu.');
+    } catch (_) {
+      if (mounted) notifySocial(context, 'Şəkil yüklənmədi. Storage qaydalarını yoxla.');
+    } finally {
+      if (mounted) setState(() => uploading = false);
+    }
+  }
+
+  Future<void> _setProfilePhoto(String url) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(widget.profile.uid).set({
+        'photoUrl': url,
+      }, SetOptions(merge: true));
+      if (mounted) notifySocial(context, 'Profil şəkli dəyişdirildi.');
+    } catch (_) {
+      if (mounted) notifySocial(context, 'Profil şəkli dəyişmədi.');
+    }
+  }
+
+  Future<void> _removePhoto(String url) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(widget.profile.uid).set({
+        'gallery': FieldValue.arrayRemove([url]),
+      }, SetOptions(merge: true));
+      try {
+        await FirebaseStorage.instance.refFromURL(url).delete();
+      } catch (_) {}
+      if (mounted) notifySocial(context, 'Şəkil silindi.');
+    } catch (_) {
+      if (mounted) notifySocial(context, 'Şəkil silinmədi.');
+    }
+  }
+
+  void _photoMenu(String url) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xff151020),
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.account_circle_rounded, color: vibePink),
+              title: const Text('Profil şəkli et', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(sheet);
+                _setProfilePhoto(url);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: Color(0xffff6b7d)),
+              title: const Text('Şəkli sil', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(sheet);
+                _removePhoto(url);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('users').doc(widget.profile.uid).snapshots(),
+      builder: (context, snap) {
+        final d = snap.data?.data() ?? {};
+        final gallery = ((d['gallery'] as List?) ?? const []).map((e) => '$e').where((e) => e.isNotEmpty).toList();
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xff121020),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xff332444)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Foto qalereya', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                        SizedBox(height: 3),
+                        Text('Şəkilə basıb profil şəkli edə bilərsən', style: TextStyle(color: mutedInk, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  IconButton.filled(
+                    onPressed: uploading ? null : _addPhoto,
+                    style: IconButton.styleFrom(backgroundColor: const Color(0xff2b1740)),
+                    icon: uploading
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.add_a_photo_rounded),
+                  ),
+                ],
+              ),
+              if (gallery.isEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  height: 92,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xff0d0a15),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xff2c2039)),
+                  ),
+                  child: const Text('Hələ şəkil əlavə edilməyib', style: TextStyle(color: mutedInk)),
+                ),
+              ] else ...[
+                const SizedBox(height: 14),
+                SizedBox(
+                  height: 112,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: gallery.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (_, i) => GestureDetector(
+                      onTap: () => _photoMenu(gallery[i]),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: Image.network(
+                          gallery[i],
+                          width: 92,
+                          height: 112,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 92,
+                            color: const Color(0xff21162f),
+                            alignment: Alignment.center,
+                            child: const Icon(Icons.broken_image_outlined, color: mutedInk),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class SocialProfile extends StatelessWidget {
   const SocialProfile({
     super.key,
@@ -748,7 +1320,7 @@ class SocialProfile extends StatelessWidget {
   final ValueChanged<int> navigate;
   @override
   Widget build(BuildContext context) => SocialSurface(
-    color: const Color(0xfffff2c7),
+    color: const Color(0xff170923),
     child: ListView(
       padding: const EdgeInsets.all(18),
       children: [
@@ -790,22 +1362,61 @@ class SocialProfile extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  SocialAvatar(
-                    name: name,
-                    size: 88,
-                    symbol: '${d['avatarEmoji'] ?? ''}',
+                  Container(
+                    padding: EdgeInsets.all(d['vip'] == true ? 3 : 0),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: d['vip'] == true
+                          ? const LinearGradient(
+                              colors: [
+                                Color(0xffffd86b),
+                                Color(0xffff2bd6),
+                                Color(0xff8b5cff),
+                              ],
+                            )
+                          : null,
+                      boxShadow: d['vip'] == true
+                          ? const [
+                              BoxShadow(
+                                color: Color(0x55ffd86b),
+                                blurRadius: 22,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: SocialAvatar(
+                      name: name,
+                      size: 88,
+                      symbol: '${d['avatarEmoji'] ?? ''}',
+                      imageUrl: '${d['photoUrl'] ?? ''}',
+                    ),
                   ),
                   const SizedBox(width: 15),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                name,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            if (d['vip'] == true) ...[
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.workspace_premium_rounded,
+                                color: Color(0xffffd86b),
+                                size: 22,
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 8),
                         const Text(
@@ -821,7 +1432,122 @@ class SocialProfile extends StatelessWidget {
             );
           },
         ),
-        const SizedBox(height: 30),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: (database ?? FirebaseFirestore.instance)
+                    .collection('users')
+                    .doc(profile.uid)
+                    .collection('followers')
+                    .snapshots(),
+                builder: (_, snap) => _ProfileStatCard(
+                  label: 'İzləyici',
+                  value: '${snap.data?.docs.length ?? 0}',
+                  icon: Icons.people_alt_rounded,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: (database ?? FirebaseFirestore.instance)
+                    .collection('users')
+                    .doc(profile.uid)
+                    .collection('following')
+                    .snapshots(),
+                builder: (_, snap) => _ProfileStatCard(
+                  label: 'İzlənilən',
+                  value: '${snap.data?.docs.length ?? 0}',
+                  icon: Icons.person_add_alt_1_rounded,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: (database ?? FirebaseFirestore.instance)
+                    .collection('users')
+                    .doc(profile.uid)
+                    .snapshots(),
+                builder: (_, snap) {
+                  final data = snap.data?.data() ?? const <String, dynamic>{};
+                  final gallery = (data['gallery'] as List?) ?? const [];
+                  return _ProfileStatCard(
+                    label: 'Media',
+                    value: '${gallery.length}',
+                    icon: Icons.photo_library_rounded,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: (database ?? FirebaseFirestore.instance).collection('users').doc(profile.uid).snapshots(),
+          builder: (context, adminSnap) {
+            final d = adminSnap.data?.data() ?? const <String, dynamic>{};
+            if (d['isAdmin'] != true && d['role'] != 'admin') return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xff26163f), Color(0xff42152f)]),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xff704a8f)),
+                ),
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xff8b5cff),
+                    child: Icon(Icons.admin_panel_settings_rounded, color: Colors.white),
+                  ),
+                  title: const Text('Admin panel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                  subtitle: const Text('Şikayətləri yoxla və idarə et', style: TextStyle(color: mutedInk)),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white70),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VibeAdminPanel())),
+                ),
+              ),
+            );
+          },
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _ProfileShortcut(
+                icon: Icons.sports_esports_rounded,
+                title: 'Oyunlar',
+                colors: const [Color(0xff8b5cff), Color(0xffff2bd6)],
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VibeGameCenterPage(profile: profile),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _ProfileShortcut(
+                icon: Icons.military_tech_rounded,
+                title: 'Level',
+                colors: const [Color(0xffffb347), Color(0xffffd86b)],
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VibeLevelsPage(profile: profile),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        VibeWalletCard(profile: profile),
+        const SizedBox(height: 14),
+        ProfileGalleryCard(profile: profile),
+        const SizedBox(height: 20),
         SoftCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -844,7 +1570,7 @@ class SocialProfile extends StatelessWidget {
                       'Profil dekoru',
                       'Səni ifadə et',
                       Icons.auto_awesome,
-                      const Color(0xffffe6a5),
+                      const Color(0xff3a2a12),
                       () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -863,7 +1589,7 @@ class SocialProfile extends StatelessWidget {
                       'Görünüş',
                       'Rəngini dəyiş',
                       Icons.palette_outlined,
-                      const Color(0xffe8dcff),
+                      const Color(0xff25193f),
                       () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -892,25 +1618,25 @@ class SocialProfile extends StatelessWidget {
                   _quick(
                     'Mesajlar',
                     Icons.chat_bubble_outline,
-                    const Color(0xffddeaff),
-                    () => navigate(3),
+                    const Color(0xff132a46),
+                    () => navigate(4),
                   ),
                   _quick(
                     'Anlar',
                     Icons.auto_awesome_outlined,
-                    const Color(0xffffe0ed),
-                    () => navigate(1),
+                    const Color(0xff3a1730),
+                    () => navigate(2),
                   ),
                   _quick(
                     'Otaqlar',
                     Icons.meeting_room_outlined,
-                    const Color(0xffddf9df),
-                    () => navigate(2),
+                    const Color(0xff153421),
+                    () => navigate(3),
                   ),
                   _quick(
                     'Ayarlar',
                     Icons.tune,
-                    const Color(0xffefdefc),
+                    const Color(0xff2b1839),
                     () => Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -1015,6 +1741,98 @@ class SocialProfile extends StatelessWidget {
       ),
     ),
   );
+}
+
+
+
+class _ProfileShortcut extends StatelessWidget {
+  const _ProfileShortcut({
+    required this.icon,
+    required this.title,
+    required this.colors,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final List<Color> colors;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        height: 82,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: colors),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(color: Color(0x3320002e), blurRadius: 18),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 28),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileStatCard extends StatelessWidget {
+  const _ProfileStatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xff151020),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xff342743)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: vibePurple, size: 20),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: mutedInk, fontSize: 10),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class EditSocialProfile extends StatefulWidget {
@@ -1382,16 +2200,105 @@ class _SocialFeedState extends State<SocialFeed> {
     }
   }
 
+  Future<void> _toggleMomentLike(DocumentReference<Map<String, dynamic>> ref, Map<String, dynamic> data) async {
+    final likes = (data['likes'] as List?)?.map((e) => '$e').toSet() ?? <String>{};
+    final liked = likes.contains(widget.profile.uid);
+    try {
+      await ref.set({
+        'likes': liked ? FieldValue.arrayRemove([widget.profile.uid]) : FieldValue.arrayUnion([widget.profile.uid]),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      if (mounted) notifySocial(context, 'Like saxlanmadı. Yenidən sına.');
+    }
+  }
+
+  Future<void> _shareMoment(String text) async {
+    await Clipboard.setData(ClipboardData(text: 'VIBE · $text'));
+    if (mounted) notifySocial(context, 'Paylaşım mətni kopyalandı.');
+  }
+
+  void _openMomentComments(DocumentReference<Map<String, dynamic>> ref) {
+    final controller = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xff120d1d),
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.fromLTRB(16, 14, 16, MediaQuery.viewInsetsOf(sheetContext).bottom + 16),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .62,
+          child: Column(
+            children: [
+              Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8))),
+              const SizedBox(height: 14),
+              const Text('Şərhlər', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 10),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: ref.collection('comments').orderBy('createdAt', descending: true).limit(100).snapshots(),
+                  builder: (_, snap) {
+                    if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: vibePink));
+                    if (snap.data!.docs.isEmpty) return const Center(child: Text('İlk şərhi sən yaz 💜', style: TextStyle(color: mutedInk)));
+                    return ListView.builder(
+                      reverse: true,
+                      itemCount: snap.data!.docs.length,
+                      itemBuilder: (_, i) {
+                        final d = snap.data!.docs[i].data();
+                        return ListTile(
+                          leading: SocialAvatar(name: '${d['name'] ?? 'V'}', imageUrl: '${d['photoUrl'] ?? ''}', size: 38),
+                          title: Text('${d['name'] ?? 'VIBE'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                          subtitle: Text('${d['text'] ?? ''}', style: const TextStyle(color: Color(0xffd8d0e7))),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(child: TextField(controller: controller, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Şərh yaz...'))),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: () async {
+                      final text = controller.text.trim();
+                      if (text.isEmpty) return;
+                      try {
+                        await ref.collection('comments').add({
+                          'uid': widget.profile.uid,
+                          'name': widget.profile.name,
+                          'text': text,
+                          'createdAt': FieldValue.serverTimestamp(),
+                        });
+                        controller.clear();
+                      } catch (_) {
+                        if (sheetContext.mounted) notifySocial(sheetContext, 'Şərh göndərilmədi.');
+                      }
+                    },
+                    icon: const Icon(Icons.send_rounded),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).whenComplete(controller.dispose);
+  }
+
   @override
-  Widget build(BuildContext context) => SocialSurface(
-    color: widget.rooms ? const Color(0xffdef5e9) : const Color(0xfff0dfff),
+  Widget build(BuildContext context) {
+    if (widget.rooms) {
+      return PartyRoomsPage(profile: widget.profile);
+    }
+    return SocialSurface(
+      color: const Color(0xff120817),
     child: Column(
       children: [
         PageHeading(
           widget.rooms ? 'Otaqlar' : 'Anlar',
           subtitle: widget.rooms
-              ? 'Bir mövzu, çox söhbət'
-              : 'Günün kiçik, gözəl anları',
+              ? 'Canlı səsli otaqlara qoşul və söhbət et'
+              : 'Şəkil, fikir və anlarını dostlarınla paylaş',
           action: IconButton.filled(
             tooltip: widget.rooms ? 'Otaq yarat' : 'An paylaş',
             onPressed: create,
@@ -1499,6 +2406,33 @@ class _SocialFeedState extends State<SocialFeed> {
                             '${doc.data()['text']}',
                             style: const TextStyle(fontSize: 17, height: 1.5),
                           ),
+                          if (!widget.rooms) ...[
+                            const SizedBox(height: 14),
+                            Builder(builder: (context) {
+                              final likes = (doc.data()['likes'] as List?)?.map((e) => '$e').toList() ?? const <String>[];
+                              final liked = likes.contains(widget.profile.uid);
+                              return Row(
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () => _toggleMomentLike(doc.reference, doc.data()),
+                                    icon: Icon(liked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: liked ? vibePink : mutedInk),
+                                    label: Text('${likes.length}', style: const TextStyle(color: Colors.white70)),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: () => _openMomentComments(doc.reference),
+                                    icon: const Icon(Icons.chat_bubble_outline_rounded, color: mutedInk),
+                                    label: const Text('Şərh', style: TextStyle(color: Colors.white70)),
+                                  ),
+                                  const Spacer(),
+                                  IconButton(
+                                    tooltip: 'Paylaş',
+                                    onPressed: () => _shareMoment('${doc.data()['text'] ?? ''}'),
+                                    icon: const Icon(Icons.ios_share_rounded, color: mutedInk),
+                                  ),
+                                ],
+                              );
+                            }),
+                          ],
                           if (widget.rooms) ...[
                             const SizedBox(height: 16),
                             FilledButton.tonalIcon(
@@ -1526,7 +2460,8 @@ class _SocialFeedState extends State<SocialFeed> {
         ),
       ],
     ),
-  );
+    );
+  }
 }
 
 class ComposeSocial extends StatefulWidget {
@@ -1660,7 +2595,7 @@ class _SocialRoomChatState extends State<SocialRoomChat> {
                         padding: const EdgeInsets.all(15),
                         decoration: BoxDecoration(
                           color: d.data()['senderId'] == widget.profile.uid
-                              ? const Color(0xffe9e0ff)
+                              ? const Color(0xff2a1c43)
                               : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -1715,601 +2650,3 @@ class _SocialRoomChatState extends State<SocialRoomChat> {
     ),
   );
 }
-// ============================================================
-// VIBE VIDEO / SƏNİN ÜÇÜN
-// ============================================================
-
-class VibeVideoFeed extends StatefulWidget {
-  const VibeVideoFeed({super.key, required this.profile});
-  final UserProfile profile;
-
-  @override
-  State<VibeVideoFeed> createState() => _VibeVideoFeedState();
-}
-
-class _VibeVideoFeedState extends State<VibeVideoFeed> {
-  final PageController pageController = PageController();
-  int activeIndex = 0;
-  bool followingTab = false;
-  Set<String> followingCreators = <String>{};
-
-  final List<Map<String, dynamic>> videos = const [
-    {
-      'id': 'vibe_welcome',
-      'name': 'VIBE',
-      'text': 'VIBE Video-ya xoş gəldin 🔥',
-      'likes': 128,
-      'comments': 24,
-      'url': 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    },
-    {
-      'id': 'ehmed_video_1',
-      'name': 'Əhməd',
-      'text': 'Yuxarı sürüşdür və növbəti videoya keç 🎬',
-      'likes': 86,
-      'comments': 12,
-      'url': 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    },
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFollowing();
-  }
-
-  Future<void> _loadFollowing() async {
-    try {
-      final snap = await FirebaseFirestore.instance.collection('users').doc(widget.profile.uid).get();
-      final data = snap.data();
-      final list = (data?['followingVideoCreators'] as List?) ?? const [];
-      if (mounted) {
-        setState(() => followingCreators = list.map((e) => '$e').toSet());
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _toggleFollow(String creator) async {
-    final willFollow = !followingCreators.contains(creator);
-    setState(() {
-      if (willFollow) {
-        followingCreators.add(creator);
-      } else {
-        followingCreators.remove(creator);
-      }
-    });
-    try {
-      await FirebaseFirestore.instance.collection('users').doc(widget.profile.uid).set({
-        'followingVideoCreators': willFollow
-            ? FieldValue.arrayUnion([creator])
-            : FieldValue.arrayRemove([creator]),
-      }, SetOptions(merge: true));
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('İzləmə yadda saxlanmadı. İnterneti yoxla.')),
-      );
-    }
-  }
-
-  List<Map<String, dynamic>> get visibleVideos {
-    if (!followingTab) return videos;
-    return videos.where((v) => followingCreators.contains('${v['name']}')).toList();
-  }
-
-  @override
-  void dispose() {
-    pageController.dispose();
-    super.dispose();
-  }
-
-  void showComingSoon(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$text növbəti mərhələdə işlək olacaq.')),
-    );
-  }
-
-  void _selectTab(bool following) {
-    setState(() {
-      followingTab = following;
-      activeIndex = 0;
-    });
-    if (pageController.hasClients) pageController.jumpToPage(0);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final feed = visibleVideos;
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          if (feed.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.person_add_alt_1_rounded, color: Colors.white70, size: 58),
-                    const SizedBox(height: 16),
-                    const Text('Hələ heç kimi izləmirsən', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 8),
-                    const Text('“Sənin üçün” bölməsindən bir profilin + düyməsinə bas.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, fontSize: 14)),
-                    const SizedBox(height: 18),
-                    FilledButton(onPressed: () => _selectTab(false), child: const Text('Sənin üçün')),
-                  ],
-                ),
-              ),
-            )
-          else
-            PageView.builder(
-              key: ValueKey(followingTab),
-              controller: pageController,
-              scrollDirection: Axis.vertical,
-              itemCount: feed.length,
-              onPageChanged: (index) => setState(() => activeIndex = index),
-              itemBuilder: (context, index) {
-                final video = feed[index];
-                final name = '${video['name']}';
-                return _VibeVideoCard(
-                  key: ValueKey('${video['id']}_${followingTab}_$index'),
-                  profile: widget.profile,
-                  videoId: '${video['id']}',
-                  name: name,
-                  text: '${video['text']}',
-                  likes: video['likes'] as int,
-                  comments: video['comments'] as int,
-                  videoUrl: '${video['url']}',
-                  active: index == activeIndex,
-                  followed: followingCreators.contains(name),
-                  onFollow: () => _toggleFollow(name),
-                  onComment: () => showComingSoon('Şərh'),
-                  onProfile: () => showComingSoon('Profil'),
-                );
-              },
-            ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
-                child: Row(
-                  children: [
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => _selectTab(true),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('İzlənilən', style: TextStyle(color: followingTab ? Colors.white : Colors.white60, fontSize: 16, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 4),
-                          SizedBox(width: 34, height: 2, child: ColoredBox(color: followingTab ? Colors.white : Colors.transparent)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 22),
-                    GestureDetector(
-                      onTap: () => _selectTab(false),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('Sənin üçün', style: TextStyle(color: !followingTab ? Colors.white : Colors.white60, fontSize: 17, fontWeight: FontWeight.w900)),
-                          const SizedBox(height: 4),
-                          SizedBox(width: 34, height: 2, child: ColoredBox(color: !followingTab ? Colors.white : Colors.transparent)),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      tooltip: 'Video əlavə et',
-                      onPressed: () => showComingSoon('Video yükləmə'),
-                      icon: const Icon(Icons.add_box_outlined, color: Colors.white, size: 29),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VibeVideoCard extends StatefulWidget {
-  const _VibeVideoCard({
-    super.key,
-    required this.profile,
-    required this.videoId,
-    required this.name,
-    required this.text,
-    required this.likes,
-    required this.comments,
-    required this.videoUrl,
-    required this.active,
-    required this.followed,
-    required this.onFollow,
-    required this.onComment,
-    required this.onProfile,
-  });
-
-  final UserProfile profile;
-  final String videoId;
-  final String name;
-  final String text;
-  final int likes;
-  final int comments;
-  final String videoUrl;
-  final bool active;
-  final bool followed;
-  final VoidCallback onFollow;
-  final VoidCallback onComment;
-  final VoidCallback onProfile;
-
-  @override
-  State<_VibeVideoCard> createState() => _VibeVideoCardState();
-}
-
-class _VibeVideoCardState extends State<_VibeVideoCard> {
-  late final VideoPlayerController controller;
-  bool liked = false;
-  bool saved = false;
-  bool showPlay = false;
-  bool failed = false;
-  bool muted = false;
-  bool stateLoaded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
-    _loadState();
-    _prepare();
-  }
-
-  Future<void> _loadState() async {
-    try {
-      final snap = await FirebaseFirestore.instance.collection('users').doc(widget.profile.uid).get();
-      final data = snap.data();
-      final likedIds = ((data?['likedVideoIds'] as List?) ?? const []).map((e) => '$e').toSet();
-      final savedIds = ((data?['savedVideoIds'] as List?) ?? const []).map((e) => '$e').toSet();
-      if (mounted) {
-        setState(() {
-          liked = likedIds.contains(widget.videoId);
-          saved = savedIds.contains(widget.videoId);
-          stateLoaded = true;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => stateLoaded = true);
-    }
-  }
-
-  Future<void> _prepare() async {
-    try {
-      await controller.initialize();
-      await controller.setLooping(true);
-      await controller.setVolume(1);
-      if (widget.active) {
-        try {
-          await controller.play();
-        } catch (_) {
-          muted = true;
-          await controller.setVolume(0);
-          await controller.play();
-        }
-      }
-      if (mounted) setState(() {});
-    } catch (_) {
-      if (mounted) setState(() => failed = true);
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _VibeVideoCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!controller.value.isInitialized) return;
-    if (widget.active && !oldWidget.active) {
-      controller.play();
-    } else if (!widget.active && oldWidget.active) {
-      controller.pause();
-    }
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  void togglePlay() {
-    if (!controller.value.isInitialized) return;
-    setState(() {
-      if (controller.value.isPlaying) {
-        controller.pause();
-        showPlay = true;
-      } else {
-        controller.play();
-        showPlay = false;
-      }
-    });
-  }
-
-  Future<void> _toggleSound() async {
-    if (!controller.value.isInitialized) return;
-    muted = !muted;
-    await controller.setVolume(muted ? 0 : 1);
-    if (!controller.value.isPlaying) await controller.play();
-    if (mounted) setState(() => showPlay = false);
-  }
-
-  Future<void> _toggleLike() async {
-    final newValue = !liked;
-    setState(() => liked = newValue);
-    try {
-      await FirebaseFirestore.instance.collection('users').doc(widget.profile.uid).set({
-        'likedVideoIds': newValue
-            ? FieldValue.arrayUnion([widget.videoId])
-            : FieldValue.arrayRemove([widget.videoId]),
-      }, SetOptions(merge: true));
-    } catch (_) {
-      if (mounted) setState(() => liked = !newValue);
-    }
-  }
-
-  Future<void> _toggleSave() async {
-    final newValue = !saved;
-    setState(() => saved = newValue);
-    try {
-      await FirebaseFirestore.instance.collection('users').doc(widget.profile.uid).set({
-        'savedVideoIds': newValue
-            ? FieldValue.arrayUnion([widget.videoId])
-            : FieldValue.arrayRemove([widget.videoId]),
-      }, SetOptions(merge: true));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(newValue ? 'Video “Yadda saxlanılanlar” bazasına əlavə edildi' : 'Video yadda saxlanılanlardan çıxarıldı')),
-      );
-    } catch (_) {
-      if (mounted) {
-        setState(() => saved = !newValue);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Yadda saxlamaq alınmadı')));
-      }
-    }
-  }
-
-  void _showShareSheet() {
-    final link = 'https://vibe-f9d13.web.app/video/${widget.videoId}';
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (sheetContext) {
-        Widget shareItem(IconData icon, String label, VoidCallback onTap) {
-          return InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: SizedBox(
-              width: 82,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(radius: 27, backgroundColor: const Color(0xfff2f2f4), child: Icon(icon, color: const Color(0xff302e38))),
-                  const SizedBox(height: 8),
-                  Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-          );
-        }
-
-        void copyAndClose(String message) {
-          Clipboard.setData(ClipboardData(text: link));
-          Navigator.pop(sheetContext);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-        }
-
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Paylaş', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 18),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      shareItem(Icons.link_rounded, 'Linki kopyala', () => copyAndClose('Video linki kopyalandı')),
-                      const SizedBox(width: 10),
-                      shareItem(Icons.chat_bubble_rounded, 'Mesajla göndər', () => copyAndClose('Link kopyalandı — Mesajlar bölməsində göndərə bilərsən')),
-                      const SizedBox(width: 10),
-                      shareItem(Icons.send_rounded, 'Dostuna göndər', () => copyAndClose('Paylaşım linki kopyalandı')),
-                      const SizedBox(width: 10),
-                      shareItem(Icons.more_horiz_rounded, 'Daha çox', () => copyAndClose('Video linki kopyalandı')),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currentLikes = widget.likes + (liked ? 1 : 0);
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: togglePlay,
-      child: Container(
-        color: Colors.black,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (controller.value.isInitialized)
-              Center(
-                child: AspectRatio(
-                  aspectRatio: controller.value.aspectRatio,
-                  child: VideoPlayer(controller),
-                ),
-              )
-            else
-              Center(
-                child: failed
-                    ? const Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.error_outline_rounded, color: Colors.white70, size: 55),
-                          SizedBox(height: 12),
-                          Text('Video açıla bilmədi', style: TextStyle(color: Colors.white70)),
-                        ],
-                      )
-                    : const CircularProgressIndicator(color: Colors.white),
-              ),
-            if (showPlay)
-              const Center(child: Icon(Icons.play_circle_fill_rounded, color: Colors.white70, size: 76)),
-            Positioned(
-              top: 72,
-              right: 12,
-              child: SafeArea(
-                bottom: false,
-                child: IconButton.filledTonal(
-                  tooltip: muted ? 'Səsi aç' : 'Səsi bağla',
-                  onPressed: _toggleSound,
-                  icon: Icon(muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 18,
-              right: 90,
-              bottom: 30,
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onTap: widget.onProfile,
-                      child: Text('@${widget.name}', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(widget.text, style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.35, fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 13),
-                    const Row(
-                      children: [
-                        Icon(Icons.music_note_rounded, color: Colors.white, size: 18),
-                        SizedBox(width: 6),
-                        Expanded(child: Text('VIBE original səs', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              right: 10,
-              bottom: 28,
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  children: [
-                    GestureDetector(
-                      onTap: widget.onFollow,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        alignment: Alignment.center,
-                        children: [
-                          CircleAvatar(
-                            radius: 25,
-                            backgroundColor: Colors.white,
-                            child: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: const Color(0xff6d28d9),
-                              child: Text(widget.name.isEmpty ? '?' : widget.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                            ),
-                          ),
-                          Positioned(
-                            bottom: -7,
-                            child: CircleAvatar(
-                              radius: 9,
-                              backgroundColor: widget.followed ? const Color(0xff22c55e) : const Color(0xffef4444),
-                              child: Icon(widget.followed ? Icons.check : Icons.add, size: 14, color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    _VideoAction(
-                      icon: liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      text: '$currentLikes',
-                      active: liked,
-                      onTap: _toggleLike,
-                    ),
-                    const SizedBox(height: 22),
-                    _VideoAction(icon: Icons.mode_comment_outlined, text: '${widget.comments}', onTap: widget.onComment),
-                    const SizedBox(height: 22),
-                    _VideoAction(
-                      icon: saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                      text: saved ? 'Saxlanıb' : 'Yadda saxla',
-                      active: saved,
-                      onTap: _toggleSave,
-                    ),
-                    const SizedBox(height: 22),
-                    _VideoAction(icon: Icons.reply_rounded, text: 'Paylaş', onTap: _showShareSheet),
-                    const SizedBox(height: 25),
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.grey.shade900, border: Border.all(color: Colors.white24, width: 2)),
-                      child: const Icon(Icons.music_note_rounded, color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _VideoAction extends StatelessWidget {
-  const _VideoAction({required this.icon, required this.text, required this.onTap, this.active = false});
-  final IconData icon;
-  final String text;
-  final VoidCallback onTap;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: SizedBox(
-        width: 70,
-        child: Column(
-          children: [
-            Icon(icon, color: active ? const Color(0xffff375f) : Colors.white, size: 34),
-            const SizedBox(height: 5),
-            Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-

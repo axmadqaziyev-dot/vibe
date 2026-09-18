@@ -1,22 +1,59 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // PRIVATE CHAT VOICE
     match /chat_audio/{chatId}/{senderId}/{messageId}/{fileName} {
       function member() {
-        return request.auth != null
+        return signedIn()
           && request.auth.uid in firestore.get(
-            /databases/(default)/documents/chats/$(chatId)).data.members;
+            /databases/(default)/documents/chats/$(chatId)
+          ).data.members;
       }
-      // Private downloads through the authenticated SDK; no public URLs.
+
       allow read: if member();
+
       allow create, update: if member()
         && request.auth.uid == senderId
-        && messageId.matches('[A-Za-z0-9]{20}')
         && fileName == 'voice.wav'
         && request.resource.size > 44
         && request.resource.size <= 12582912
-        && request.resource.contentType == 'audio/wav'
-        && !firestore.exists(/databases/(default)/documents/chats/$(chatId)/messages/$(messageId));
+        && request.resource.contentType == 'audio/wav';
+
+      allow delete: if member() && request.auth.uid == senderId;
+    }
+
+    // PROFILE GALLERY / PROFILE PHOTO SOURCE
+    match /profile_media/{uid}/{fileName} {
+      allow read: if signedIn();
+      allow create, update, delete: if isOwner(uid)
+        && request.resource.size <= 10485760
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // MOMENTS
+    match /moments/{uid}/{fileName} {
+      allow read: if signedIn();
+      allow create, update, delete: if isOwner(uid)
+        && request.resource.size <= 15728640
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // VIDEOS
+    match /videos/{uid}/{fileName} {
+      allow read: if signedIn();
+      allow create, update, delete: if isOwner(uid)
+        && request.resource.size <= 209715200
+        && request.resource.contentType.matches('video/.*');
     }
   }
 }
