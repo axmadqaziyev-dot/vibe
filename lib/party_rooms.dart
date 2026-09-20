@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'user_profile.dart';
+import 'rankings.dart';
 import 'vibe_ranking.dart';
 import 'game_center.dart';
 import 'gifts.dart';
@@ -913,6 +914,21 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
             },
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+
+        // Günlük və həftəlik lövhələr — həm göndərən, həm otaq üçün.
+        recordGiftInTransaction(
+          tx,
+          db: FirebaseFirestore.instance,
+          fromUid: widget.profile.uid,
+          fromName: widget.profile.name,
+          fromPhoto: '${data['photoUrl'] ?? ''}',
+          toUid: targetUid,
+          toName: targetName,
+          toPhoto: '${targetData['photoUrl'] ?? ''}',
+          amount: total,
+          roomId: room.id,
+          roomTitle: '${roomData['title'] ?? ''}',
+        );
 
         tx.set(room.collection('gifts').doc(), {
           'fromUid': widget.profile.uid,

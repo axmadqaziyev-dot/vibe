@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'gifts.dart';
+import 'rankings.dart';
 import 'push_send.dart';
 import 'ui/vibe_design.dart';
 
@@ -110,6 +111,19 @@ class _GiftSheetState extends State<_GiftSheet> {
           'giftReceived': received,
           'level': 1 + (received ~/ 500),
         }, SetOptions(merge: true));
+
+        // Günlük və həftəlik lövhələr.
+        recordGiftInTransaction(
+          tx,
+          db: db,
+          fromUid: widget.fromUid,
+          fromName: widget.fromName,
+          fromPhoto: '${meData['photoUrl'] ?? ''}',
+          toUid: widget.toUid,
+          toName: widget.toName,
+          toPhoto: '${youData['photoUrl'] ?? ''}',
+          amount: gift.price,
+        );
 
         // Paylaşıma göndərilibsə, orada da görünsün.
         final target = widget.target;

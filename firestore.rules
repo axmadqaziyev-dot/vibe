@@ -230,6 +230,37 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // REYTINQ LOVHELERI
+    //
+    // rankings/{dovr}/users/{uid} ve rankings/{dovr}/rooms/{roomId}.
+    // Hediyye gonderilende tranzaksiya icinde yazilir.
+    //
+    // Qeyd: yazma huququ her giris etmis istifadeciyededir, cunki sikke
+    // hesabi da hazirda muştəri terefinde aparilir (users.giftSent eyni
+    // sekildedir). Yeni xal yalnız artırıla bilər — azaltma bloklanır ki,
+    // basqasinin xalini sifirlamaq mumkun olmasin.
+    match /rankings/{period} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+
+      match /users/{uid} {
+        allow read: if signedIn();
+        allow create: if signedIn();
+        allow update: if signedIn()
+          && request.resource.data.get('sent', 0) >= resource.data.get('sent', 0)
+          && request.resource.data.get('received', 0) >= resource.data.get('received', 0);
+        allow delete: if isAdmin();
+      }
+
+      match /rooms/{roomId} {
+        allow read: if signedIn();
+        allow create: if signedIn();
+        allow update: if signedIn()
+          && request.resource.data.get('total', 0) >= resource.data.get('total', 0);
+        allow delete: if isAdmin();
+      }
+    }
+
     // LEGACY POSTS
     match /posts/{postId} {
       allow read, write: if signedIn();
