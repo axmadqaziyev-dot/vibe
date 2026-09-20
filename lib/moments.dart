@@ -616,9 +616,15 @@ class _MomentCardState extends State<MomentCard> {
 
     // Threads quruluşu: solda avatar sütunu və şaquli xətt,
     // sağda ad, mətn, media və əməliyyatlar.
+    final repostOf = '${widget.data['repostOf'] ?? ''}'.trim();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: IntrinsicHeight(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+      if (repostOf.isNotEmpty) _repostBanner(ownerName),
+      IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -645,6 +651,14 @@ class _MomentCardState extends State<MomentCard> {
                         color: Colors.white,
                         fontSize: 14.5,
                         height: 1.45,
+                      ),
+                    ),
+                  ],
+                  if (widget.data['quoted'] is Map) ...[
+                    const SizedBox(height: 10),
+                    _quotedBox(
+                      Map<String, dynamic>.from(
+                        widget.data['quoted'] as Map,
                       ),
                     ),
                   ],
@@ -711,7 +725,273 @@ class _MomentCardState extends State<MomentCard> {
           ],
         ),
       ),
+        ],
+      ),
     );
+  }
+
+
+  // ----------------------------------------------------------
+  // YENİDƏN PAYLAŞIM
+  // ----------------------------------------------------------
+
+  /// Kartın başındakı "yenidən paylaşdı" sətri.
+  Widget _repostBanner(String ownerName) => Padding(
+        padding: const EdgeInsets.only(left: 4, bottom: 6),
+        child: Row(
+          children: [
+            const Icon(Icons.repeat_rounded, size: 13, color: vMuted),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                '$ownerName yenidən paylaşdı',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: vMuted,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  /// Sitat gətirilən anın kiçik görünüşü.
+  ///
+  /// Orijinal sənədə ayrıca sorğu getmir: lazım olan sahələr sitat
+  /// yaradılanda köçürülür. An sonradan silinsə də sitat oxunaqlı qalır.
+  Widget _quotedBox(Map<String, dynamic> quoted) {
+    final name = '${quoted['ownerName'] ?? 'VIBE'}';
+    final text = '${quoted['caption'] ?? ''}'.trim();
+    final thumb = '${quoted['thumbUrl'] ?? ''}'.trim();
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xff17122a),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xff2d2540)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (thumb.isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(9),
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Image.network(thumb, fit: BoxFit.cover),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (text.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    text,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: vMuted,
+                      fontSize: 12.5,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openRepostMenu(String ownerName, String caption) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xff151020),
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 0, 18, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Yenidən paylaşım',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.format_quote_rounded, color: vBlue),
+              title: const Text('Sitat gətir',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Öz sözünü əlavə et',
+                  style: TextStyle(color: vMuted, fontSize: 12)),
+              onTap: () {
+                Navigator.pop(sheet);
+                _quote(ownerName, caption);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.repeat_rounded, color: vMint),
+              title: const Text('Olduğu kimi paylaş',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Söz əlavə etmədən',
+                  style: TextStyle(color: vMuted, fontSize: 12)),
+              onTap: () {
+                Navigator.pop(sheet);
+                _repost(ownerName);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Olduğu kimi yenidən paylaşır.
+  ///
+  /// Media orijinaldan köçürülür — belə olanda lent kartı göstərmək üçün
+  /// ikinci sorğu göndərmir və orijinal silinsə də paylaşım sınmır.
+  Future<void> _repost(String ownerName) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final id = db.collection('moments').doc().id;
+
+      await db.collection('moments').doc(id).set({
+        'id': id,
+        'ownerUid': widget.profile.uid,
+        'ownerName': widget.profile.name,
+        'caption': '${widget.data['caption'] ?? ''}',
+        if (widget.data['images'] != null) 'images': widget.data['images'],
+        if (widget.data['thumbs'] != null) 'thumbs': widget.data['thumbs'],
+        if (widget.data['imageUrl'] != null)
+          'imageUrl': widget.data['imageUrl'],
+        if (widget.data['thumbUrl'] != null)
+          'thumbUrl': widget.data['thumbUrl'],
+        if (widget.data['videoUrl'] != null)
+          'videoUrl': widget.data['videoUrl'],
+        'repostOf': widget.momentId,
+        'repostOwnerName': ownerName,
+        'visibility': 'public',
+        'createdAt': Timestamp.now(),
+      });
+
+      await moment.set(
+        {'repostCount': FieldValue.increment(1)},
+        SetOptions(merge: true),
+      );
+
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Yenidən paylaşıldı.')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Alınmadı. Bağlantını yoxla.')),
+      );
+    }
+  }
+
+  /// Sitat gətirir — öz sözünü yazmaq üçün pəncərə açır.
+  Future<void> _quote(String ownerName, String caption) async {
+    final controller = TextEditingController();
+
+    final text = await showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: const Color(0xff151020),
+        title: const Text(
+          'Sitat gətir',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          maxLength: 200,
+          style: const TextStyle(color: Colors.white),
+          cursorColor: vPink,
+          decoration: const InputDecoration(
+            hintText: 'Nə demək istəyirsən?',
+            hintStyle: TextStyle(color: vMuted),
+            counterStyle: TextStyle(color: vMuted, fontSize: 11),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('İmtina', style: TextStyle(color: vMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, controller.text.trim()),
+            child: const Text(
+              'Paylaş',
+              style: TextStyle(color: vPink, fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (text == null || text.isEmpty || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final id = db.collection('moments').doc().id;
+
+      await db.collection('moments').doc(id).set({
+        'id': id,
+        'ownerUid': widget.profile.uid,
+        'ownerName': widget.profile.name,
+        'caption': text,
+        // Orijinalın kiçik nüsxəsi — ayrıca sorğu getməsin deyə.
+        'quoted': {
+          'momentId': widget.momentId,
+          'ownerName': ownerName,
+          'caption': caption,
+          'thumbUrl':
+              '${widget.data['thumbUrl'] ?? widget.data['imageUrl'] ?? ''}',
+        },
+        'visibility': 'public',
+        'createdAt': Timestamp.now(),
+      });
+
+      await moment.set(
+        {'repostCount': FieldValue.increment(1)},
+        SetOptions(merge: true),
+      );
+
+      messenger.showSnackBar(const SnackBar(content: Text('Paylaşıldı.')));
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Alınmadı. Bağlantını yoxla.')),
+      );
+    }
   }
 
   /// Profil şəkli — onlayn nişanı ilə.
@@ -1261,8 +1541,15 @@ class _MomentCardState extends State<MomentCard> {
     );
   }
 
+  /// Beş düymə dar telefonda bir sıraya sığmır və daşırdı.
+  /// Sol qrup üfüqi sürüşür, paylaşma düyməsi sağda sabit qalır.
   Widget _actions(String ownerName, String caption) => Row(
     children: [
+      Expanded(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
       StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: myLike.snapshots(),
         builder: (context, mine) {
@@ -1302,7 +1589,26 @@ class _MomentCardState extends State<MomentCard> {
           );
         },
       ),
-      const Spacer(),
+      const SizedBox(width: 18),
+      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: moment.snapshots(),
+        builder: (context, snap) {
+          final count =
+              int.tryParse('${snap.data?.data()?['repostCount'] ?? 0}') ?? 0;
+
+          return _pill(
+            icon: Icons.repeat_rounded,
+            label: count > 0 ? '$count' : '',
+            color: count > 0 ? vMint : Colors.white,
+            onTap: () => _openRepostMenu(ownerName, caption),
+          );
+        },
+      ),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(width: 10),
       // Əvvəl bu düymə yalnız "anı aç / şərh yaz" verirdi — paylaşma
       // düyməsində gözlənilən bu deyil. İndi yönləndirmə vərəqi açılır:
       // dostlara göndər, kopyala və ya telefonun öz pəncərəsi ilə paylaş.
