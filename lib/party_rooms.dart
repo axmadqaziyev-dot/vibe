@@ -33,6 +33,21 @@ const _bg = Color(0xff070510);
 const _panel = Color(0xff151020);
 const _muted = Color(0xffa89fbd);
 
+// PK komandalarının rəngləri — otaqdakı digər maviyə qarışmasın deyə
+// ayrıca saxlanılır.
+const _pkBlue = Color(0xff2f7bff);
+const _pkRed = Color(0xffff3b6b);
+
+/// Kürsünü PK komandasına bölür: soldakı yarı mavi (0), sağdakı yarı qırmızı (1).
+///
+/// Cüt/tək bölgü də mümkün idi, amma o zaman komanda yoldaşları şəbəkədə
+/// bir-birindən aralı düşür və ekrana baxanda kimin kiminlə olduğu bilinmir.
+/// Yarıya bölmək TikTok-dakı "sol tərəf / sağ tərəf" görünüşünü verir.
+///
+/// Tək sayda kürsü olanda artıq bir nəfər mavi tərəfə düşür.
+int pkTeamOf(int seatIndex, int seatCount) =>
+    seatIndex < (seatCount / 2).ceil() ? 0 : 1;
+
 /// Otaq mövzuları.
 ///
 /// İstifadəçi otağa girməzdən əvvəl onun nə üçün olduğunu görür —
@@ -872,6 +887,12 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         // PK gedirsə eyni hədiyyə həm də yarış xalı sayılır.
         final pkActive = _pkEndsAt(roomData) != null;
 
+        // Yarışda kimin nə qədər dəstək verdiyini də saxlayırıq —
+        // zolağın altında ilk dəstəkçilər göstərilir.
+        final team = pkActive
+            ? pkTeamOf(int.tryParse(seatKey) ?? 0, seatTotal(roomData))
+            : 0;
+
         tx.set(room, {
           'giftTotal': FieldValue.increment(total),
           'seats': {
@@ -880,6 +901,16 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
               if (pkActive) 'pkPoints': FieldValue.increment(total),
             },
           },
+          if (pkActive)
+            'pk': {
+              'supporters': {
+                widget.profile.uid: {
+                  'name': widget.profile.name,
+                  'team': team,
+                  'points': FieldValue.increment(total),
+                },
+              },
+            },
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
@@ -2129,6 +2160,56 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
   // PK YARIŞI
   // ============================================================
 
+  /// Hər komandanın topladığı xal: (mavi, qırmızı).
+  (int, int) _pkScores(Map<String, dynamic> d) {
+    final seats = Map<String, dynamic>.from(d['seats'] ?? {});
+    final count = seatTotal(d);
+    var blue = 0;
+    var red = 0;
+
+    seats.forEach((key, value) {
+      if (value is! Map) return;
+      final points = value['pkPoints'] is num
+          ? (value['pkPoints'] as num).toInt()
+          : 0;
+      if (points <= 0) return;
+      if (pkTeamOf(int.tryParse(key) ?? 0, count) == 0) {
+        blue += points;
+      } else {
+        red += points;
+      }
+    });
+
+    return (blue, red);
+  }
+
+  /// Komandanın ilk dəstəkçiləri — çox verəndən aza doğru.
+  List<({String name, int points})> _pkSupporters(
+    Map<String, dynamic> d,
+    int team,
+  ) {
+    final pk = d['pk'];
+    if (pk is! Map) return const [];
+    final raw = pk['supporters'];
+    if (raw is! Map) return const [];
+
+    final list = <({String name, int points})>[];
+    raw.forEach((uid, value) {
+      if (value is! Map) return;
+      if ((value['team'] is num ? (value['team'] as num).toInt() : 0) != team) {
+        return;
+      }
+      final points = value['points'] is num
+          ? (value['points'] as num).toInt()
+          : 0;
+      if (points <= 0) return;
+      list.add((name: '${value['name'] ?? ''}', points: points));
+    });
+
+    list.sort((a, b) => b.points.compareTo(a.points));
+    return list.take(3).toList();
+  }
+
   /// PK aktivdirsə bitmə vaxtını qaytarır.
   DateTime? _pkEndsAt(Map<String, dynamic> d) {
     final pk = d['pk'];
@@ -2148,8 +2229,9 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
         ),
         content: const Text(
-          'Yarış boyunca mikrofondakılara göndərilən hədiyyələr xal sayılır. '
-          'Sonda ən çox xal toplayan qalib olur.',
+          'Mikrofondakılar iki komandaya bölünür — soldakı yarı Mavi, '
+          'sağdakı yarı Qırmızı. Onlara göndərilən hədiyyələr komandanın '
+          'xalıdır. Sonda çox toplayan tərəf qalib gəlir.',
           style: TextStyle(color: _muted, height: 1.45),
         ),
         actions: [
@@ -2167,28 +2249,31 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     final seats = Map<String, dynamic>.from(
       (await room.get()).data()?['seats'] ?? {},
     );
-    final reset = <String, dynamic>{};
-    seats.forEach((key, value) {
-      reset[key] = {'pkPoints': 0};
-    });
+
+    // update() işlədirik ki, "pk" xəritəsi bütöv əvəzlənsin — set(merge)
+    // olsaydı keçən yarışın dəstəkçiləri içəridə qalardı.
+    // Kürsülərdə isə yalnız xalı sıfırlayırıq, ad və uid yerində qalmalıdır.
+    final updates = <String, dynamic>{
+      'pk': {
+        'active': true,
+        'startedAt': Timestamp.now(),
+        'endsAt': Timestamp.fromDate(
+          DateTime.now().add(Duration(minutes: minutes)),
+        ),
+        'startedBy': widget.profile.uid,
+      },
+    };
+    for (final key in seats.keys) {
+      updates['seats.$key.pkPoints'] = 0;
+    }
 
     try {
-      await room.set({
-        'pk': {
-          'active': true,
-          'startedAt': Timestamp.now(),
-          'endsAt': Timestamp.fromDate(
-            DateTime.now().add(Duration(minutes: minutes)),
-          ),
-          'startedBy': widget.profile.uid,
-        },
-        'seats': reset,
-      }, SetOptions(merge: true));
+      await room.update(updates);
 
       await room.collection('messages').add({
         'uid': widget.profile.uid,
         'name': widget.profile.name,
-        'text': '⚔️ PK yarışı başladı! $minutes dəqiqə — hədiyyələr xal sayılır.',
+        'text': '⚔️ PK başladı! $minutes dəqiqə — Mavi 🆚 Qırmızı',
         'type': 'system',
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -2201,40 +2286,41 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     }
   }
 
-  /// PK-nı bitirir və qalibi elan edir.
+  /// PK-nı bitirir və qalib komandanı elan edir.
   Future<void> _endPk(Map<String, dynamic> d) async {
-    final seats = Map<String, dynamic>.from(d['seats'] ?? {});
+    final (blue, red) = _pkScores(d);
 
-    var bestName = '';
-    var bestPoints = 0;
-    seats.forEach((key, value) {
-      if (value is! Map) return;
-      final points = value['pkPoints'] is num
-          ? (value['pkPoints'] as num).toInt()
-          : 0;
-      final name = '${value['name'] ?? ''}';
-      if (points > bestPoints && name.isNotEmpty) {
-        bestPoints = points;
-        bestName = name;
-      }
-    });
+    final String result;
+    if (blue == 0 && red == 0) {
+      result = '⚔️ PK bitdi. Bu dəfə xal toplanmadı.';
+    } else if (blue == red) {
+      result = '🤝 PK bərabərə! $blue — $red';
+    } else if (blue > red) {
+      result = '🏆 Mavi komanda qalib! $blue — $red';
+    } else {
+      result = '🏆 Qırmızı komanda qalib! $red — $blue';
+    }
 
     try {
-      await room.set({
-        'pk': {'active': false},
-      }, SetOptions(merge: true));
+      // Nəticə sonra da görünsün deyə xallar yazılır, yarış isə bağlanır.
+      await room.update({
+        'pk': {
+          'active': false,
+          'blue': blue,
+          'red': red,
+          'endedAt': Timestamp.now(),
+        },
+      });
 
       await room.collection('messages').add({
         'uid': widget.profile.uid,
         'name': widget.profile.name,
-        'text': bestPoints > 0
-            ? '🏆 PK bitdi! Qalib: $bestName — $bestPoints xal'
-            : '⚔️ PK bitdi. Bu dəfə xal toplanmadı.',
+        'text': result,
         'type': 'system',
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      if (mounted && bestPoints > 0) _spawnHearts(6);
+      if (mounted && (blue > 0 || red > 0)) _spawnHearts(8);
     } catch (_) {}
   }
 
@@ -2287,70 +2373,85 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
       return const SizedBox.shrink();
     }
 
+    return _pkBattleBar(d, left, isHost);
+  }
+
+  /// TikTok-dakı PK görünüşü: iki komanda, ortada bölünən zolaq.
+  ///
+  /// Zolağın uzunluğu xalların nisbətini göstərir. Tam sıfıra endirmirik —
+  /// uduzan tərəf də görünsün deyə ən azı onda bir yer saxlanılır.
+  Widget _pkBattleBar(Map<String, dynamic> d, Duration left, bool isHost) {
     final minutes = left.inMinutes.toString().padLeft(2, '0');
     final seconds = (left.inSeconds % 60).toString().padLeft(2, '0');
 
-    // Ən çox xal toplayan
-    final seats = Map<String, dynamic>.from(d['seats'] ?? {});
-    var leader = '';
-    var leaderPoints = 0;
-    seats.forEach((key, value) {
-      if (value is! Map) return;
-      final points = value['pkPoints'] is num
-          ? (value['pkPoints'] as num).toInt()
-          : 0;
-      if (points > leaderPoints) {
-        leaderPoints = points;
-        leader = '${value['name'] ?? ''}';
-      }
-    });
+    final (blue, red) = _pkScores(d);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              _pink.withValues(alpha: .28),
-              _purple.withValues(alpha: .2),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _pink.withValues(alpha: .55)),
+          color: const Color(0xff17102a),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _pink.withValues(alpha: .45)),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.sports_mma_rounded, size: 16, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(
-              'PK  $minutes:$seconds',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
+            Row(
+              children: [
+                _pkScore('Mavi', blue, _pkBlue, true),
+                Expanded(
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: .45),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$minutes:$seconds',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                _pkScore('Qırmızı', red, _pkRed, false),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                leaderPoints > 0 ? '🏆 $leader · $leaderPoints xal' : 'Xal yığılmayıb',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white70, fontSize: 11.5),
-              ),
+            const SizedBox(height: 8),
+            _pkSplitBar(blue, red),
+            const SizedBox(height: 7),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _pkSupporterList(d, 0, true)),
+                const SizedBox(width: 8),
+                Expanded(child: _pkSupporterList(d, 1, false)),
+              ],
             ),
             if (isHost)
-              PressableScale(
-                onTap: () => _endPk(d),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  child: Text(
-                    'Bitir',
-                    style: TextStyle(
-                      color: Color(0xffffc9d3),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
+              Align(
+                alignment: Alignment.centerRight,
+                child: PressableScale(
+                  onTap: () => _endPk(d),
+                  child: const Padding(
+                    padding: EdgeInsets.only(top: 4, left: 8),
+                    child: Text(
+                      'Yarışı bitir',
+                      style: TextStyle(
+                        color: Color(0xffffc9d3),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),
@@ -2358,6 +2459,123 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Komandanın adı və xalı. Sol tərəfdəki sola, sağdakı sağa yığılır.
+  Widget _pkScore(String name, int points, Color color, bool onLeft) {
+    final label = Column(
+      crossAxisAlignment:
+          onLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          name,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        Text(
+          '$points',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+
+    return SizedBox(width: 86, child: label);
+  }
+
+  /// Ortadan bölünən zolaq — solda mavi, sağda qırmızı.
+  Widget _pkSplitBar(int blue, int red) {
+    final total = blue + red;
+    final share = total == 0 ? 0.5 : (blue / total).clamp(0.1, 0.9);
+
+    return LayoutBuilder(
+      builder: (context, box) {
+        final width = box.maxWidth;
+
+        return SizedBox(
+          height: 22,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Bütöv zolaq qırmızıdır, mavi onun üstünə çəkilir.
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_pkRed.withValues(alpha: .75), _pkRed],
+                  ),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOut,
+                width: width * share,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_pkBlue, _pkBlue.withValues(alpha: .75)],
+                  ),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+              ),
+              // Sərhəddəki alov.
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOut,
+                left: (width * share) - 13,
+                top: -5,
+                child: Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xff17102a),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: const Center(
+                    child: Text('🔥', style: TextStyle(fontSize: 13)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Komandanı ən çox dəstəkləyən üç nəfər.
+  Widget _pkSupporterList(Map<String, dynamic> d, int team, bool onLeft) {
+    final people = _pkSupporters(d, team);
+
+    if (people.isEmpty) {
+      return Text(
+        'dəstək yoxdur',
+        textAlign: onLeft ? TextAlign.left : TextAlign.right,
+        style: const TextStyle(color: _muted, fontSize: 10.5),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment:
+          onLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final person in people)
+          Text(
+            '${person.name} · ${person.points}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white70, fontSize: 10.5),
+          ),
+      ],
     );
   }
 

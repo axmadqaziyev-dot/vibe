@@ -4939,87 +4939,96 @@ class _RealChatPageState extends State<RealChatPage> {
   void openMoreSheet() {
     messageFocusNode.unfocus();
 
+    // Siyahı yeddi sətirdir; adi vərəq ekranın yarısını keçməyə qoymur və
+    // son sətirlər kəsilirdi. Ona görə vərəq sürüşən rejimdədir və hündürlüyü
+    // ekranın 85%-nə qədər uzana bilir.
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       backgroundColor: const Color(0xff120d1d),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .85,
+      ),
       builder: (sheet) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(12, 0, 12, 10),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Söhbəti canlandır 🎉',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Söhbəti canlandır 🎉',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: Color(0xff48e08a)),
-                title: const Text('Şəkil göndər', style: TextStyle(color: Colors.white)),
-                subtitle: const Text('Qalereyadan seç', style: TextStyle(color: vMuted, fontSize: 12)),
-                onTap: () {
-                  Navigator.pop(sheet);
-                  _sendPhoto(ImageSource.gallery);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_camera_rounded, color: Color(0xff22a7ff)),
-                title: const Text('Şəkil çək', style: TextStyle(color: Colors.white)),
-                subtitle: const Text('Kamera ilə indi çək', style: TextStyle(color: vMuted, fontSize: 12)),
-                onTap: () {
-                  Navigator.pop(sheet);
-                  _sendPhoto(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.auto_awesome_rounded, color: Color(0xffff5bd6)),
-                title: const Text('Stiker göndər', style: TextStyle(color: Colors.white)),
-                subtitle: const Text('Böyük emoji stikerlər', style: TextStyle(color: vMuted, fontSize: 12)),
-                onTap: () {
-                  Navigator.pop(sheet);
-                  openStickerPicker();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.casino_rounded, color: Color(0xff48e08a)),
-                title: const Text('Domino oyna',
-                    style: TextStyle(color: Colors.white)),
-                subtitle: const Text('Dostunla növbə ilə — real oyun',
-                    style: TextStyle(color: vMuted, fontSize: 12)),
-                onTap: () {
-                  Navigator.pop(sheet);
-                  _startDomino();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.psychology_alt_rounded, color: Color(0xff8fd4ff)),
-                title: const Text('Doğruluq', style: TextStyle(color: Colors.white)),
-                subtitle: const Text('Təsadüfi sual göndər', style: TextStyle(color: vMuted, fontSize: 12)),
-                onTap: () => _sendFun(truths),
-              ),
-              ListTile(
-                leading: const Icon(Icons.local_fire_department_rounded, color: Color(0xffff8a3d)),
-                title: const Text('Cəsarət', style: TextStyle(color: Colors.white)),
-                subtitle: const Text('Kiçik bir tapşırıq at', style: TextStyle(color: vMuted, fontSize: 12)),
-                onTap: () => _sendFun(dares),
-              ),
-              ListTile(
-                leading: const Icon(Icons.casino_rounded, color: Color(0xff48e08a)),
-                title: const Text('Sən hansını seçərsən?', style: TextStyle(color: Colors.white)),
-                subtitle: const Text('İki variantdan biri', style: TextStyle(color: vMuted, fontSize: 12)),
-                onTap: () => _sendFun(wouldYouRather),
-              ),
-            ],
+                ListTile(
+                  leading: const Icon(Icons.photo_library_rounded, color: Color(0xff48e08a)),
+                  title: const Text('Şəkil göndər', style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('Qalereyadan seç', style: TextStyle(color: vMuted, fontSize: 12)),
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    _sendPhoto(ImageSource.gallery);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_camera_rounded, color: Color(0xff22a7ff)),
+                  title: const Text('Şəkil çək', style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('Kamera ilə indi çək', style: TextStyle(color: vMuted, fontSize: 12)),
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    _sendPhoto(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.auto_awesome_rounded, color: Color(0xffff5bd6)),
+                  title: const Text('Stiker göndər', style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('Böyük emoji stikerlər', style: TextStyle(color: vMuted, fontSize: 12)),
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    openStickerPicker();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.casino_rounded, color: Color(0xff48e08a)),
+                  title: const Text('Domino oyna',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('Dostunla növbə ilə — real oyun',
+                      style: TextStyle(color: vMuted, fontSize: 12)),
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    _startDomino();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.psychology_alt_rounded, color: Color(0xff8fd4ff)),
+                  title: const Text('Doğruluq', style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('Təsadüfi sual göndər', style: TextStyle(color: vMuted, fontSize: 12)),
+                  onTap: () => _sendFun(truths),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.local_fire_department_rounded, color: Color(0xffff8a3d)),
+                  title: const Text('Cəsarət', style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('Kiçik bir tapşırıq at', style: TextStyle(color: vMuted, fontSize: 12)),
+                  onTap: () => _sendFun(dares),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.casino_rounded, color: Color(0xff48e08a)),
+                  title: const Text('Sən hansını seçərsən?', style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('İki variantdan biri', style: TextStyle(color: vMuted, fontSize: 12)),
+                  onTap: () => _sendFun(wouldYouRather),
+                ),
+              ],
+            ),
           ),
         ),
       ),
