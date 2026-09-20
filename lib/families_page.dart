@@ -738,19 +738,41 @@ class FamilyPage extends StatelessWidget {
           final inFamily = snap.data?.exists == true;
           final owner = '${d['ownerUid'] ?? ''}' == profile.uid;
 
-          if (owner) {
-            return const Text(
-              'Bu ailənin qurucususan.',
-              style: TextStyle(color: vGold, fontSize: 12.5),
+          // Üzv olanlar xəzinəyə töhfə verə bilir — səviyyə bununla artır.
+          if (inFamily || owner) {
+            return Row(
+              children: [
+                Expanded(
+                  child: GradientButton(
+                    label: 'Xəzinəyə töhfə',
+                    icon: Icons.savings_rounded,
+                    gradient: vSunset,
+                    height: 48,
+                    onPressed: () => _contribute(context),
+                  ),
+                ),
+                if (!owner) ...[
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 52,
+                    height: 48,
+                    child: IconButton(
+                      tooltip: 'Ailədən çıx',
+                      icon: const Icon(Icons.logout_rounded, color: vMuted),
+                      onPressed: () => _leave(context),
+                    ),
+                  ),
+                ],
+              ],
             );
           }
 
           return GradientButton(
-            label: inFamily ? 'Ailədən çıx' : 'Ailəyə qoşul',
-            icon: inFamily ? Icons.logout_rounded : Icons.group_add_rounded,
-            gradient: inFamily ? vSunset : vBrand,
+            label: 'Ailəyə qoşul',
+            icon: Icons.group_add_rounded,
+            gradient: vBrand,
             height: 48,
-            onPressed: () => inFamily ? _leave(context) : _join(context, d),
+            onPressed: () => _join(context, d),
           );
         },
       );
@@ -870,6 +892,109 @@ class FamilyPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+
+  /// Xəzinəyə sikkə verir.
+  ///
+  /// Sikkə istifadəçidən çıxır, ailənin xəzinəsinə və adamın öz töhfə
+  /// sayğacına yazılır. Üçü də bir tranzaksiyadadır: yarımçıq qalsa
+  /// sikkə itər və ya yoxdan yaranardı.
+  Future<void> _contribute(BuildContext context) async {
+    final controller = TextEditingController(text: '1000');
+
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: const Color(0xff151020),
+        title: const Text(
+          'Xəzinəyə töhfə',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Verdiyin sikkə ailənin səviyyəsini qaldırır və '
+              'üzvlər siyahısında sənin adının yanında görünür.',
+              style: TextStyle(color: vMuted, height: 1.45, fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white, fontSize: 18),
+              cursorColor: vPink,
+              decoration: const InputDecoration(
+                prefixText: '💰  ',
+                prefixStyle: TextStyle(fontSize: 18),
+                hintText: 'Məbləğ',
+                hintStyle: TextStyle(color: vMuted),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('İmtina', style: TextStyle(color: vMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(
+              dialog,
+              int.tryParse(controller.text.trim()) ?? 0,
+            ),
+            child: const Text(
+              'Ver',
+              style: TextStyle(color: vGold, fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (amount == null || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (amount <= 0) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Məbləğ sıfırdan böyük olmalıdır.')),
+      );
+      return;
+    }
+
+    try {
+      final me = db.collection('users').doc(profile.uid);
+
+      await db.runTransaction((tx) async {
+        final snap = await tx.get(me);
+        final coins = int.tryParse('${snap.data()?['coins'] ?? 0}') ?? 0;
+
+        if (coins < amount) throw StateError('coins');
+
+        tx.set(me, {'coins': coins - amount}, SetOptions(merge: true));
+
+        tx.set(family, {
+          'treasure': FieldValue.increment(amount),
+        }, SetOptions(merge: true));
+
+        tx.set(family.collection('members').doc(profile.uid), {
+          'contributed': FieldValue.increment(amount),
+        }, SetOptions(merge: true));
+      });
+
+      messenger.showSnackBar(
+        SnackBar(content: Text('$amount sikkə xəzinəyə keçdi.')),
+      );
+    } on StateError {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Sikkən çatmır.')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+    }
   }
 
   Future<void> _join(BuildContext context, Map<String, dynamic> d) async {
