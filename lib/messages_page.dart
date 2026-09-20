@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 
 import 'main.dart' show PersonPage, isReallyOnline;
 import 'social_ui.dart' show SocialSurface, openChat, isUnread;
+import 'suggest_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'blocking.dart';
 import 'notifications_center.dart';
 import 'user_profile.dart';
@@ -52,6 +54,9 @@ class _SocialMessagesState extends State<SocialMessages> {
   /// Toplu silmə rejimi.
   bool selecting = false;
   final Set<String> selected = <String>{};
+
+  /// Tövsiyə pəncərəsi bir açılışda yalnız bir dəfə çıxsın.
+  bool suggestChecked = false;
   String query = '';
   bool searching = false;
   Timer? timer;
@@ -352,6 +357,11 @@ class _SocialMessagesState extends State<SocialMessages> {
               const SizedBox(height: 10),
               const Divider(color: Color(0xff221a33), height: 24),
               if (visible.isEmpty)
+                Builder(builder: (context) {
+                  _maybeSuggest();
+                  return const SizedBox.shrink();
+                }),
+              if (visible.isEmpty)
                 _EmptyMessages(
                     onAction: () => setState(() => tab = 1),
                     inviteName: widget.profile.name,
@@ -364,6 +374,67 @@ class _SocialMessagesState extends State<SocialMessages> {
         },
       );
 
+
+
+  /// Söhbət siyahısı boş olanda tövsiyə pəncərəsini bir dəfə açır.
+  ///
+  /// Gündə bir dəfədən çox çıxmır: hər açılışda pəncərə ilə qarşılaşmaq
+  /// bezdirici olardı. Tarix cihazda saxlanılır.
+  Future<void> _maybeSuggest() async {
+    if (suggestChecked) return;
+    suggestChecked = true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      if (prefs.getString('suggestShownOn') == today) return;
+
+      final people = await loadSuggestions(
+        profile: widget.profile,
+        database: widget.database,
+      );
+
+      if (!mounted || people.isEmpty) return;
+
+      await prefs.setString('suggestShownOn', today);
+      if (!mounted) return;
+
+      await showSuggestionsDialog(
+        context,
+        profile: widget.profile,
+        people: people,
+        database: widget.database,
+      );
+    } catch (_) {
+      // Tövsiyə göstərilməsə də ekran normal işləməlidir.
+    }
+  }
+
+  /// Menyudan əl ilə açılanda — tarix yoxlaması olmadan.
+  Future<void> _openSuggestions() async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    final people = await loadSuggestions(
+      profile: widget.profile,
+      database: widget.database,
+    );
+
+    if (!mounted) return;
+
+    if (people.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Hazırda yeni tövsiyə yoxdur.')),
+      );
+      return;
+    }
+
+    await showSuggestionsDialog(
+      context,
+      profile: widget.profile,
+      people: people,
+      database: widget.database,
+    );
+  }
 
   // ----------------------------------------------------------
   // ALƏTLƏR
@@ -389,6 +460,17 @@ class _SocialMessagesState extends State<SocialMessages> {
               onTap: () {
                 Navigator.pop(sheet);
                 setState(() => tab = 1);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome_rounded, color: vPink),
+              title: const Text('Tanış ol',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Sənə uyğun adamlara salam de',
+                  style: TextStyle(color: vMuted, fontSize: 12)),
+              onTap: () {
+                Navigator.pop(sheet);
+                _openSuggestions();
               },
             ),
             ListTile(
