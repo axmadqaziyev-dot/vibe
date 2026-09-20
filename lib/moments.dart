@@ -9,6 +9,8 @@ import 'package:flutter/services.dart';
 import 'user_profile.dart';
 import 'moment_create.dart';
 import 'moment_ranking.dart';
+import 'voice/moment_voice.dart';
+import 'voice/waveform.dart';
 import 'share_sheet.dart';
 import 'moment_detail.dart';
 import 'blocking.dart';
@@ -660,6 +662,16 @@ class _MomentCardState extends State<MomentCard> {
                       Map<String, dynamic>.from(
                         widget.data['quoted'] as Map,
                       ),
+                    ),
+                  ],
+                  if ('${widget.data['audioUrl'] ?? ''}'.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    MomentVoice(
+                      url: '${widget.data['audioUrl']}',
+                      durationMs:
+                          int.tryParse('${widget.data['audioMs'] ?? 0}') ?? 0,
+                      waveform: waveformFromData(widget.data['audioWave']),
+                      name: ownerName,
                     ),
                   ],
                   if (videoUrl.isNotEmpty || photos.isNotEmpty) ...[

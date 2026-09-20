@@ -6,6 +6,11 @@ import 'package:image_picker/image_picker.dart';
 
 import 'legal.dart';
 import 'media_store.dart';
+import 'dart:async';
+import 'package:record/record.dart';
+import 'package:cross_file/cross_file.dart';
+import 'voice/audio_file.dart';
+import 'voice/waveform.dart';
 import 'media_upload.dart';
 import 'telemetry.dart';
 import 'ui/vibe_chrome.dart';
@@ -30,6 +35,9 @@ class CreateMomentPage extends StatefulWidget {
 const int _maxTotalImageBytes = 780 * 1024;
 const int _maxImages = 3;
 
+/// Səsli an bundan uzun ola bilməz — uzun səs nə yüklənir, nə dinlənilir.
+const int maxMomentVoiceSeconds = 60;
+
 class _CreateMomentPageState extends State<CreateMomentPage> {
   final caption = TextEditingController();
   final focus = FocusNode();
@@ -39,6 +47,16 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
   Uint8List? videoBytes;
   bool posting = false;
 
+  // ---- səsli an ----
+  final recorder = AudioRecorder();
+  final clock = Stopwatch();
+  Timer? ticker;
+
+  Uint8List? audioBytes;
+  List<int> audioWave = const [];
+  int audioMs = 0;
+  bool recording = false;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +65,8 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
 
   @override
   void dispose() {
+    ticker?.cancel();
+    recorder.dispose();
     caption.dispose();
     focus.dispose();
     super.dispose();
@@ -54,7 +74,11 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
 
   bool get canPost =>
       !posting &&
-      (caption.text.trim().isNotEmpty || photos.isNotEmpty || video != null);
+      !recording &&
+      (caption.text.trim().isNotEmpty ||
+          photos.isNotEmpty ||
+          video != null ||
+          audioBytes != null);
 
   int get usedBytes =>
       photos.fold(0, (total, image) =>
@@ -128,6 +152,16 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
         ownerCountry = '${me.data()?['countryCode'] ?? ''}';
       } catch (_) {}
 
+      String? audioUrl;
+      if (audioBytes != null) {
+        audioUrl = await MediaUpload.upload(
+          bucket: MediaUpload.videoBucket,
+          path: '${widget.profile.uid}/moment-$id.wav',
+          bytes: audioBytes!,
+          contentType: 'audio/wav',
+        );
+      }
+
       String? videoUrl;
       if (videoBytes != null) {
         videoUrl = await MediaUpload.upload(
@@ -148,6 +182,13 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
         if (photos.isNotEmpty) 'imageUrl': photos.first.full,
         if (photos.isNotEmpty) 'thumbUrl': photos.first.thumb,
         if (videoUrl != null) 'videoUrl': videoUrl,
+        if (audioUrl != null) ...{
+          'audioUrl': audioUrl,
+          'audioMs': audioMs,
+          // Dalğa sənəddə saxlanılır: lent onu çəkmək üçün faylı
+          // endirmək məcburiyyətində qalmasın.
+          'audioWave': audioWave,
+        },
         if (ownerCountry.isNotEmpty) 'ownerCountry': ownerCountry,
         'createdAt': Timestamp.now(),
         'visibility': 'public',
@@ -272,6 +313,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
                           ),
                           if (photos.isNotEmpty) _photoStrip(),
                           if (video != null) _videoCard(),
+                          if (recording || audioBytes != null) _audioPreview(),
                           const SizedBox(height: 4),
                           _attachRow(),
                         ],
@@ -384,6 +426,166 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
     );
   }
 
+
+  // ----------------------------------------------------------
+  // SƏSLİ AN
+  // ----------------------------------------------------------
+
+  Future<void> _startRecording() async {
+    if (recording) return;
+
+    try {
+      if (!await recorder.hasPermission()) {
+        _say('Mikrofona icazə verilməyib. Parametrlərdən icazə ver.');
+        return;
+      }
+
+      final path = await newRecordingPath();
+
+      // WAV seçilir: dalğa şəklini çıxarmaq üçün baytları birbaşa
+      // oxumaq lazımdır, sıxılmış formatda bu mümkün olmazdı.
+      await recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+
+      if (!mounted) {
+        await recorder.cancel();
+        return;
+      }
+
+      clock
+        ..reset()
+        ..start();
+
+      setState(() {
+        recording = true;
+        audioMs = 0;
+      });
+
+      ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
+        if (!mounted) return;
+        setState(() => audioMs = clock.elapsedMilliseconds);
+
+        // Özü dayanır: uzun səs həm yüklənmir, həm dinlənilmir.
+        if (audioMs >= maxMomentVoiceSeconds * 1000) _stopRecording();
+      });
+    } catch (_) {
+      if (mounted) {
+        _say('Səs yazılmadı. Səhifəni HTTPS üzərindən aç və icazəni yoxla.');
+      }
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    if (!recording) return;
+
+    ticker?.cancel();
+    clock.stop();
+
+    try {
+      final path = await recorder.stop();
+      if (path == null) throw StateError('fayl');
+
+      final bytes = await XFile(path).readAsBytes();
+
+      if (clock.elapsedMilliseconds < 1000 || bytes.length <= 44) {
+        if (mounted) {
+          setState(() => recording = false);
+          _say('Səs çox qısadır. Ən azı bir saniyə danış.');
+        }
+        return;
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        recording = false;
+        audioBytes = bytes;
+        audioMs = clock.elapsedMilliseconds;
+        // Dalğa elə indi hesablanır: sonradan faylı yenidən oxumaq
+        // lazım gəlməsin deyə sənədlə birlikdə saxlanılır.
+        audioWave = waveformFromWav(bytes);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => recording = false);
+      _say('Səs saxlanmadı. Yenidən sına.');
+    }
+  }
+
+  void _removeAudio() => setState(() {
+        audioBytes = null;
+        audioWave = const [];
+        audioMs = 0;
+      });
+
+  /// Yazılan səsin önizləməsi.
+  Widget _audioPreview() {
+    final seconds = (audioMs / 1000).round();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xff241a44), Color(0xff17122a)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: vPurple.withValues(alpha: .4)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: recording ? null : vHot,
+              color: recording ? const Color(0xffff657b) : null,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              recording ? Icons.fiber_manual_record_rounded : Icons.graphic_eq_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  recording ? 'Yazılır…' : 'Səs hazırdır',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$seconds saniyə',
+                  style: const TextStyle(color: vMuted, fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+          if (!recording)
+            IconButton(
+              tooltip: 'Səsi sil',
+              icon: const Icon(Icons.close_rounded, color: vMuted),
+              onPressed: _removeAudio,
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _attachRow() {
     return Row(
       children: [
@@ -401,6 +603,11 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
           Icons.videocam_rounded,
           'Video',
           _addVideo,
+        ),
+        _attachButton(
+          recording ? Icons.stop_circle_rounded : Icons.mic_rounded,
+          recording ? 'Dayandır' : 'Səs',
+          recording ? _stopRecording : _startRecording,
         ),
       ],
     );
