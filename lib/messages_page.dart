@@ -11,6 +11,7 @@ import 'main.dart' show PersonPage, isReallyOnline;
 import 'social_ui.dart' show SocialSurface, openChat, isUnread;
 import 'suggest_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'families_page.dart';
 import 'blocking.dart';
 import 'notifications_center.dart';
 import 'user_profile.dart';
@@ -346,6 +347,21 @@ class _SocialMessagesState extends State<SocialMessages> {
                 title: 'Söhbət otağı',
                 subtitle: 'Otağa gir və dostlarınla danış',
                 onTap: () => widget.navigate(2),
+              ),
+              _shortcut(
+                icon: Icons.shield_rounded,
+                colors: const [Color(0xff22a7ff), Color(0xff1b6fd6)],
+                title: 'Ailələr',
+                subtitle: 'Ailəyə qoşul, birlikdə xəzinə yığ',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FamiliesPage(
+                      profile: widget.profile,
+                      database: widget.database,
+                    ),
+                  ),
+                ),
               ),
               _shortcut(
                 icon: Icons.auto_awesome_rounded,

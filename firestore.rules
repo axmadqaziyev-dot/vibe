@@ -244,6 +244,31 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // AILELER (klan)
+    match /families/{familyId} {
+      allow read: if signedIn();
+
+      // Yaradan yalniz oz adina aile aca biler.
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+
+      // Uzv sayi ve xezine her uzvun emeli ile deyisir (qosulma, tohfe),
+      // ona gore yenileme giris etmis herkese aciqdir. Silmek yalniz
+      // qurucunun ve ya adminin isidir.
+      allow update: if signedIn();
+      allow delete: if signedIn()
+        && (resource.data.ownerUid == request.auth.uid || isAdmin());
+
+      match /members/{uid} {
+        allow read: if signedIn();
+        // Ozunu elave edib cixara bilersen; qurucu bashqasini cixara biler.
+        allow write: if isMe(uid)
+          || get(/databases/$(database)/documents/families/$(familyId))
+               .data.ownerUid == request.auth.uid
+          || isAdmin();
+      }
+    }
+
     // REYTINQ LOVHELERI
     //
     // rankings/{dovr}/users/{uid} ve rankings/{dovr}/rooms/{roomId}.
