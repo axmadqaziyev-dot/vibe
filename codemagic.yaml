@@ -1,0 +1,99 @@
+# VIBE — mağaza üçün avtomatik build.
+#
+# NİYƏ: iOS tətbiqini yığmaq üçün macOS lazımdır, sən isə Windows-dasan.
+# Codemagic macOS maşınlarını buludda verir (pulsuz tarifdə ayda 500 dəqiqə),
+# beləliklə Mac almadan App Store üçün IPA yığmaq olur.
+#
+# QURAŞDIRMA:
+#   1. codemagic.io → GitHub hesabı ilə gir → bu reponu əlavə et
+#   2. Aşağıdakı iş axınını seç və "Start new build"
+#   3. İmzalama üçün Codemagic → Teams → Code signing identities bölməsində
+#      Apple Developer hesabını bağla (App Store Connect API açarı ilə)
+
+workflows:
+  android-release:
+    name: Android — Play Store
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      java: 17
+      groups:
+        # Codemagic → Environment variables bölməsində bu qrupu yarat:
+        #   CM_KEYSTORE            (base64 formatında .jks faylı)
+        #   CM_KEYSTORE_PASSWORD
+        #   CM_KEY_ALIAS
+        #   CM_KEY_PASSWORD
+        - android_signing
+    scripts:
+      - name: İmza faylını hazırla
+        script: |
+          echo $CM_KEYSTORE | base64 --decode > $CM_BUILD_DIR/android/vibe.jks
+          cat > $CM_BUILD_DIR/android/key.properties <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=vibe.jks
+          EOF
+      - name: Paketləri gətir
+        script: flutter pub get
+      - name: Testlər
+        script: flutter test
+      - name: App Bundle yığ
+        script: flutter build appbundle --release
+    artifacts:
+      - build/**/outputs/bundle/**/*.aab
+      - build/**/outputs/**/mapping.txt
+    publishing:
+      # Play Console → Setup → API access bölməsindən service account yarat
+      # və JSON açarını Codemagic-ə əlavə et.
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT
+        track: internal
+
+  ios-release:
+    name: iOS — App Store
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: az.vibe.app
+    scripts:
+      - name: Paketləri gətir
+        script: flutter pub get
+      - name: CocoaPods
+        script: |
+          cd ios && pod install
+      - name: İmza profillərini tətbiq et
+        script: xcode-project use-profiles
+      - name: IPA yığ
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  web-release:
+    name: Veb — Firebase Hosting
+    max_build_duration: 30
+    environment:
+      flutter: stable
+      groups:
+        # FIREBASE_TOKEN — `firebase login:ci` əmri ilə alınır.
+        - firebase
+    scripts:
+      - name: Paketləri gətir
+        script: flutter pub get
+      - name: Veb yığ
+        script: flutter build web --release
+      - name: Yayımla
+        script: |
+          npm install -g firebase-tools
+          firebase deploy --only hosting --token "$FIREBASE_TOKEN"

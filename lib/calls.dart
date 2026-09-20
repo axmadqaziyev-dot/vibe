@@ -3,6 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math' as math;
+
+import 'party_rooms.dart' show PartyRoomPage;
+import 'user_profile.dart';
+import 'voice/ice_servers.dart';
+import 'ui/vibe_design.dart';
+import 'ui/vibe_chrome.dart';
 
 bool callOpen = false;
 
@@ -169,6 +177,7 @@ class _IncomingCallsState extends State<IncomingCalls> {
                 fullscreenDialog: true,
                 builder: (_) => _IncomingCallScreen(
                   callerName: callerName,
+                  callerUid: '${data['caller'] ?? ''}',
                   video: isVideo,
                   onDecline: () async {
                     try {
@@ -252,128 +261,375 @@ class _IncomingCallsState extends State<IncomingCalls> {
   Widget build(BuildContext context) => widget.child;
 }
 
-class _IncomingCallScreen extends StatelessWidget {
+class _IncomingCallScreen extends StatefulWidget {
   const _IncomingCallScreen({
     required this.callerName,
+    required this.callerUid,
     required this.video,
     required this.onDecline,
     required this.onAccept,
   });
 
   final String callerName;
+  final String callerUid;
   final bool video;
   final Future<void> Function() onDecline;
   final VoidCallback onAccept;
+
+  @override
+  State<_IncomingCallScreen> createState() => _IncomingCallScreenState();
+}
+
+class _IncomingCallScreenState extends State<_IncomingCallScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat();
+
+  @override
+  void dispose() {
+    pulse.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: const Color(0xff070510),
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment(0, -0.15),
-              radius: 1.15,
-              colors: [Color(0xff2a0f45), Color(0xff10091f), Color(0xff070510)],
-            ),
-          ),
+        backgroundColor: vBg,
+        body: AuroraBackground(
+          strength: 1.3,
           child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 56, 24, 34),
-            child: Column(
-              children: [
-                const Spacer(),
-                const CircleAvatar(
-                  radius: 58,
-                  backgroundColor: Color(0xff8b5cf6),
-                  child: Icon(
-                    Icons.person_rounded,
-                    size: 66,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 26),
-                Text(
-                  callerName,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  video ? 'VIBE video zəngi gəlir…' : 'VIBE səsli zəngi gəlir…',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 17,
-                  ),
-                ),
-                const Spacer(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Column(
-                      children: [
-                        FloatingActionButton.large(
-                          heroTag: 'decline_incoming',
-                          backgroundColor: Colors.redAccent,
-                          onPressed: () async => onDecline(),
-                          child: const Icon(
-                            Icons.call_end_rounded,
-                            color: Colors.white,
-                            size: 34,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 30),
+              child: Column(
+                children: [
+                  const Center(child: VibeLogo(size: 30)),
+                  const Spacer(flex: 2),
+
+                  // ---- avatar + nəbz halqası ----
+                  StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: widget.callerUid.isEmpty
+                        ? const Stream.empty()
+                        : FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(widget.callerUid)
+                              .snapshots(),
+                    builder: (context, snapshot) {
+                      final d = snapshot.data?.data() ?? const <String, dynamic>{};
+                      return AnimatedBuilder(
+                        animation: pulse,
+                        builder: (context, child) {
+                          final t = pulse.value;
+                          return SizedBox(
+                            width: 200,
+                            height: 200,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  width: 150 + 50 * t,
+                                  height: 150 + 50 * t,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: vPink.withValues(alpha: (1 - t) * .5),
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                                child!,
+                              ],
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 148,
+                          height: 148,
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [vPink, vPurple, vBlue],
+                            ),
+                            boxShadow: [
+                              BoxShadow(color: Color(0x66ff2bd6), blurRadius: 34),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: VibePhoto(
+                              url: '${d['photoUrl'] ?? ''}',
+                              name: widget.callerName,
+                              emoji: '${d['avatarEmoji'] ?? ''}',
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Rədd et',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 26),
+
+                  Text(
+                    widget.callerName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 29,
+                      fontWeight: FontWeight.w900,
                     ),
-                    Column(
-                      children: [
-                        FloatingActionButton.large(
-                          heroTag: 'accept_incoming',
-                          backgroundColor: Colors.green,
-                          onPressed: onAccept,
-                          child: Icon(
-                            video
-                                ? Icons.videocam_rounded
-                                : Icons.call_rounded,
-                            color: Colors.white,
-                            size: 34,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Qəbul et',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.video ? 'Video zəng gəlir...' : 'Səsli zəng gəlir...',
+                    style: const TextStyle(color: vMuted, fontSize: 15),
+                  ),
+                  const SizedBox(height: 22),
+
+                  _Waveform(controller: pulse),
+                  const Spacer(flex: 2),
+
+                  // ---- kiçik əməliyyatlar ----
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _smallAction(
+                        Icons.chat_bubble_outline_rounded,
+                        'Mesaj',
+                        () => _quickReply(),
+                      ),
+                      const SizedBox(width: 44),
+                      _smallAction(
+                        Icons.alarm_rounded,
+                        'Xatırlat',
+                        () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${widget.callerName} sonra geri zəng siyahısına əlavə edildi.',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+
+                  // ---- əsas düymələr ----
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _bigButton(
+                        color: const Color(0xffff3b4e),
+                        icon: Icons.call_end_rounded,
+                        label: 'Rədd et',
+                        onTap: () async => widget.onDecline(),
+                      ),
+                      _bigButton(
+                        color: const Color(0xff22c55e),
+                        icon: widget.video
+                            ? Icons.videocam_rounded
+                            : Icons.call_rounded,
+                        label: 'Cavab ver',
+                        onTap: widget.onAccept,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
         ),
       ),
     );
   }
+
+  void _quickReply() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xff120d1d),
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Tez cavab',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            for (final text in const [
+              'İndi danışa bilmirəm, sonra zəng edim?',
+              'Yoldayam, 10 dəqiqəyə zəng edirəm.',
+              'Mesajla yaza bilərsən 💬',
+            ])
+              ListTile(
+                leading: const Icon(Icons.send_rounded, color: vPurple),
+                title: Text(text, style: const TextStyle(color: Colors.white)),
+                onTap: () async {
+                  Navigator.pop(sheet);
+                  await _sendQuickReply(text);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendQuickReply(String text) async {
+    final me = FirebaseAuth.instance.currentUser?.uid;
+    if (me == null || widget.callerUid.isEmpty) return;
+
+    final ids = [me, widget.callerUid]..sort();
+    final chatId = '${ids[0]}_${ids[1]}';
+    final chat = FirebaseFirestore.instance.collection('chats').doc(chatId);
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      batch.set(chat, {
+        'members': [me, widget.callerUid],
+        'lastMessage': text,
+        'lastSenderId': me,
+        'updatedAt': Timestamp.now(),
+      }, SetOptions(merge: true));
+      batch.set(chat.collection('messages').doc(), {
+        'senderId': me,
+        'text': text,
+        'type': 'text',
+        'createdAt': Timestamp.now(),
+      });
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cavab göndərildi.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cavab göndərilmədi.')),
+        );
+      }
+    }
+  }
+
+  Widget _smallAction(IconData icon, String label, VoidCallback onTap) =>
+      PressableScale(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .08),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: .14)),
+              ),
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+            const SizedBox(height: 8),
+            Text(label, style: const TextStyle(color: vMuted, fontSize: 12)),
+          ],
+        ),
+      );
+
+  Widget _bigButton({
+    required Color color,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) => PressableScale(
+    onTap: onTap,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(color: color.withValues(alpha: .45), blurRadius: 24),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 31),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
+/// Zəng ekranındakı səs dalğası animasiyası.
+class _Waveform extends StatelessWidget {
+  const _Waveform({required this.controller});
+
+  final AnimationController controller;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: controller,
+    builder: (context, _) {
+      final t = controller.value;
+      return SizedBox(
+        height: 34,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (int i = 0; i < 17; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                child: Container(
+                  width: 3,
+                  height: 6 +
+                      24 *
+                          (0.5 +
+                              0.5 *
+                                  math.sin(
+                                    (t * 2 * math.pi) + i * 0.7,
+                                  )).abs(),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [vPink, vPurple],
+                    ),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    },
+  );
+}
 class CallPage extends StatefulWidget {
   const CallPage({
     super.key,
@@ -418,6 +674,7 @@ class _CallPageState extends State<CallPage> {
   bool remoteSet = false;
   bool applying = false;
   bool ended = false;
+  bool movingToRoom = false;
 
   final pending = <RTCIceCandidate>[];
 
@@ -435,6 +692,14 @@ class _CallPageState extends State<CallPage> {
 
         if (['ended', 'declined', 'busy'].contains(data['status'])) {
           await finish(write: false);
+          return;
+        }
+
+        // Zəng səsli otağa çevrilib — hər iki tərəf otağa keçir.
+        final moveTo = '${data['moveToRoom'] ?? ''}';
+        if (moveTo.isNotEmpty && !movingToRoom) {
+          movingToRoom = true;
+          await _openRoom(moveTo);
           return;
         }
 
@@ -545,25 +810,8 @@ class _CallPageState extends State<CallPage> {
 
       local.srcObject = media;
 
-      const turn = String.fromEnvironment('TURN_URL');
-
-      connection = await createPeerConnection({
-        'iceServers': [
-          {
-            'urls': 'stun:stun.l.google.com:19302',
-          },
-          if (turn.isNotEmpty)
-            {
-              'urls': turn,
-              'username': const String.fromEnvironment(
-                'TURN_USERNAME',
-              ),
-              'credential': const String.fromEnvironment(
-                'TURN_CREDENTIAL',
-              ),
-            },
-        ],
-      });
+      // STUN + TURN. TURN olmadan mobil şəbəkələrdə zəng qoşulmur.
+      connection = await createPeerConnection(vibeIceConfig);
 
       if (ended) {
         await release();
@@ -813,6 +1061,81 @@ class _CallPageState extends State<CallPage> {
     return '$minutes:$seconds';
   }
 
+  /// Zəngi səsli otağa çevirir.
+  ///
+  /// 1-ə-1 zəngə üçüncü adamı birbaşa qoşmaq mümkün deyil — bunun üçün
+  /// otaq quruluşu lazımdır. Ona görə zəng otağa çevrilir: hər iki tərəf
+  /// otağa keçir, oradan istənilən sayda dost dəvət oluna bilər.
+  Future<void> _convertToRoom() async {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null || movingToRoom) return;
+
+    movingToRoom = true;
+    try {
+      final profileSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(me.uid)
+          .get();
+      final myName = '${profileSnap.data()?['name'] ?? 'VIBE'}';
+
+      final roomRef = FirebaseFirestore.instance.collection('partyRooms').doc();
+      await roomRef.set({
+        'name': '$myName və dostları',
+        'hostId': me.uid,
+        'hostName': myName,
+        'seatCount': 6,
+        'memberCount': 0,
+        'private': false,
+        'seats': {
+          '0': {'uid': me.uid, 'name': myName, 'muted': false, 'locked': false},
+          for (var i = 1; i < 6; i++)
+            '$i': {'uid': '', 'name': '', 'muted': false, 'locked': false},
+        },
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // Qarşı tərəf də eyni otağa keçsin.
+      await widget.ref.update({'moveToRoom': roomRef.id});
+
+      await _openRoom(roomRef.id);
+    } catch (_) {
+      movingToRoom = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Otaq yaradılmadı. Yenidən sına.')),
+        );
+      }
+    }
+  }
+
+  /// Zəngi bağlayıb otağı açır.
+  Future<void> _openRoom(String roomId) async {
+    final me = FirebaseAuth.instance.currentUser;
+    if (me == null) return;
+
+    final navigator = Navigator.of(context);
+    Map<String, dynamic> data = const {};
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(me.uid)
+          .get();
+      data = snap.data() ?? const {};
+    } catch (_) {}
+
+    await finish(write: true);
+    if (!mounted) return;
+
+    navigator.pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => PartyRoomPage(
+          profile: UserProfile.fromMap({...data, 'uid': me.uid}),
+          roomId: roomId,
+        ),
+      ),
+    );
+  }
+
   Future<void> toggleSpeaker() async {
     speakerOn = !speakerOn;
 
@@ -1009,6 +1332,17 @@ class _CallPageState extends State<CallPage> {
                                 : Icons
                                     .hearing,
                           ),
+                        ),
+
+                      if (ready)
+                        IconButton.filled(
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xff21142f),
+                            foregroundColor: Colors.white,
+                          ),
+                          tooltip: 'Dostu əlavə et',
+                          onPressed: movingToRoom ? null : _convertToRoom,
+                          icon: const Icon(Icons.group_add_rounded),
                         ),
 
                       if (ready &&

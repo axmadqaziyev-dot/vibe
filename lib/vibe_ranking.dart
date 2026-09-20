@@ -7,7 +7,6 @@ const _panel = Color(0xff151020);
 const _muted = Color(0xffa89fbd);
 const _pink = Color(0xffff2bd6);
 const _purple = Color(0xff8b5cff);
-const _blue = Color(0xff22a7ff);
 
 class VibeRankingPage extends StatelessWidget {
   const VibeRankingPage({super.key, required this.profile});

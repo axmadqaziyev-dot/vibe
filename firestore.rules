@@ -11,15 +11,38 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // Moderator/admin — profil sənədində işarələnir.
+    function isAdmin() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid))
+             .data.get('isAdmin', false) == true;
+    }
+
     // USERS
     match /users/{userId} {
       allow read: if signedIn();
       allow create, update, delete: if isMe(userId);
 
-      // VIBE currently uses these nested collections for social/video state.
-      // Kept open to signed-in users so follow/notification flows work.
-      match /{subCollection}/{docId} {
+      // Admin hesabı dayandıra/bərpa edə bilər.
+      allow update: if isAdmin();
+
+      // Başqaları YALNIZ bu alt kolleksiyalara yaza bilər:
+      // bildiriş göndərmək, izləmək və bloklamaq üçün lazımdır.
+      match /notifications/{docId} {
         allow read, write: if signedIn();
+      }
+      match /followers/{docId} {
+        allow read, write: if signedIn();
+      }
+      match /blockedBy/{docId} {
+        allow read, write: if signedIn();
+      }
+
+      // Qalan hər şey (media, qalereya, pul kisəsi, tokenlər, bloklananlar…)
+      // yalnız sahibi tərəfindən dəyişdirilə bilər.
+      match /{subCollection}/{docId} {
+        allow read: if signedIn();
+        allow write: if isMe(userId);
       }
     }
 
@@ -37,24 +60,43 @@ service cloud.firestore {
         && request.auth.uid in resource.data.members;
 
       match /messages/{messageId} {
-        function chatMembers() {
-          return get(/databases/$(database)/documents/chats/$(chatId)).data.members;
+        // Mövcud vəziyyət (oxumaq/silmək üçün).
+        function chatNow() {
+          return get(/databases/$(database)/documents/chats/$(chatId)).data;
+        }
+
+        // Batch-dən SONRAKI vəziyyət. İlk mesaj göndəriləndə söhbət sənədi
+        // eyni batch-də yaradılır — `get` onu görmür, `getAfter` görür.
+        function chatAfter() {
+          return getAfter(/databases/$(database)/documents/chats/$(chatId)).data;
         }
 
         allow read: if signedIn()
-          && request.auth.uid in chatMembers();
+          && request.auth.uid in chatNow().members;
 
         allow create: if signedIn()
-          && request.auth.uid in chatMembers()
-          && request.resource.data.senderId == request.auth.uid;
+          && request.auth.uid in chatAfter().members
+          && request.resource.data.senderId == request.auth.uid
+          // Kimsə bloklanıbsa, heç kim yaza bilmir.
+          && chatAfter().get('blockedBy', []).size() == 0;
 
-        // Needed for reactions and message state changes.
+        // Reaksiya və mesaj vəziyyəti dəyişiklikləri üçün.
         allow update: if signedIn()
-          && request.auth.uid in chatMembers();
+          && request.auth.uid in chatNow().members;
 
         allow delete: if signedIn()
-          && request.auth.uid in chatMembers()
+          && request.auth.uid in chatNow().members
           && resource.data.senderId == request.auth.uid;
+
+        // Şəkilin tam ölçülü nüsxəsi ayrıca sənəddə saxlanılır.
+        // Bu qayda olmadan şəkil göndərmək mümkün deyil.
+        match /media/{mediaId} {
+          allow read: if signedIn()
+            && request.auth.uid in chatNow().members;
+
+          allow write: if signedIn()
+            && request.auth.uid in chatAfter().members;
+        }
       }
     }
 
@@ -76,8 +118,19 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid;
-      allow update, delete: if signedIn()
-        && resource.data.ownerUid == request.auth.uid;
+
+      // Sahib hər şeyi dəyişə bilər; başqaları YALNIZ sayğacları
+      // ("Populyar" sıralaması üçün).
+      allow update: if signedIn()
+        && (
+          resource.data.ownerUid == request.auth.uid
+          || request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['likeCount', 'commentCount'])
+        );
+
+      // Sahib və ya admin silə bilər (moderasiya).
+      allow delete: if signedIn()
+        && (resource.data.ownerUid == request.auth.uid || isAdmin());
 
       match /likes/{uid} {
         allow read: if signedIn();
@@ -88,8 +141,10 @@ service cloud.firestore {
         allow read: if signedIn();
         allow create: if signedIn()
           && request.resource.data.uid == request.auth.uid;
-        allow update, delete: if signedIn()
+        allow update: if signedIn()
           && resource.data.uid == request.auth.uid;
+        allow delete: if signedIn()
+          && (resource.data.uid == request.auth.uid || isAdmin());
 
         match /likes/{uid} {
           allow read: if signedIn();
@@ -108,7 +163,7 @@ service cloud.firestore {
       // Owner edits/deletes; view/share counters can also be updated by signed-in viewers.
       allow update: if signedIn();
       allow delete: if signedIn()
-        && resource.data.ownerUid == request.auth.uid;
+        && (resource.data.ownerUid == request.auth.uid || isAdmin());
 
       match /likes/{uid} {
         allow read: if signedIn();
@@ -135,10 +190,13 @@ service cloud.firestore {
     }
 
     // PARTY ROOMS
+    //
+    // `{document=**}` lazımdır: canlı səsin siqnallaşması
+    // rtc/{cüt}/a/{namizəd} kimi iki səviyyə dərinlikdədir.
     match /partyRooms/{roomId} {
       allow read, write: if signedIn();
 
-      match /{subCollection}/{docId} {
+      match /{document=**} {
         allow read, write: if signedIn();
       }
     }
@@ -152,10 +210,24 @@ service cloud.firestore {
       }
     }
 
+    // DOMINO OYUNLARI
+    //
+    // Sənədi yalnız oyunun iki iştirakçısı oxuyub yaza bilər.
+    match /dominoMatches/{matchId} {
+      allow create: if signedIn()
+        && request.resource.data.players is list
+        && request.auth.uid in request.resource.data.players;
+
+      allow read, update, delete: if signedIn()
+        && request.auth.uid in resource.data.players;
+    }
+
     // REPORTS
     match /reports/{reportId} {
       allow create: if signedIn();
-      allow read, update, delete: if false;
+      // Şikayətləri yalnız admin görür və bağlayır.
+      allow read, update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // LEGACY POSTS

@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
+import 'ui/vibe_chrome.dart';
 import 'user_profile.dart';
 import 'moment_comments.dart';
 
@@ -54,10 +56,7 @@ class MomentDetailPage extends StatelessWidget {
                           size: 56,
                         ),
                       )
-                    : Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                      ),
+                    : VibePhoto(url: imageUrl, name: 'VIBE'),
               ),
               Padding(
                 padding: const EdgeInsets.all(16),

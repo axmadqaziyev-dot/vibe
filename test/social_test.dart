@@ -7,9 +7,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_application_1/main.dart';
 import 'package:flutter_application_1/social_ui.dart';
+import 'package:flutter_application_1/home_discover.dart';
+import 'package:flutter_application_1/messages_page.dart';
+import 'package:flutter_application_1/user_profile.dart';
 import 'package:flutter_application_1/preferences.dart';
+import 'package:flutter_application_1/ui/vibe_chrome.dart';
+import 'package:flutter_application_1/profile_header.dart';
+import 'package:flutter_application_1/coin_wallet.dart';
+import 'package:flutter_application_1/media_store.dart';
+import 'package:image/image.dart' as img;
 
 const profile = UserProfile(
   uid: 'me',
@@ -19,6 +26,19 @@ const profile = UserProfile(
   email: 'test@example.com',
   about: 'Musiqi və yeni dostlar ✨',
 );
+
+
+/// Widget ekranın görünən hissəsindədirmi? (Dar ekranlarda üfüqi
+/// siyahıdakı pillər kadrdan kənarda qala bilər.)
+bool _onScreen(WidgetTester tester, Finder finder) {
+  if (finder.evaluate().isEmpty) return false;
+  final rect = tester.getRect(finder.first);
+  final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+  return rect.left >= 0 &&
+      rect.top >= 0 &&
+      rect.right <= size.width &&
+      rect.bottom <= size.height;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +66,121 @@ void main() {
     data['lastSenderId'] = 'me';
     data.remove('readAt');
     expect(isUnread(data, 'me'), false);
+  });
+
+
+  testWidgets('Profili düzəlt düyməsi toxunuşu qəbul edir', (tester) async {
+    // Regressiya: düymə Stack-in hüdudundan kənarda idi (bottom: -34),
+    // görünürdü, amma heç bir toxunuş ona çatmırdı.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final db = FakeFirebaseFirestore();
+    await db.collection('users').doc('me').set({'name': 'Əhməd'});
+
+    var edited = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListView(
+            children: [
+              ProfileCoverHeader(
+                profile: profile,
+                database: db,
+                onEdit: () => edited++,
+                onSettings: () {},
+                onShare: () {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.text('Profili düzəlt'));
+    await tester.pump();
+
+    expect(edited, 1, reason: 'Düymə toxunuşu handler-ə çatmalıdır');
+  });
+
+  test('Balans çatmayanda InsufficientCoins atılır, balans dəyişmir', () async {
+    // Regressiya: istisna tranzaksiyanın içindən atılırdı və Firestore onu
+    // sarıdığı üçün "Oyun tamamlanmadı" kimi yanlış mesaj çıxırdı.
+    final db = FakeFirebaseFirestore();
+    await db.collection('users').doc('me').set({'coins': 5});
+
+    await expectLater(
+      changeCoins(uid: 'me', delta: -10, reason: 'test', database: db),
+      throwsA(isA<InsufficientCoins>()),
+    );
+
+    final after = await db.collection('users').doc('me').get();
+    expect(after.data()!['coins'], 5);
+  });
+
+  test('Uduş və xərc balansa düzgün yazılır', () async {
+    final db = FakeFirebaseFirestore();
+    await db.collection('users').doc('me').set({'coins': 100});
+
+    expect(await changeCoins(uid: 'me', delta: -10, reason: 'mərc', database: db), 90);
+    expect(await changeCoins(uid: 'me', delta: 30, reason: 'uduş', database: db), 120);
+  });
+
+  test('Şəkil sıxılıb Firestore sənədinə sığır', () {
+    // 1200x900 rəngli şəkil — real foto ölçüsünə yaxın.
+    final source = img.Image(width: 1200, height: 900);
+    for (var y = 0; y < source.height; y++) {
+      for (var x = 0; x < source.width; x++) {
+        source.setPixelRgb(x, y, x % 256, y % 256, (x + y) % 256);
+      }
+    }
+
+    final stored = compressToStoredImage(img.encodeJpg(source));
+
+    expect(stored, isNotNull);
+    expect(stored!.thumb.startsWith('data:image/jpeg;base64,'), isTrue);
+    expect(stored.full.startsWith('data:image/jpeg;base64,'), isTrue);
+
+    // Kiçik nüsxə siyahılar üçün yüngül olmalıdır.
+    expect(stored.thumb.length, lessThan(40 * 1024));
+    // Böyük nüsxə Firestore-un 1 MB sənəd limitinin altında qalmalıdır.
+    expect(stored.full.length, lessThan(700 * 1024));
+    expect(stored.full.length, greaterThan(stored.thumb.length));
+  });
+
+  testWidgets('Axtarış Azərbaycan hərfləri ilə də tapır', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final db = FakeFirebaseFirestore();
+    await db.collection('users').doc('me').set({'name': 'Mən'});
+    await db.collection('users').doc('a').set({
+      'name': 'Ləman',
+      'city': 'Şəki',
+      'lastSeen': Timestamp.now(),
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SocialHome(profile: profile, database: db)),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // Axtarışı aç
+    await tester.tap(find.byIcon(Icons.search_rounded).first);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // "seki" yazılsa da "Şəki"dəki Ləman tapılmalıdır
+    await tester.enterText(find.byType(TextField).first, 'seki');
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Ləman'), findsOneWidget);
   });
 
   for (final width in [320.0, 390.0, 760.0]) {
@@ -100,22 +235,38 @@ void main() {
             home: Scaffold(body: page),
           ),
         );
-        await tester.pumpAndSettle();
+        // Fonda dayanmadan işləyən animasiyalar var (aurora, shimmer),
+        // ona görə pumpAndSettle yox, sabit addım istifadə olunur.
+        await tester.pump(const Duration(milliseconds: 400));
         expect(tester.takeException(), isNull);
       }
 
       await show(SocialHome(profile: profile, database: db));
       expect(find.text('Aysel'), findsOneWidget);
-      await tester.tap(find.text('Aktiv'));
-      await tester.pumpAndSettle();
-      expect(find.text('Dəniz'), findsNothing);
+      // "Online" pili üfüqi siyahıdadır; çox dar ekranda görünməyə bilər.
+      final onlinePill = find.descendant(
+        of: find.byType(PillTabs),
+        matching: find.text('Online'),
+      );
+      if (_onScreen(tester, onlinePill)) {
+        await tester.tap(onlinePill);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('Dəniz'), findsNothing);
+      }
       await show(
         SocialMessages(profile: profile, database: db, navigate: (_) {}),
       );
-      await tester.tap(find.text('Oxunmamış'));
-      await tester.pumpAndSettle();
-      expect(find.text('Aysel'), findsOneWidget);
-      expect(find.text('Dəniz'), findsNothing);
+      // "Oxunmamış" pili də üfüqi siyahıdadır.
+      final unreadPill = find.descendant(
+        of: find.byType(PillTabs),
+        matching: find.text('Oxunmamış'),
+      );
+      if (_onScreen(tester, unreadPill)) {
+        await tester.tap(unreadPill);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('Aysel'), findsOneWidget);
+        expect(find.text('Dəniz'), findsNothing);
+      }
       await show(
         SocialProfile(profile: profile, database: db, navigate: (_) {}),
       );
@@ -204,7 +355,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 600));
       expect(tester.takeException(), isNull);
       await tester.runAsync(() async {
         final boundary =

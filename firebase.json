@@ -4,7 +4,7 @@
       "android": {
         "default": {
           "projectId": "vibe-f9d13",
-          "appId": "1:719591915896:android:046f85847f23c4d606888d",
+          "appId": "1:719591915896:android:ca12702c6b0a2a4606888d",
           "fileOutput": "android/app/google-services.json"
         }
       },
@@ -12,8 +12,8 @@
         "lib/firebase_options.dart": {
           "projectId": "vibe-f9d13",
           "configurations": {
-            "android": "1:719591915896:android:046f85847f23c4d606888d",
-            "ios": "1:719591915896:ios:1111e666c4cf8ebe06888d",
+            "android": "1:719591915896:android:ca12702c6b0a2a4606888d",
+            "ios": "1:719591915896:ios:8eb47f8f33e58e9606888d",
             "web": "1:719591915896:web:d54dd234b4e12de006888d"
           }
         }
@@ -21,7 +21,8 @@
     }
   },
   "firestore": {
-    "rules": "firestore.rules"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "storage": {
     "rules": "storage.rules"
@@ -48,7 +49,37 @@
             "value": "no-cache"
           }
         ]
+      },
+      {
+        "source": "**/*.@(png|jpg|jpeg|webp|svg|woff2|ttf|otf)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=604800"
+          }
+        ]
+      },
+      {
+        "source": "/canvaskit/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
       }
     ]
-  }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "*.local"
+      ]
+    }
+  ]
 }

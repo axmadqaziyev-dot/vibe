@@ -51,13 +51,16 @@ class DefaultFirebaseOptions {
     appId: '1:719591915896:web:d54dd234b4e12de006888d',
     messagingSenderId: '719591915896',
     projectId: 'vibe-f9d13',
-    authDomain: 'vibe-f9d13.firebaseapp.com',
+    // Giriş axını tətbiqin öz domenində qalmalıdır.
+    // Fərqli domen olsa, Safari yaddaşı bloklayır və Google girişi
+    // yarımçıq qalıb istifadəçini geri atır.
+    authDomain: 'vibe-f9d13.web.app',
     storageBucket: 'vibe-f9d13.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBQzBkU4igx0Tib6P4g3o7-gSCbnJqFfTI',
-    appId: '1:719591915896:android:046f85847f23c4d606888d',
+    appId: '1:719591915896:android:ca12702c6b0a2a4606888d',
     messagingSenderId: '719591915896',
     projectId: 'vibe-f9d13',
     storageBucket: 'vibe-f9d13.firebasestorage.app',
@@ -65,10 +68,10 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAwpL_xLbD6XOSB-F6pvU4tdlsUcto4SIg',
-    appId: '1:719591915896:ios:1111e666c4cf8ebe06888d',
+    appId: '1:719591915896:ios:8eb47f8f33e58e9606888d',
     messagingSenderId: '719591915896',
     projectId: 'vibe-f9d13',
     storageBucket: 'vibe-f9d13.firebasestorage.app',
-    iosBundleId: 'com.example.flutterApplication1',
+    iosBundleId: 'az.vibe.app',
   );
 }

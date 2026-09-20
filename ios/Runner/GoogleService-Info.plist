@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>719591915896-nrtakci8kj23p7ij326buh74bnrem76m.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.719591915896-nrtakci8kj23p7ij326buh74bnrem76m</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>719591915896-s6ea8i3m2tqk4he7f1glr0ni6njndfnn.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyAwpL_xLbD6XOSB-F6pvU4tdlsUcto4SIg</string>
 	<key>GCM_SENDER_ID</key>
@@ -9,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.flutterApplication1</string>
+	<string>az.vibe.app</string>
 	<key>PROJECT_ID</key>
 	<string>vibe-f9d13</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:719591915896:ios:1111e666c4cf8ebe06888d</string>
+	<string>1:719591915896:ios:8eb47f8f33e58e9606888d</string>
 </dict>
 </plist>

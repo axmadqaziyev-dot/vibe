@@ -22,7 +22,9 @@
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- Brauzerin ust zolagi da tetbiqin fonu ile eyni rengde olsun. -->
+  <meta name="theme-color" content="#07040f">
   <meta name="apple-mobile-web-app-title" content="VIBE">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -31,8 +33,172 @@
 
   <title>VIBE</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Açılış ekranı: tətbiq açılanda görünən ilk ekran. -->
+  <style>
+    html, body { margin: 0; padding: 0; background: #0a0618; }
+
+    #vibe-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 0 max(46px, env(safe-area-inset-bottom));
+      box-sizing: border-box;
+      overflow: hidden;
+      background: linear-gradient(165deg, #7c5cff 0%, #9a53f2 48%, #d94ad0 100%);
+      transition: opacity .5s ease;
+    }
+
+    #vibe-splash.gone { opacity: 0; pointer-events: none; }
+
+    #vibe-splash .blob {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .13);
+      animation: vibe-drift 9s ease-in-out infinite;
+    }
+
+    #vibe-splash .b1 { width: 260px; height: 260px; top: -70px; left: -80px; }
+    #vibe-splash .b2 { width: 200px; height: 200px; top: 90px; right: -70px;
+      animation-delay: 1.2s; background: rgba(255, 180, 240, .18); }
+    #vibe-splash .b3 { width: 300px; height: 300px; bottom: -120px; left: -60px;
+      animation-delay: 2.4s; }
+    #vibe-splash .b4 { width: 150px; height: 150px; bottom: 120px; right: -40px;
+      animation-delay: .6s; background: rgba(255, 180, 240, .16); }
+
+    #vibe-splash .art {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      max-height: 74vh;
+      display: block;
+      animation: vibe-pop .8s cubic-bezier(.2, .9, .3, 1.2) both;
+    }
+
+    #vibe-splash .tagline {
+      position: relative;
+      font-family: "Snell Roundhand", "Bradley Hand", "Segoe Script",
+        "Brush Script MT", cursive;
+      font-size: 44px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1;
+      margin-bottom: 26px;
+      text-shadow: 0 3px 14px rgba(70, 20, 120, .28);
+      animation: vibe-rise .7s .25s ease-out both;
+    }
+
+    #vibe-splash .brand {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      animation: vibe-rise .7s .4s ease-out both;
+    }
+
+    #vibe-splash .tile {
+      width: 44px;
+      height: 44px;
+      border-radius: 13px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 25px;
+      font-weight: 900;
+      color: #8b3cff;
+      box-shadow: 0 6px 18px rgba(60, 10, 110, .3);
+    }
+
+    #vibe-splash .word {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: #fff;
+    }
+
+    @keyframes vibe-drift {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(14px, -18px); }
+    }
+
+    @keyframes vibe-pop {
+      from { transform: scale(.86); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes vibe-rise {
+      from { transform: translateY(16px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
 </head>
 <body>
+  <div id="vibe-splash">
+    <span class="blob b1"></span>
+    <span class="blob b2"></span>
+    <span class="blob b3"></span>
+    <span class="blob b4"></span>
+
+    <svg class="art" viewBox="0 0 390 520" preserveAspectRatio="xMidYMid meet"
+         xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="sBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#b9a6ff"/>
+          <stop offset="1" stop-color="#7b53e8"/>
+        </linearGradient>
+        <linearGradient id="sHeart" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffa6d8"/>
+          <stop offset="1" stop-color="#ff5fc0"/>
+        </linearGradient>
+        <linearGradient id="sHead" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#cdbcff"/>
+          <stop offset="1" stop-color="#9f83f5"/>
+        </linearGradient>
+        <clipPath id="sHeadClip"><circle cx="195" cy="210" r="96"/></clipPath>
+      </defs>
+
+      <ellipse cx="195" cy="452" rx="120" ry="18" fill="#5b2fb8" opacity=".25"/>
+
+      <rect x="128" y="272" width="134" height="170" rx="64" fill="url(#sBody)"/>
+      <ellipse cx="195" cy="372" rx="46" ry="58" fill="#f3eeff" opacity=".92"/>
+
+      <circle cx="195" cy="210" r="96" fill="url(#sHead)"/>
+      <g clip-path="url(#sHeadClip)">
+        <ellipse cx="195" cy="240" rx="62" ry="52" fill="#f7f3ff"/>
+      </g>
+
+      <ellipse cx="160" cy="196" rx="17" ry="21" fill="#4b2a9e"/>
+      <ellipse cx="230" cy="196" rx="17" ry="21" fill="#4b2a9e"/>
+      <circle cx="166" cy="189" r="6" fill="#fff" opacity=".85"/>
+      <circle cx="236" cy="189" r="6" fill="#fff" opacity=".85"/>
+      <ellipse cx="195" cy="236" rx="22" ry="15" fill="#4b2a9e"/>
+      <path d="M195 250 q0 18 -16 22" stroke="#4b2a9e" stroke-width="6"
+            fill="none" stroke-linecap="round"/>
+
+      <path d="M106 158 a58 58 0 0 1 178 0" fill="none" stroke="#fff"
+            stroke-width="15" stroke-linecap="round" opacity=".95"/>
+      <rect x="86" y="150" width="30" height="62" rx="15" fill="#ff5fc0"/>
+      <rect x="274" y="150" width="30" height="62" rx="15" fill="#ff5fc0"/>
+
+      <path d="M120 300 c-34-34 4-84 38-52 c10 9 17 20 17 20 s7-11 17-20
+               c34-32 72 18 38 52 c-24 24 -55 50 -55 50 s-31-26 -55-50 z"
+            fill="url(#sHeart)"/>
+    </svg>
+
+    <div class="tagline">Tək deyilsən</div>
+
+    <div class="brand">
+      <div class="tile">V</div>
+      <div class="word">VIBE</div>
+    </div>
+  </div>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -42,5 +208,123 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+
+  <script>
+    // Flutter ilk kadrı çəkəndə Dart tərəfdən çağırılır.
+    // Açılış ekranı ən azı bu qədər görünsün — yoxsa yanıb-sönür.
+    var vibeSplashShownAt = Date.now();
+    var VIBE_SPLASH_MIN_MS = 900;
+
+    window.vibeHideSplash = function () {
+      var splash = document.getElementById('vibe-splash');
+      if (!splash) return;
+
+      var waited = Date.now() - vibeSplashShownAt;
+      if (waited < VIBE_SPLASH_MIN_MS) {
+        setTimeout(window.vibeHideSplash, VIBE_SPLASH_MIN_MS - waited);
+        return;
+      }
+
+      splash.classList.add('gone');
+      setTimeout(function () { splash.remove(); }, 600);
+    };
+
+    // Flutter ekrana çıxan kimi açılış ekranını götür.
+    // Dart tərəfdən gələn siqnaldan asılı qalmırıq.
+    (function () {
+      var started = Date.now();
+
+      var timer = setInterval(function () {
+        var view = document.querySelector('flutter-view, flt-glass-pane');
+        // Tətbiq həqiqətən çəkilibmi? Boş element kifayət deyil —
+        // əks halda açılış ekranı erkən götürülür və boş fon görünür.
+        var ready = view && view.getBoundingClientRect().height > 0;
+        var tooLong = Date.now() - started > 25000;
+
+        if (ready || tooLong) {
+          clearInterval(timer);
+          setTimeout(window.vibeHideSplash, ready ? 450 : 0);
+        }
+      }, 120);
+    })();
+  </script>
+
+  <!-- Tətbiqi ana ekrana quraşdırmaq üçün. Brauzer hazır olanda
+       hadisəni saxlayırıq, Flutter tərəfi lazım olanda çağırır. -->
+  <script>
+    window.vibeInstallEvent = null;
+
+    window.addEventListener('beforeinstallprompt', function (event) {
+      event.preventDefault();
+      window.vibeInstallEvent = event;
+    });
+
+    window.addEventListener('appinstalled', function () {
+      window.vibeInstallEvent = null;
+    });
+
+    window.vibeCanInstall = function () {
+      return !!window.vibeInstallEvent;
+    };
+
+    window.vibeInstall = function () {
+      var event = window.vibeInstallEvent;
+      if (!event) return;
+      window.vibeInstallEvent = null;
+      event.prompt();
+    };
+
+    // iOS Safari `beforeinstallprompt` hadisəsini dəstəkləmir —
+    // orada istifadəçiyə təlimat göstəririk.
+    window.vibeIsIos = function () {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent);
+    };
+
+    // Quraşdırıla bilən tətbiq üçün service worker qeydiyyatı.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('pwa_sw.js').catch(function () {});
+      });
+    }
+
+    // Yeni versiya yoxlamasi.
+    // Her yayimda `flutter_bootstrap.js` deyisir, ona gore ETag-i
+    // muqayise edirik. Deyisibse tetbiq istifadeciye bildirir.
+    (function () {
+      var currentTag = null;
+      window.vibeUpdateReady = false;
+
+      function check() {
+        fetch('flutter_bootstrap.js', { method: 'HEAD', cache: 'no-store' })
+          .then(function (response) {
+            var tag = response.headers.get('etag') ||
+              response.headers.get('last-modified');
+            if (!tag) return;
+            if (currentTag === null) { currentTag = tag; return; }
+            if (tag !== currentTag) window.vibeUpdateReady = true;
+          })
+          .catch(function () {});
+      }
+
+      check();
+      setInterval(check, 5 * 60 * 1000);
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) check();
+      });
+    })();
+
+    window.vibeIsUpdateReady = function () {
+      return !!window.vibeUpdateReady;
+    };
+
+    window.vibeReload = function () {
+      window.location.reload();
+    };
+
+    window.vibeIsStandalone = function () {
+      return window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true;
+    };
+  </script>
 </body>
 </html>

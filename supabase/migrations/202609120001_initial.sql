@@ -1,3 +1,10 @@
+-- ⚠️  İŞƏ SALMA — KÖHNƏ FAYLDIR.
+--
+-- Bu, layihənin ilk versiyasının sxemidir və heç vaxt işə salınmayıb.
+-- İçindəki profiles / blocks / messages cədvəlləri indiki 0001_schema.sql
+-- faylındakılarla eyni adlıdır, amma tamam başqa formadadır.
+-- İşə salınsa baza sınar. Yalnız tarix üçün saxlanılır.
+
 -- Apply once to a NEW Supabase project using the SQL editor.
 begin;
 create table public.profiles (

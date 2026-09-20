@@ -164,10 +164,16 @@ class _VoiceComposerState extends State<VoiceComposer>
       });
     } catch (e) {
       if (mounted) {
+        final storageOff = '$e'.contains('storage/') ||
+            '$e'.contains('not been set up') ||
+            '$e'.contains('unknown');
         setState(() {
           error = e is StateError
               ? e.message.toString()
-              : 'Səs saxlanmadı. Yenidən sına.';
+              : storageOff
+                    ? 'Səsli mesaj üçün Firebase Storage aktiv olmalıdır '
+                          '(Blaze planı).'
+                    : 'Səs saxlanmadı. Yenidən sına.';
         });
       }
     } finally {

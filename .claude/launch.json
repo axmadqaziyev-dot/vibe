@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vibe-web",
+      "runtimeExecutable": "C:\\flutter_sdk\\flutter\\bin\\flutter.bat",
+      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "8088", "--web-hostname", "127.0.0.1"],
+      "port": 8088,
+      "url": "http://127.0.0.1:8088"
+    }
+  ]
+}

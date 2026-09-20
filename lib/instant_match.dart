@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'user_profile.dart';
+import 'ui/vibe_chrome.dart';
 import 'main.dart' show PersonPage, RealChatPage;
 import 'calls.dart';
 
@@ -29,6 +30,13 @@ class _InstantMatchPageState extends State<InstantMatchPage>
   DocumentSnapshot<Map<String, dynamic>>? match;
   Timer? pulseTimer;
   int pulse = 0;
+
+  /// Axtarış edildi, amma heç kim tapılmadı.
+  bool noResult = false;
+
+  /// Tapılan adam hazırda offline-dır.
+  bool matchedOffline = false;
+
   final Set<String> blockedIds = <String>{};
 
   @override
@@ -42,6 +50,7 @@ class _InstantMatchPageState extends State<InstantMatchPage>
     setState(() {
       searching = true;
       match = null;
+      noResult = false;
       pulse = 0;
     });
 
@@ -51,26 +60,27 @@ class _InstantMatchPageState extends State<InstantMatchPage>
     });
 
     try {
-      final blockedSnap = await FirebaseFirestore.instance
+      final me = FirebaseFirestore.instance
           .collection('users')
-          .doc(widget.profile.uid)
-          .collection('blocked')
-          .get();
+          .doc(widget.profile.uid);
+      final blockedSnap = await me.collection('blocked').get();
+      final blockedBySnap = await me.collection('blockedBy').get();
 
       blockedIds
         ..clear()
-        ..addAll(blockedSnap.docs.map((e) => e.id));
+        ..addAll(blockedSnap.docs.map((e) => e.id))
+        ..addAll(blockedBySnap.docs.map((e) => e.id));
 
       final snap = await FirebaseFirestore.instance
           .collection('users')
           .limit(100)
           .get();
 
-      final candidates = snap.docs.where((doc) {
+      bool passes(QueryDocumentSnapshot<Map<String, dynamic>> doc, bool onlineOnly) {
         if (doc.id == widget.profile.uid) return false;
         if (blockedIds.contains(doc.id)) return false;
         final d = doc.data();
-        if (!_isOnline(d)) return false;
+        if (onlineOnly && !_isOnline(d)) return false;
 
         if (city == 'same' && widget.profile.city.trim().isNotEmpty) {
           final targetCity = '${d['city'] ?? ''}'.trim().toLowerCase();
@@ -96,7 +106,15 @@ class _InstantMatchPageState extends State<InstantMatchPage>
         }
 
         return true;
-      }).toList();
+      }
+
+      // Əvvəl yalnız online; heç kim yoxdursa, offline olanlara da bax.
+      var candidates = snap.docs.where((doc) => passes(doc, true)).toList();
+      var offlineOnly = false;
+      if (candidates.isEmpty) {
+        candidates = snap.docs.where((doc) => passes(doc, false)).toList();
+        offlineOnly = candidates.isNotEmpty;
+      }
 
       candidates.shuffle();
 
@@ -104,7 +122,18 @@ class _InstantMatchPageState extends State<InstantMatchPage>
       if (!mounted) return;
 
       final found = candidates.isEmpty ? null : candidates.first;
-      if (found != null) {
+
+      if (found == null) {
+        setState(() {
+          match = null;
+          searching = false;
+          noResult = true;
+        });
+        return;
+      }
+      noResult = false;
+      matchedOffline = offlineOnly;
+      {
         final fd = found.data();
         try {
           await FirebaseFirestore.instance
@@ -128,7 +157,10 @@ class _InstantMatchPageState extends State<InstantMatchPage>
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => searching = false);
+      setState(() {
+        searching = false;
+        noResult = true;
+      });
     } finally {
       pulseTimer?.cancel();
     }
@@ -202,7 +234,7 @@ class _InstantMatchPageState extends State<InstantMatchPage>
                 child: searching
                     ? _searching()
                     : match == null
-                        ? _empty()
+                        ? (noResult ? _noResult() : _empty())
                         : _matchCard(match!, d),
               ),
             ),
@@ -286,6 +318,74 @@ class _InstantMatchPageState extends State<InstantMatchPage>
       ),
     );
   }
+
+  /// Axtarışdan sonra heç kim tapılmayanda göstərilir.
+  Widget _noResult() => Center(
+    key: const ValueKey('noResult'),
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 110,
+            height: 110,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _purple.withValues(alpha: .18),
+              border: Border.all(color: _purple.withValues(alpha: .5)),
+            ),
+            child: const Icon(
+              Icons.person_search_rounded,
+              color: Colors.white,
+              size: 50,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Hazırda uyğun kimsə tapılmadı',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 21,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Filtri genişləndir (cinsiyyət / şəhər) və ya bir az sonra '
+            'yenidən yoxla.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: _muted, height: 1.45),
+          ),
+          const SizedBox(height: 22),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: [
+              FilledButton.icon(
+                onPressed: () {
+                  setState(() {
+                    gender = 'all';
+                    city = 'all';
+                  });
+                  _findMatch();
+                },
+                icon: const Icon(Icons.filter_alt_off_rounded),
+                label: const Text('Filtrsiz axtar'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _findMatch,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Yenidən'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _empty() {
     return Center(
@@ -400,13 +500,33 @@ class _InstantMatchPageState extends State<InstantMatchPage>
     final age = int.tryParse('${d['age'] ?? ''}');
     final photo = '${d['photoUrl'] ?? d['profilePhoto'] ?? ''}';
 
+    // Online kimsə tapılmayanda offline istifadəçi göstərilir — bunu deyirik.
+    final offlineNote = matchedOffline
+        ? Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Text(
+              'Hazırda online kimsə yoxdur — bu profil offline-dır',
+              style: TextStyle(color: _muted, fontSize: 11.5),
+            ),
+          )
+        : const SizedBox.shrink();
+
     return Center(
       key: ValueKey(doc.id),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 430),
-          child: Container(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              offlineNote,
+              Container(
             decoration: BoxDecoration(
               color: _panel,
               borderRadius: BorderRadius.circular(30),
@@ -424,12 +544,8 @@ class _InstantMatchPageState extends State<InstantMatchPage>
                   child: SizedBox(
                     width: double.infinity,
                     height: 330,
-                    child: photo.isNotEmpty
-                        ? Image.network(
-                            photo,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _fallback(name),
-                          )
+                    child: vibeImageProvider(photo) != null
+                        ? VibePhoto(url: photo, name: name)
                         : _fallback(name),
                   ),
                 ),
@@ -542,6 +658,8 @@ class _InstantMatchPageState extends State<InstantMatchPage>
                 ),
               ],
             ),
+          ),
+            ],
           ),
         ),
       ),

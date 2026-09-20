@@ -1,10 +1,14 @@
 ﻿import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import 'firebase_options.dart';
@@ -17,15 +21,58 @@ import 'voice/voice_message_service.dart';
 import 'voice/voice_player.dart';
 import 'user_profile.dart';
 import 'vibe_video.dart';
+import 'package:image_picker/image_picker.dart' show ImageSource;
+import 'media_store.dart';
+import 'games/domino_page.dart';
 import 'moments.dart';
+import 'party_rooms.dart' show PartyRoomPage;
+import 'vibe_status.dart';
+import 'ui/vibe_design.dart';
+import 'ui/vibe_chrome.dart';
+import 'ui/welcome_art.dart';
+import 'ui/welcome_backdrop.dart';
+import 'blocking.dart';
+import 'email_verify.dart';
+import 'onboarding.dart';
+import 'auth_social.dart';
+import 'auth_tiktok.dart';
+import 'auth_phone.dart';
+import 'coin_wallet.dart';
+import 'daily_reward.dart';
+import 'legal.dart';
+import 'push_notifications.dart';
+import 'push_send.dart';
+import 'moment_create.dart';
+import 'app/i18n.dart';
+import 'telemetry.dart';
+import 'home_discover.dart';
+import 'install_app.dart';
+import 'messages_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Çökmələri və hadisələri toplamağa başla.
+  await Telemetry.start();
+
+  // Push: arxa plan handler-i runApp-dan ƏVVƏL qeydə alınmalıdır.
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  }
+  // Media anbarı — video və səsli mesajlar burada saxlanılır.
+  // Bu açar açıqdır (hər istifadəçinin cihazında olur); gizli açar deyil.
+  // Supabase hazırda yalnız fayl saxlamaq üçündür (şəkil, video, səs).
+  // Məlumat bazası Firebase-dədir.
+  //
+  // Supabase cədvəllərinə keçmək istəsək, buraya accessToken əlavə olunmalıdır
+  // ki, Firebase girişi Supabase tərəfdə tanınsın — şərtlər SUPABASE_KECID.md-də.
+  // O parametri vaxtından əvvəl əlavə etmək olmaz: Supabase tanımadığı tokeni
+  // rədd edir və fayl yükləmə dayanır.
   await Supabase.initialize(
-    url: 'https://phxqglacacbyspxucslh.supabase.co',
-    publishableKey: 'sb_publishable_HhTEqYafIZGrApWxW3NwvA_LJrIU2Cd',
+    url: 'https://txjqqohqownpfcokscep.supabase.co',
+    publishableKey: 'sb_publishable_P6hJ0hoQXAz_rZ6lWBwTLA_dLT-edZB',
   );
 
   if (kIsWeb) {
@@ -49,7 +96,23 @@ Future<void> main() async {
     accentColors.length - 1,
   );
 
+  await loadLanguage(prefs);
+
   runApp(const VibeApp());
+
+  // Google/Apple yönləndirməsindən qayıdıbsa, girişi tamamla.
+  //
+  // Bu, tətbiq işə düşəndən SONRA və gözləmədən çağırılır: əks halda
+  // sorğu ləngiyəndə ekran boş qalır.
+  unawaited(
+    handleRedirectSignIn().timeout(
+      const Duration(seconds: 12),
+      onTimeout: () {},
+    ),
+  );
+
+  // İlk kadr çəkiləndə HTML açılış ekranını söndür.
+  WidgetsBinding.instance.addPostFrameCallback((_) => hideStartupSplash());
 }
 
 // ============================================================
@@ -61,7 +124,9 @@ class VibeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
+    return ValueListenableBuilder<AppLang>(
+      valueListenable: appLanguage,
+      builder: (context, language, __) => ValueListenableBuilder<int>(
       valueListenable: appearance,
       builder: (context, accent, _) {
         return MaterialApp(
@@ -166,6 +231,7 @@ class VibeApp extends StatelessWidget {
           home: const AuthGate(),
         );
       },
+      ),
     );
   }
 }
@@ -306,17 +372,100 @@ class AuthGate extends StatelessWidget {
             }
 
             if (!snapshot.data!.exists || snapshot.data!.data() == null) {
-              return const MissingProfilePage();
+              return MissingProfilePage(user: user);
             }
 
-            return MainScreen(
-              profile: UserProfile.fromMap(snapshot.data!.data()!),
-            );
+            final data = snapshot.data!.data()!;
+
+            // Moderasiya: dayandırılmış hesab tətbiqə girə bilməz.
+            if (data['suspended'] == true) {
+              return SuspendedPage(
+                reason: '${data['suspendedReason'] ?? ''}',
+              );
+            }
+
+            // Profil yarımçıqdırsa, əvvəlcə onu tamamlayır.
+            if (needsOnboarding(data)) {
+              return OnboardingPage(uid: user.uid, data: data);
+            }
+
+            return MainScreen(profile: UserProfile.fromMap(data));
           },
         );
       },
     );
   }
+}
+
+/// Dayandırılmış hesab üçün ekran.
+class SuspendedPage extends StatelessWidget {
+  const SuspendedPage({super.key, required this.reason});
+
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: vBg,
+    body: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: vRose.withValues(alpha: .18),
+                border: Border.all(color: vRose.withValues(alpha: .5)),
+              ),
+              child: const Icon(Icons.gavel_rounded, color: vRose, size: 38),
+            ),
+            const SizedBox(height: 22),
+            const Text(
+              'Hesabın dayandırılıb',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              reason.isEmpty
+                  ? 'İcma qaydalarının pozulması səbəbindən hesabın müvəqqəti '
+                        'dayandırılıb.'
+                  : 'Səbəb: $reason',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: vMuted, height: 1.5),
+            ),
+            const SizedBox(height: 28),
+            GradientButton(
+              label: 'Dəstəyə yaz',
+              icon: Icons.mail_outline_rounded,
+              expand: false,
+              onPressed: () {
+                Clipboard.setData(const ClipboardData(text: supportEmail));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('E-poçt kopyalandı.')),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => FirebaseAuth.instance.signOut(),
+              child: const Text(
+                'Çıxış et',
+                style: TextStyle(color: vMuted),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class LoadingPage extends StatelessWidget {
@@ -341,18 +490,84 @@ class ErrorPage extends StatelessWidget {
   }
 }
 
+/// Hesab var, amma Firestore-da profil sənədi yoxdur — məsələn ilk yazma
+/// şəbəkə xətası ilə kəsilib. Çıxış etdirmək əvəzinə profili burada yaradırıq.
 class MissingProfilePage extends StatelessWidget {
-  const MissingProfilePage({super.key});
+  const MissingProfilePage({super.key, required this.user});
+
+  final User user;
+
+  Future<void> _create() async {
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'uid': user.uid,
+      'name': (user.displayName ?? '').trim().isNotEmpty
+          ? user.displayName!.trim()
+          : 'VIBE istifadəçisi',
+      'email': user.email ?? '',
+      if ((user.photoURL ?? '').isNotEmpty) 'photoUrl': user.photoURL,
+      'level': 1,
+      'coins': 100,
+      'online': true,
+      'createdAt': FieldValue.serverTimestamp(),
+      'lastSeen': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: FilledButton(
-          onPressed: () async {
-            await FirebaseAuth.instance.signOut();
-          },
-          child: const Text('Yenidən giriş et'),
+      backgroundColor: vBg,
+      body: AuroraBackground(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.person_add_alt_1_rounded,
+                    color: vPink, size: 56),
+                const SizedBox(height: 18),
+                const Text(
+                  'Profilin hazır deyil',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: vInk,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Hesabın var, amma profil məlumatların yazılmayıb. '
+                  'Bir toxunuşla tamamlayaq.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: vMuted, fontSize: 14, height: 1.45),
+                ),
+                const SizedBox(height: 22),
+                GradientButton(
+                  label: 'Profili yarat',
+                  expand: false,
+                  gradient: vBrand,
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await _create();
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text('Alınmadı: $e')),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: () => FirebaseAuth.instance.signOut(),
+                  child: const Text('Çıxış et',
+                      style: TextStyle(color: vMuted)),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -373,6 +588,9 @@ class WelcomePage extends StatefulWidget {
 class _WelcomePageState extends State<WelcomePage> {
   String lang = 'AZ';
   int guestTab = 0;
+
+  /// Giriş əməliyyatı gedir — düymələr bağlanır.
+  bool authBusy = false;
 
   static const Map<String, Map<String, String>> t = {
     'AZ': {
@@ -615,6 +833,16 @@ class _WelcomePageState extends State<WelcomePage> {
             ),
           ),
 
+          // Sağ tərəfdə illüstrasiya — yalnız Ana səhifədə.
+          if (guestTab == 0)
+            Positioned(
+              right: w * .045,
+              top: h * .13,
+              width: (w * .44).clamp(320.0, 720.0).toDouble(),
+              height: (h * .68).clamp(260.0, 620.0).toDouble(),
+              child: const VibeWelcomeArt(height: double.infinity),
+            ),
+
           if (guestTab != 0)
             Positioned(
               left: w * .055,
@@ -813,47 +1041,88 @@ class _WelcomePageState extends State<WelcomePage> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        const ColoredBox(color: Color(0xff05030d)),
-        Container(color: const Color(0xff05030d).withValues(alpha: .74)),
+        const VibeWelcomeBackdrop(),
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [
-                  _logo(30),
-                  const Spacer(),
-                  const Icon(Icons.language, color: Colors.white, size: 20),
-                  const SizedBox(width: 6),
-                  DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: lang,
-                      dropdownColor: const Color(0xff151022),
-                      iconEnabledColor: Colors.white,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                      items: const ['AZ','TR','EN','RU'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                      onChanged: (v) => setState(() => lang = v ?? lang),
-                    ),
-                  ),
-                ]),
+                Row(
+                  children: [
+                    _langPill(),
+                    const Spacer(),
+                    _supportButton(),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                _logo(44),
                 const Spacer(),
-                _logo(64),
-                const SizedBox(height: 12),
-                Text('${x('people')}\n${x('connections')}', style: const TextStyle(color: Color(0xffff43d7), fontSize: 28, height: 1.12, fontStyle: FontStyle.italic)),
-                const SizedBox(height: 20),
-                Text(x('desc'), style: const TextStyle(color: Colors.white70, fontSize: 17, height: 1.4)),
-                const SizedBox(height: 26),
-                SizedBox(
-                  width: double.infinity, height: 58,
-                  child: DecoratedBox(
-                    decoration: const BoxDecoration(borderRadius: BorderRadius.all(Radius.circular(32)), gradient: LinearGradient(colors: [Color(0xff13b9ff), Color(0xff7657ff), Color(0xffff10c8)])),
-                    child: TextButton(onPressed: () => openPage(const LoginPage()), child: Text(x('start'), style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800))),
+                Text(
+                  '${x('people')} · ${x('connections')}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xffe6dcff),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Center(child: TextButton(onPressed: () => openPage(const LoginPage()), child: Text(x('login'), style: const TextStyle(color: Colors.white, decoration: TextDecoration.underline, decorationColor: Colors.white)))),
-                const Spacer(),
+                const SizedBox(height: 18),
+                // Apple yuxarıda, Google altda — mağaza tətbiqlərindəki sıra.
+                if (appleSignInAvailable) ...[
+                  WelcomeAuthButton(
+                    label: 'Apple ilə davam et',
+                    icon: const Icon(Icons.apple, size: 26, color: Colors.black),
+                    onPressed: authBusy ? null : _welcomeApple,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                WelcomeAuthButton(
+                  label: 'Google ilə davam et',
+                  icon: _googleMark(),
+                  onPressed: authBusy ? null : _welcomeGoogle,
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    WelcomeMiniButton(
+                      icon: Icons.phone_iphone_rounded,
+                      color: const Color(0xffd9ccff),
+                      tooltip: 'Nömrə ilə',
+                      onPressed:
+                          authBusy ? null : () => openPage(const PhoneAuthPage()),
+                    ),
+                    const SizedBox(width: 16),
+                    WelcomeMiniButton(
+                      icon: Icons.mail_outline_rounded,
+                      color: const Color(0xff9fe4ff),
+                      tooltip: 'E-poçt ilə',
+                      onPressed:
+                          authBusy ? null : () => openPage(const LoginPage()),
+                    ),
+                    const SizedBox(width: 16),
+                    WelcomeMiniButton(
+                      icon: Icons.more_horiz_rounded,
+                      color: const Color(0xffffd9a0),
+                      tooltip: 'Digər',
+                      onPressed: authBusy ? null : _openMoreWays,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _termsNote(),
+                if (authBusy) ...[
+                  const SizedBox(height: 10),
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -861,6 +1130,252 @@ class _WelcomePageState extends State<WelcomePage> {
       ],
     );
   }
+
+  /// Davam etməklə qaydaların qəbulu — App Store tələbidir.
+  Widget _termsNote() => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle_rounded, size: 15, color: vMint),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                style: const TextStyle(
+                  color: Color(0xff9d95b8),
+                  fontSize: 11.5,
+                  height: 1.45,
+                ),
+                children: [
+                  const TextSpan(text: 'Davam etməklə '),
+                  TextSpan(
+                    text: 'İstifadə şərtlərini',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () => LegalPage.openTerms(context),
+                  ),
+                  const TextSpan(text: ', '),
+                  TextSpan(
+                    text: 'Məxfilik siyasətini',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () => LegalPage.openPrivacy(context),
+                  ),
+                  const TextSpan(text: ' və '),
+                  TextSpan(
+                    text: 'İcma qaydalarını',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () => LegalPage.openRules(context),
+                  ),
+                  const TextSpan(text: ' qəbul etmiş olursan.'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+
+  Widget _supportButton() => WelcomeMiniButton(
+        icon: Icons.headset_mic_rounded,
+        color: const Color(0xffd9ccff),
+        tooltip: 'Dəstək',
+        onPressed: () {
+          Clipboard.setData(const ClipboardData(text: supportEmail));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Dəstək e-poçtu kopyalandı.')),
+          );
+        },
+      );
+
+  Widget _googleMark() => SizedBox(
+        width: 22,
+        height: 22,
+        child: CustomPaint(painter: _GoogleGLogoPainter()),
+      );
+
+  /// Üç nöqtə: digər giriş yolları.
+  ///
+  /// SUGO-dakı kimi — yuvarlaq provayder ikonları bir sıra ilə.
+  void _openMoreWays() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Bununla giriş et',
+                style: TextStyle(
+                  color: Color(0xff1f1f1f),
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _wayButton(
+                    label: 'TikTok',
+                    background: const Color(0xff121212),
+                    child: const TiktokMark(size: 30),
+                    onTap: () {
+                      Navigator.pop(sheet);
+                      if (tiktokReady) {
+                        // Açarlar hazır olanda buradan TikTok axını başlayır.
+                        return;
+                      }
+                      showTiktokNotReady(context);
+                    },
+                  ),
+                  const SizedBox(width: 26),
+                  _wayButton(
+                    label: 'Nömrə',
+                    background: const Color(0xff8b5cff),
+                    child: const Icon(Icons.phone_iphone_rounded,
+                        color: Colors.white, size: 27),
+                    onTap: () {
+                      Navigator.pop(sheet);
+                      openPage(const PhoneAuthPage());
+                    },
+                  ),
+                  const SizedBox(width: 26),
+                  _wayButton(
+                    label: 'E-poçt',
+                    background: const Color(0xff22a7ff),
+                    child: const Icon(Icons.mail_rounded,
+                        color: Colors.white, size: 26),
+                    onTap: () {
+                      Navigator.pop(sheet);
+                      openPage(const LoginPage());
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              const Divider(height: 1, color: Color(0xffe6e2ef)),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(sheet);
+                  openPage(const RegisterPage());
+                },
+                child: const Text(
+                  'Yeni hesab yarat',
+                  style: TextStyle(
+                    color: Color(0xff8b5cff),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Yuvarlaq provayder düyməsi.
+  Widget _wayButton({
+    required String label,
+    required Color background,
+    required Widget child,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: background,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(width: 58, height: 58, child: Center(child: child)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xff555160),
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _welcomeGoogle() => _runAuth(signInWithGoogle);
+
+  Future<void> _welcomeApple() => _runAuth(signInWithApple);
+
+  /// Giriş axını: yüklənmə, xəta mətni, uğurda ekranı bağlamaq.
+  Future<void> _runAuth(Future<UserCredential> Function() action) async {
+    if (authBusy) return;
+    setState(() => authBusy = true);
+    try {
+      await action();
+      // AuthGate özü əsas ekrana keçirir.
+    } catch (error) {
+      final message = describeAuthError(error);
+      if (mounted && message.isNotEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+    } finally {
+      if (mounted) setState(() => authBusy = false);
+    }
+  }
+
+  Widget _langPill() => Container(
+        padding: const EdgeInsets.only(left: 12, right: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .06),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: vLine),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.language_rounded, color: vInk, size: 16),
+            const SizedBox(width: 6),
+            DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: lang,
+                isDense: true,
+                dropdownColor: vPanelHigh,
+                iconEnabledColor: vMuted,
+                style: const TextStyle(
+                  color: vInk,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+                items: const ['AZ', 'TR', 'EN', 'RU']
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .toList(),
+                onChanged: (v) => setState(() => lang = v ?? lang),
+              ),
+            ),
+          ],
+        ),
+      );
 
   Widget _logo(double size) => ShaderMask(
     shaderCallback: (r) => const LinearGradient(colors: [Color(0xff18b9ff), Color(0xff8b5cff), Color(0xffff22c7)]).createShader(r),
@@ -924,7 +1439,6 @@ class _WelcomePageState extends State<WelcomePage> {
 class _GoogleGLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
     final stroke = size.width * .22;
     final paint = Paint()
       ..style = PaintingStyle.stroke
@@ -1063,6 +1577,106 @@ class _LoginPageState extends State<LoginPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
+  /// Nömrə ilə giriş — SMS kodu ilə.
+  Future<void> _signInWithPhone() async {
+    if (loading) return;
+    final done = await showPhoneAuthSheet(context);
+    if (done && mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  }
+
+  /// Şifrəni unudanlar üçün bərpa: e-poçt linki və ya SMS kodu.
+  Future<void> _resetPassword() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: vPanel,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 18, 20, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Şifrəni necə bərpa edək?',
+                  style: TextStyle(
+                    color: vInk,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.mail_outline_rounded, color: vBlue),
+              title: const Text('E-poçta link göndər',
+                  style: TextStyle(color: vInk)),
+              subtitle: const Text('Gmail və digər e-poçt ünvanları üçün',
+                  style: TextStyle(color: vMuted, fontSize: 12)),
+              onTap: () => Navigator.pop(sheet, 'email'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.sms_rounded, color: vMint),
+              title: const Text('Nömrəyə SMS kod göndər',
+                  style: TextStyle(color: vInk)),
+              subtitle: const Text('Hesabına nömrə bağlıdırsa',
+                  style: TextStyle(color: vMuted, fontSize: 12)),
+              onTap: () => Navigator.pop(sheet, 'phone'),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+
+    if (choice == null || !mounted) return;
+
+    if (choice == 'phone') {
+      final done = await showPhoneAuthSheet(
+        context,
+        mode: PhoneAuthMode.recover,
+      );
+      if (done && mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+      return;
+    }
+
+    await _resetByEmail();
+  }
+
+  /// E-poçt ünvanına bərpa linki.
+  Future<void> _resetByEmail() async {
+    final typed = emailController.text.trim();
+    final email = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => _ResetPasswordDialog(initialEmail: typed),
+    );
+    if (email == null || !mounted) return;
+
+    setState(() => loading = true);
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (!mounted) return;
+      showMessage('$email ünvanına bərpa linki göndərildi. Poçtunu yoxla.');
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      // `user-not-found` cavabını gizlədirik: kimin hesabı olduğunu açmamalıyıq.
+      if (e.code == 'user-not-found' || e.code == 'invalid-email') {
+        showMessage('Belə bir hesab varsa, bərpa linki göndərildi.');
+      } else {
+        showMessage('Göndərmək alınmadı: ${e.message}');
+      }
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
   @override
   void dispose() {
     emailController.dispose();
@@ -1082,95 +1696,33 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _appleLogo({double size = 22}) {
-    return Icon(
-      Icons.apple,
-      color: const Color(0xfff2f2f2),
-      size: size,
-    );
-  }
-
-  Future<void> _saveSocialUser(User user) async {
-    final fallbackName = user.email?.split('@').first ?? 'VIBE istifadəçisi';
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-      'uid': user.uid,
-      'name': (user.displayName ?? '').trim().isEmpty ? fallbackName : user.displayName!.trim(),
-      'email': user.email ?? '',
-      'age': 0,
-      'city': '',
-      'about': '',
-      'online': true,
-      'lastSeen': FieldValue.serverTimestamp(),
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-  }
-
-  Future<void> _signInWithGoogle() async {
+  /// Google/Apple üçün ortaq axın: yüklənmə, xəta mətni, yönləndirmə.
+  Future<void> _social(Future<UserCredential> Function() run) async {
+    if (loading) return;
+    setState(() => loading = true);
     try {
-      setState(() => loading = true);
-      final provider = GoogleAuthProvider();
-      provider.setCustomParameters({'prompt': 'select_account'});
-
-      final credential = kIsWeb
-          ? await FirebaseAuth.instance.signInWithPopup(provider)
-          : await FirebaseAuth.instance.signInWithProvider(provider);
-
-      final user = credential.user;
-      if (user != null) await _saveSocialUser(user);
+      await run();
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('rememberMe', true);
 
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Google ilə giriş alınmadı')),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Google ilə giriş alınmadı')),
-      );
+    } catch (error) {
+      final message = describeAuthError(error);
+      // Boş mətn = istifadəçi özü ləğv edib, xəta göstərmirik.
+      if (!mounted || message.isEmpty) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => loading = false);
     }
   }
 
-  Future<void> _signInWithApple() async {
-    try {
-      setState(() => loading = true);
-      final provider = AppleAuthProvider();
-      provider.addScope('email');
-      provider.addScope('name');
+  Future<void> _signInWithGoogle() => _social(signInWithGoogle);
 
-      final credential = kIsWeb
-          ? await FirebaseAuth.instance.signInWithPopup(provider)
-          : await FirebaseAuth.instance.signInWithProvider(provider);
-
-      final user = credential.user;
-      if (user != null) await _saveSocialUser(user);
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('rememberMe', true);
-
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Apple ilə giriş alınmadı')),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Apple ilə giriş alınmadı')),
-      );
-    } finally {
-      if (mounted) setState(() => loading = false);
-    }
-  }
+  Future<void> _signInWithApple() => _social(signInWithApple);
 
   @override
   Widget build(BuildContext context) {
@@ -1329,7 +1881,7 @@ class _LoginPageState extends State<LoginPage> {
                                       const Text('Məni yadda saxla', style: TextStyle(color: Colors.white, fontSize: 13)),
                                       const Spacer(),
                                       TextButton(
-                                        onPressed: () => showMessage('Şifrə bərpasını növbəti addımda qoşacağıq.'),
+                                        onPressed: loading ? null : _resetPassword,
                                         child: const Text(
                                           'Şifrəni unutmusan?',
                                           style: TextStyle(color: Color(0xffd8c9ff), fontSize: 12, decoration: TextDecoration.underline),
@@ -1368,24 +1920,24 @@ class _LoginPageState extends State<LoginPage> {
                                     ],
                                   ),
                                   const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _socialButton(
-                                          provider: 'google',
-                                          text: 'Google ilə davam et',
-                                          onPressed: _signInWithGoogle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: _socialButton(
-                                          provider: 'apple',
-                                          text: 'Apple ilə davam et',
-                                          onPressed: _signInWithApple,
-                                        ),
-                                      ),
-                                    ],
+                                  _socialButton(
+                                    provider: 'google',
+                                    text: 'Google ilə davam et',
+                                    onPressed: _signInWithGoogle,
+                                  ),
+                                  if (appleSignInAvailable) ...[
+                                    const SizedBox(height: 10),
+                                    _socialButton(
+                                      provider: 'apple',
+                                      text: 'Apple ilə davam et',
+                                      onPressed: _signInWithApple,
+                                    ),
+                                  ],
+                                  const SizedBox(height: 10),
+                                  _socialButton(
+                                    provider: 'phone',
+                                    text: 'Nömrə ilə davam et',
+                                    onPressed: _signInWithPhone,
                                   ),
                                 ],
                               ),
@@ -1503,41 +2055,159 @@ class _LoginPageState extends State<LoginPage> {
     required Future<void> Function() onPressed,
   }) {
     final isGoogle = provider == 'google';
+    final isPhone = provider == 'phone';
 
-    return SizedBox(
-      height: 48,
-      child: OutlinedButton(
-        onPressed: loading ? null : () => onPressed(),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white,
-          side: const BorderSide(color: Color(0xff302a49)),
-          backgroundColor: const Color(0xff17142a),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (isGoogle) _googleLogo(size: 20) else _appleLogo(size: 22),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                text,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+    // Rəsmi qaydalar: Google ağ fonda, Apple qara fonda.
+    // Nömrə düyməsi tətbiqin öz rəngindədir.
+    final background = isGoogle
+        ? Colors.white
+        : (isPhone ? const Color(0xff1a1230) : Colors.black);
+    final foreground = isGoogle ? const Color(0xff1f1f1f) : Colors.white;
+
+    return Opacity(
+      opacity: loading ? .6 : 1,
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: loading ? null : () => onPressed(),
+          child: Container(
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isGoogle
+                    ? const Color(0xffdadce0)
+                    : (isPhone
+                        ? vPurple.withValues(alpha: .55)
+                        : Colors.white.withValues(alpha: .22)),
               ),
             ),
-          ],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isGoogle)
+                  _googleLogo(size: 20)
+                else if (isPhone)
+                  const Icon(Icons.phone_iphone_rounded,
+                      size: 22, color: Color(0xffd9ccff))
+                else
+                  Icon(Icons.apple, size: 25, color: foreground),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    text,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: foreground,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: .1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+
 
 }
 
 // ============================================================
 // REGISTER
 // ============================================================
+
+/// Şifrə bərpası üçün e-poçt soruşan pəncərə.
+class _ResetPasswordDialog extends StatefulWidget {
+  const _ResetPasswordDialog({required this.initialEmail});
+
+  final String initialEmail;
+
+  @override
+  State<_ResetPasswordDialog> createState() => _ResetPasswordDialogState();
+}
+
+class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
+  late final TextEditingController controller =
+      TextEditingController(text: widget.initialEmail);
+  String? error;
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final email = controller.text.trim();
+    if (!email.contains('@') || !email.contains('.') || email.length < 6) {
+      setState(() => error = 'Düzgün e-poçt ünvanı yaz.');
+      return;
+    }
+    Navigator.of(context).pop(email);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: vPanel,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Şifrəni bərpa et', style: TextStyle(color: vInk)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Hesabının e-poçtunu yaz — bərpa linkini ora göndərəcəyik.',
+            style: TextStyle(color: vMuted, fontSize: 13, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(color: vInk),
+            onSubmitted: (_) => _submit(),
+            onChanged: (_) {
+              if (error != null) setState(() => error = null);
+            },
+            decoration: InputDecoration(
+              hintText: 'ad@nümunə.com',
+              hintStyle: const TextStyle(color: vMuted),
+              errorText: error,
+              filled: true,
+              fillColor: vBg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: vLine),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: vLine),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Ləğv et', style: TextStyle(color: vMuted)),
+        ),
+        TextButton(
+          onPressed: _submit,
+          child: const Text('Göndər', style: TextStyle(color: vPink)),
+        ),
+      ],
+    );
+  }
+}
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -1556,6 +2226,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   bool loading = false;
   bool hidePassword = true;
+  bool acceptedTerms = false;
 
   Future<void> register() async {
     final name = nameController.text.trim();
@@ -1576,6 +2247,16 @@ class _RegisterPageState extends State<RegisterPage> {
 
     if (password.length < 6) {
       showMessage('Şifrə ən azı 6 simvol olmalıdır.');
+      return;
+    }
+
+    if (age < 18) {
+      showMessage('VIBE yalnız 18 yaşdan yuxarı istifadəçilər üçündür.');
+      return;
+    }
+
+    if (!acceptedTerms) {
+      showMessage('Davam etmək üçün şərtləri və icma qaydalarını qəbul et.');
       return;
     }
 
@@ -1607,15 +2288,32 @@ class _RegisterPageState extends State<RegisterPage> {
         'about': about,
         'email': email,
         'online': true,
+        'coins': 100,
+        'level': 1,
+        'acceptedTermsAt': FieldValue.serverTimestamp(),
         'lastSeen': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       });
 
+      // Təsdiq linki — göndərilməsə də qeydiyyat pozulmur.
+      try {
+        await result.user!.sendEmailVerification();
+      } catch (_) {}
+
+      Telemetry.log('sign_up', {'method': 'email'});
+
       if (!mounted) return;
 
       Navigator.popUntil(context, (route) => route.isFirst);
+    } on FirebaseAuthException catch (e) {
+      // Ən çox rast gəlinən hal: bu e-poçtla artıq hesab var.
+      if (e.code == 'email-already-in-use') {
+        _offerLogin(email);
+      } else {
+        showMessage(describeRegisterError(e));
+      }
     } catch (e) {
-      showMessage('Qeydiyyat xətası: $e');
+      showMessage('Qeydiyyat alınmadı. Bağlantını yoxla.');
     } finally {
       if (mounted) {
         setState(() {
@@ -1627,6 +2325,40 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void showMessage(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// Hesab artıq varsa, istifadəçini girişə yönəldirik.
+  void _offerLogin(String email) {
+    showDialog<void>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: vPanel,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Bu e-poçtla hesab var',
+            style: TextStyle(color: vInk, fontSize: 18)),
+        content: Text(
+          '$email artıq qeydiyyatdan keçib. Daxil ola, '
+          'şifrəni unutmusansa bərpa edə bilərsən.',
+          style: const TextStyle(color: vMuted, fontSize: 13.5, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Başqa e-poçt', style: TextStyle(color: vMuted)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialog);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+              );
+            },
+            child: const Text('Daxil ol', style: TextStyle(color: vPink)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1709,7 +2441,66 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
+
+          // App Store 1.2: qeydiyyatda şərtlərin açıq qəbulu tələb olunur.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: acceptedTerms,
+                onChanged: (value) =>
+                    setState(() => acceptedTerms = value ?? false),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text(
+                        '18 yaşım tamamdır və ',
+                        style: TextStyle(color: Color(0xffb7aecb), fontSize: 13),
+                      ),
+                      GestureDetector(
+                        onTap: () => LegalPage.openTerms(context),
+                        child: const Text(
+                          'istifadə şərtlərini',
+                          style: TextStyle(
+                            color: Color(0xffff65dc),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      const Text(
+                        ' və ',
+                        style: TextStyle(color: Color(0xffb7aecb), fontSize: 13),
+                      ),
+                      GestureDetector(
+                        onTap: () => LegalPage.openRules(context),
+                        child: const Text(
+                          'icma qaydalarını',
+                          style: TextStyle(
+                            color: Color(0xffff65dc),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      const Text(
+                        ' qəbul edirəm. Uyğunsuz məzmuna sıfır dözümlülük var.',
+                        style: TextStyle(color: Color(0xffb7aecb), fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           SizedBox(
             height: 54,
             child: FilledButton(
@@ -1720,6 +2511,16 @@ class _RegisterPageState extends State<RegisterPage> {
                       'Qeydiyyatdan keç',
                       style: TextStyle(fontSize: 18),
                     ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: TextButton(
+              onPressed: () => LegalPage.openPrivacy(context),
+              child: const Text(
+                'Məxfilik siyasəti',
+                style: TextStyle(color: Color(0xff9d94ae), fontSize: 12.5),
+              ),
             ),
           ),
         ],
@@ -1754,10 +2555,53 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     setOnline();
+    ensureWelcomeBonus(widget.profile.uid);
+    startPushNotifications(widget.profile.uid);
+    Telemetry.setUser(widget.profile.uid);
+
+    // Bildirişə toxunanda söhbəti aç.
+    pendingPushTarget.addListener(_openPushTarget);
+
+    // Gündəlik mükafat — tətbiq açılandan bir az sonra.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _offerDailyReward());
 
     heartbeat = Timer.periodic(const Duration(seconds: 15), (_) {
       setOnline();
     });
+  }
+
+  /// Gündəlik mükafat hazırdırsa pəncərəni açır.
+  ///
+  /// Gözləmə var ki, ekran oturuşsun və istifadəçi qarşılanan kimi
+  /// pəncərə ilə üzləşməsin.
+  Future<void> _offerDailyReward() async {
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (!mounted) return;
+
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.profile.uid)
+          .get();
+      final data = snap.data() ?? const <String, dynamic>{};
+
+      final now = DateTime.now();
+      if (!canClaimToday(lastClaimFrom(data), now)) return;
+      if (!mounted) return;
+
+      final streak = nextStreak(lastClaimFrom(data), streakFrom(data), now);
+
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (_) => DailyRewardSheet(
+          uid: widget.profile.uid,
+          streak: streak,
+        ),
+      );
+    } catch (_) {
+      // Mükafat göstərilmədisə tətbiq normal işləyir.
+    }
   }
 
   Future<void> setOnline() async {
@@ -1808,21 +2652,38 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     heartbeat?.cancel();
+    pendingPushTarget.removeListener(_openPushTarget);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  /// Push bildirişindən gələn söhbəti açır.
+  void _openPushTarget() {
+    final target = pendingPushTarget.value;
+    if (target == null || !mounted) return;
+    pendingPushTarget.value = null;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RealChatPage(
+          currentProfile: widget.profile,
+          targetUid: target.uid,
+          targetName: target.name,
+        ),
+      ),
+    );
+  }
+
+  void navigate(int index) {
+    setState(() {
+      selectedIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    void navigate(int index) {
-      setState(() {
-        selectedIndex = index;
-      });
-    }
-
     final pages = <Widget>[
       SocialHome(profile: widget.profile),
-      VibeVideoPage(profile: widget.profile),
       MomentsPage(profile: widget.profile),
       SocialFeed(profile: widget.profile, rooms: true),
       SocialMessages(profile: widget.profile, navigate: navigate),
@@ -1832,53 +2693,137 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     return Scaffold(
       body: IncomingCalls(
         uid: widget.profile.uid,
-        child: IndexedStack(index: selectedIndex, children: pages),
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xff090611),
-          border: Border(top: BorderSide(color: Color(0xff2a1b3e))),
-          boxShadow: [
-            BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, -6)),
+        child: Column(
+          children: [
+            const UpdateBanner(),
+            const EmailVerifyBanner(),
+            Expanded(
+              child: IndexedStack(index: selectedIndex, children: pages),
+            ),
           ],
         ),
-        child: NavigationBarTheme(
-          data: NavigationBarThemeData(
-            height: 76,
-            backgroundColor: Colors.transparent,
-            indicatorColor: const Color(0xff8b5cff).withValues(alpha: .24),
-            labelTextStyle: WidgetStateProperty.resolveWith((states) {
-              final selected = states.contains(WidgetState.selected);
-              return TextStyle(
-                color: selected ? Colors.white : const Color(0xff9d94ae),
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-              );
-            }),
-            iconTheme: WidgetStateProperty.resolveWith((states) {
-              final selected = states.contains(WidgetState.selected);
-              return IconThemeData(
-                color: selected ? const Color(0xffff2bd6) : const Color(0xff9d94ae),
-                size: 25,
-              );
-            }),
-          ),
-          child: NavigationBar(
-            selectedIndex: selectedIndex,
-            onDestinationSelected: navigate,
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Ana səhifə'),
-              NavigationDestination(icon: Icon(Icons.play_circle_outline_rounded), selectedIcon: Icon(Icons.play_circle_fill_rounded), label: 'Video'),
-              NavigationDestination(icon: Icon(Icons.auto_awesome_outlined), selectedIcon: Icon(Icons.auto_awesome_rounded), label: 'Anlar'),
-              NavigationDestination(icon: Icon(Icons.meeting_room_outlined), selectedIcon: Icon(Icons.meeting_room_rounded), label: 'Otaqlar'),
-              NavigationDestination(icon: Icon(Icons.chat_bubble_outline_rounded), selectedIcon: Icon(Icons.chat_bubble_rounded), label: 'Mesajlar'),
-              NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Mən'),
+      ),
+      bottomNavigationBar: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('chats')
+            .where('members', arrayContains: widget.profile.uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          final unread = (snapshot.data?.docs ?? const [])
+              .where((doc) => isUnread(doc.data(), widget.profile.uid))
+              .length;
+
+          return VibeBottomNav(
+            index: selectedIndex,
+            onChanged: navigate,
+            messageBadge: unread,
+            onCreate: _openCreateSheet,
+          );
+        },
+      ),
+    );
+  }
+
+  /// Mərkəzdəki "+" düyməsi: nə paylaşmaq istədiyini soruşur.
+  void _openCreateSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheet) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xff120d1d),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border(top: BorderSide(color: Color(0xff33264a))),
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 42,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xff3c2f55),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              _createTile(
+                sheet,
+                Icons.auto_awesome_rounded,
+                'Anını paylaş',
+                'Şəkil və ya fikir paylaş',
+                const [Color(0xff8b5cff), Color(0xffff2bd6)],
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CreateMomentPage(profile: widget.profile),
+                  ),
+                ),
+              ),
+              _createTile(
+                sheet,
+                Icons.play_circle_fill_rounded,
+                'VIBE Video',
+                'Şaquli video lentini aç və paylaş',
+                const [Color(0xff22a7ff), Color(0xff8b5cff)],
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VibeVideoPage(profile: widget.profile),
+                  ),
+                ),
+              ),
+              _createTile(
+                sheet,
+                Icons.mic_rounded,
+                'Səsli otaq',
+                'Öz otağını yarat, dostlarını çağır',
+                const [Color(0xff48e08a), Color(0xff22a7ff)],
+                () => navigate(2),
+              ),
+              const SizedBox(height: 6),
             ],
           ),
         ),
       ),
     );
   }
+
+  Widget _createTile(
+    BuildContext sheet,
+    IconData icon,
+    String title,
+    String subtitle,
+    List<Color> colors,
+    VoidCallback action,
+  ) => ListTile(
+    onTap: () {
+      Navigator.pop(sheet);
+      action();
+    },
+    leading: Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: colors),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Icon(icon, color: Colors.white, size: 24),
+    ),
+    title: Text(
+      title,
+      style: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w900,
+        fontSize: 15.5,
+      ),
+    ),
+    subtitle: Text(subtitle, style: const TextStyle(color: vMuted, fontSize: 12)),
+    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xff7b7390)),
+  );
 }
 
 // ============================================================
@@ -2165,7 +3110,7 @@ class _VibeVideoFeedState extends State<VibeVideoFeed> {
 // social_ui.dart bu səhifədən istifadə edir
 // ============================================================
 
-class PersonPage extends StatelessWidget {
+class PersonPage extends StatefulWidget {
   final UserProfile currentProfile;
   final String targetUid;
 
@@ -2175,7 +3120,24 @@ class PersonPage extends StatelessWidget {
     required this.targetUid,
   });
 
-  Future<void> _toggleFollow(BuildContext context, bool following, String targetName) async {
+  @override
+  State<PersonPage> createState() => _PersonPageState();
+}
+
+class _PersonPageState extends State<PersonPage> {
+  static const tabs = ['Profil', 'Anlar', 'Hədiyyələr', 'Dostlar'];
+
+  int tab = 0;
+  int coverIndex = 0;
+
+  String get targetUid => widget.targetUid;
+  UserProfile get currentProfile => widget.currentProfile;
+
+  // ----------------------------------------------------------
+  // ƏMƏLİYYATLAR
+  // ----------------------------------------------------------
+
+  Future<void> _toggleFollow(bool following, String targetName) async {
     final ref = FirebaseFirestore.instance
         .collection('users')
         .doc(currentProfile.uid)
@@ -2186,6 +3148,7 @@ class PersonPage extends StatelessWidget {
         .doc(targetUid)
         .collection('followers')
         .doc(currentProfile.uid);
+
     final batch = FirebaseFirestore.instance.batch();
     if (following) {
       batch.delete(ref);
@@ -2202,6 +3165,7 @@ class PersonPage extends StatelessWidget {
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
+
     try {
       await batch.commit();
 
@@ -2212,23 +3176,36 @@ class PersonPage extends StatelessWidget {
               .doc(targetUid)
               .collection('notifications')
               .add({
-            'type': 'follow',
-            'title': '${currentProfile.name} səni izləməyə başladı',
-            'body': 'Profilinə yeni izləyici gəldi 💜',
-            'fromUid': currentProfile.uid,
-            'read': false,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+                'type': 'follow',
+                'title': '${currentProfile.name} səni izləməyə başladı',
+                'body': 'Profilinə yeni izləyici gəldi 💜',
+                'fromUid': currentProfile.uid,
+                'read': false,
+                'createdAt': FieldValue.serverTimestamp(),
+              });
         } catch (_) {}
+
+        // Cihaz bildirişi.
+        unawaited(sendPushToUser(
+          toUid: targetUid,
+          title: 'Yeni izləyici',
+          body: '${currentProfile.name} səni izləməyə başladı',
+          type: 'follow',
+          fromName: currentProfile.name,
+        ));
       }
 
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(following ? 'İzləmədən çıxarıldı.' : '$targetName izlənilir 💜')),
+          SnackBar(
+            content: Text(
+              following ? 'İzləmədən çıxarıldı.' : '$targetName izlənilir 💜',
+            ),
+          ),
         );
       }
     } catch (_) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('İzləmə əməliyyatı alınmadı.')),
         );
@@ -2236,26 +3213,22 @@ class PersonPage extends StatelessWidget {
     }
   }
 
-  Future<void> _blockUser(BuildContext context, String targetName) async {
+  Future<void> _blockUser(String targetName) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentProfile.uid)
-          .collection('blocked')
-          .doc(targetUid)
-          .set({
-            'uid': targetUid,
-            'name': targetName,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-      if (context.mounted) {
+      await blockUser(
+        myUid: currentProfile.uid,
+        myName: currentProfile.name,
+        targetUid: targetUid,
+        targetName: targetName,
+      );
+      if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('$targetName bloklandı.')),
         );
       }
     } catch (_) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Bloklama alınmadı.')),
         );
@@ -2263,7 +3236,24 @@ class PersonPage extends StatelessWidget {
     }
   }
 
-  Future<void> _reportUser(BuildContext context, String targetName, String reason) async {
+  Future<void> _unblockUser(String targetName) async {
+    try {
+      await unblockUser(myUid: currentProfile.uid, targetUid: targetUid);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$targetName blokdan çıxarıldı.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Blok götürülmədi.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _reportUser(String targetName, String reason) async {
     try {
       await FirebaseFirestore.instance.collection('reports').add({
         'reporterId': currentProfile.uid,
@@ -2274,13 +3264,13 @@ class PersonPage extends StatelessWidget {
         'status': 'new',
         'createdAt': FieldValue.serverTimestamp(),
       });
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Şikayət göndərildi. Təşəkkür edirik.')),
         );
       }
     } catch (_) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Şikayət göndərilmədi.')),
         );
@@ -2288,8 +3278,8 @@ class PersonPage extends StatelessWidget {
     }
   }
 
-  void _openSafetyMenu(BuildContext context, String targetName) {
-    showModalBottomSheet(
+  void _openSafetyMenu(String targetName) {
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xff151020),
       showDragHandle: true,
@@ -2298,38 +3288,55 @@ class PersonPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const ListTile(
-              title: Text('Təhlükəsizlik', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-              subtitle: Text('Bu istifadəçi ilə bağlı əməliyyat seç', style: TextStyle(color: Color(0xff9e95ac))),
+              title: Text(
+                'Təhlükəsizlik',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+              ),
+              subtitle: Text(
+                'Bu istifadəçi ilə bağlı əməliyyat seç',
+                style: TextStyle(color: Color(0xff9e95ac)),
+              ),
             ),
             for (final reason in const ['Saxta profil', 'Spam', 'Uyğunsuz davranış'])
               ListTile(
                 leading: const Icon(Icons.flag_outlined, color: Color(0xffffb24a)),
-                title: Text('Şikayət et · $reason', style: const TextStyle(color: Colors.white)),
+                title: Text(
+                  'Şikayət et · $reason',
+                  style: const TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  _reportUser(context, targetName, reason);
+                  _reportUser(targetName, reason);
                 },
               ),
-            ListTile(
-              leading: const Icon(Icons.block_rounded, color: Color(0xffff5d76)),
-              title: const Text('İstifadəçini blokla', style: TextStyle(color: Colors.white)),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                final ok = await showDialog<bool>(
-                  context: context,
-                  builder: (d) => AlertDialog(
-                    backgroundColor: const Color(0xff151020),
-                    title: const Text('Bloklansın?', style: TextStyle(color: Colors.white)),
-                    content: Text('$targetName artıq səninlə əlaqə yarada bilməyəcək.', style: const TextStyle(color: Color(0xffc5bdd0))),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Ləğv et')),
-                      FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Blokla')),
-                    ],
+            StreamBuilder<BlockState>(
+              stream: watchBlockState(currentProfile.uid, targetUid),
+              builder: (context, snapshot) {
+                final blocked = snapshot.data?.iBlocked ?? false;
+                return ListTile(
+                  leading: Icon(
+                    blocked ? Icons.lock_open_rounded : Icons.block_rounded,
+                    color: const Color(0xffff5d76),
                   ),
+                  title: Text(
+                    blocked ? 'Blokdan çıxar' : 'İstifadəçini blokla',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    blocked
+                        ? 'Yenidən mesajlaşa biləcəksiniz'
+                        : 'Mesaj, zəng və profil bağlanır',
+                    style: const TextStyle(color: Color(0xff9e95ac), fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    if (blocked) {
+                      _unblockUser(targetName);
+                    } else {
+                      _blockUser(targetName);
+                    }
+                  },
                 );
-                if (ok == true && context.mounted) {
-                  await _blockUser(context, targetName);
-                }
               },
             ),
           ],
@@ -2338,242 +3345,833 @@ class PersonPage extends StatelessWidget {
     );
   }
 
+  // ----------------------------------------------------------
+  // GÖRÜNÜŞ
+  // ----------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('users').doc(targetUid).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(targetUid)
+          .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Scaffold(
-            backgroundColor: const Color(0xff080611),
+            backgroundColor: vBg,
             appBar: AppBar(backgroundColor: Colors.transparent),
-            body: Center(child: Text('Profil xətası:\n${snapshot.error}', style: const TextStyle(color: Colors.white))),
+            body: Center(
+              child: Text(
+                'Profil xətası:\n${snapshot.error}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ),
           );
         }
-        if (!snapshot.hasData || !snapshot.data!.exists || snapshot.data!.data() == null) {
+        if (!snapshot.hasData ||
+            !snapshot.data!.exists ||
+            snapshot.data!.data() == null) {
           return const LoadingPage();
         }
 
         final data = snapshot.data!.data()!;
         final name = '${data['name'] ?? 'İstifadəçi'}';
-        final age = '${data['age'] ?? ''}';
-        final city = '${data['city'] ?? ''}';
-        final about = '${data['about'] ?? ''}';
-        final image = '${data['photoUrl'] ?? data['imageUrl'] ?? ''}';
+        final age = '${data['age'] ?? ''}'.trim();
+        final about = '${data['about'] ?? ''}'.trim();
+        final photo = '${data['photoUrl'] ?? data['imageUrl'] ?? ''}';
         final online = isReallyOnline(data);
+        final status = VibeStatus.from(data);
+        final level = data['level'] is num ? (data['level'] as num).toInt() : 0;
         final vipUntil = data['vipUntil'];
         final vipActive = data['vip'] == true &&
             (vipUntil is! Timestamp || vipUntil.toDate().isAfter(DateTime.now()));
+        // Qalereya artıq users/{uid}/gallery alt kolleksiyasındadır;
+        // örtük karuseli üçün yalnız profil şəkli kifayətdir.
+        const gallery = <String>[];
+        final tags = ((data['tags'] as List?) ?? (data['interests'] as List?) ?? const [])
+            .map((e) => '$e'.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
 
         return Scaffold(
-          backgroundColor: const Color(0xff080611),
-          appBar: AppBar(
-            backgroundColor: const Color(0xff080611),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            title: const Text('Profil', style: TextStyle(fontWeight: FontWeight.w800)),
-            actions: [
-              IconButton(
-                onPressed: () => _openSafetyMenu(context, name),
-                tooltip: 'Daha çox',
-                icon: const Icon(Icons.more_horiz_rounded),
+          backgroundColor: vBg,
+          body: Stack(
+            children: [
+              // ---- örtük şəkli + foto karusel ----
+              Builder(
+                builder: (context) {
+                  final photos = <String>[
+                    if (photo.trim().isNotEmpty) photo,
+                    ...gallery.where((e) => e != photo),
+                  ];
+                  final index = photos.isEmpty
+                      ? 0
+                      : coverIndex.clamp(0, photos.length - 1);
+
+                  return SizedBox(
+                    height: 330,
+                    width: double.infinity,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        VibePhoto(
+                          url: photos.isEmpty ? '' : photos[index],
+                          name: name,
+                          emoji: '${data['avatarEmoji'] ?? ''}',
+                        ),
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Color(0x99000000),
+                                Colors.transparent,
+                                Color(0xff070510),
+                              ],
+                              stops: [0, .45, 1],
+                            ),
+                          ),
+                        ),
+                        if (photos.length > 1)
+                          Positioned(
+                            left: 14,
+                            bottom: 92,
+                            child: SizedBox(
+                              height: 46,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                shrinkWrap: true,
+                                itemCount: photos.length,
+                                itemBuilder: (context, i) => Padding(
+                                  padding: const EdgeInsets.only(right: 7),
+                                  child: PressableScale(
+                                    onTap: () => setState(() => coverIndex = i),
+                                    child: Container(
+                                      width: 46,
+                                      clipBehavior: Clip.antiAlias,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(9),
+                                        border: Border.all(
+                                          color: i == index
+                                              ? Colors.white
+                                              : Colors.white24,
+                                          width: i == index ? 2 : 1,
+                                        ),
+                                      ),
+                                      child: VibePhoto(url: photos[i], name: name),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+              // ---- məzmun ----
+              ListView(
+                padding: const EdgeInsets.only(top: 250, bottom: 36),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _infoCard(
+                      data: data,
+                      name: name,
+                      age: age,
+                      online: online,
+                      level: level,
+                      vip: vipActive,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  UnderlineTabs(
+                    labels: tabs,
+                    index: tab,
+                    onChanged: (i) => setState(() => tab = i),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: _tabBody(
+                      name: name,
+                      about: about,
+                      gallery: gallery,
+                      tags: tags,
+                      status: status,
+                      data: data,
+                    ),
+                  ),
+                ],
+              ),
+
+              // ---- üst düymələr ----
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 4,
+                left: 6,
+                right: 6,
+                child: Row(
+                  children: [
+                    _roundButton(
+                      Icons.arrow_back_rounded,
+                      'Geri',
+                      () => Navigator.pop(context),
+                    ),
+                    const Spacer(),
+                    _roundButton(
+                      Icons.card_giftcard_rounded,
+                      'Hədiyyə göndər',
+                      () => _openGiftInfo(name),
+                    ),
+                    const SizedBox(width: 6),
+                    _roundButton(
+                      Icons.videocam_rounded,
+                      'Video zəng',
+                      () => startCall(
+                        context,
+                        currentProfile.uid,
+                        currentProfile.name,
+                        targetUid,
+                        name,
+                        true,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _roundButton(
+                      Icons.more_horiz_rounded,
+                      'Daha çox',
+                      () => _openSafetyMenu(name),
+                    ),
+                  ],
+                ),
               ),
             ],
-          ),
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xff120a1d), Color(0xff080611)]),
-            ),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
-              children: [
-                Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 154,
-                        height: 154,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: vipActive
-                                ? const [Color(0xffffd166), Color(0xffff2bd6), Color(0xff8b5cff)]
-                                : const [Color(0xff8b5cff), Color(0xffff2bd6)],
-                          ),
-                          boxShadow: vipActive
-                              ? const [
-                                  BoxShadow(color: Color(0x66ff2bd6), blurRadius: 26, spreadRadius: 3),
-                                  BoxShadow(color: Color(0x558b5cff), blurRadius: 42, spreadRadius: 1),
-                                ]
-                              : null,
-                        ),
-                      ),
-                      CircleAvatar(
-                        radius: 72,
-                        backgroundColor: const Color(0xff1b1425),
-                        backgroundImage: image.trim().isNotEmpty ? NetworkImage(image) : null,
-                        child: image.trim().isEmpty ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontSize: 50, fontWeight: FontWeight.w900)) : null,
-                      ),
-                      if (online)
-                        Positioned(
-                          right: 9,
-                          bottom: 13,
-                          child: Container(
-                            width: 23,
-                            height: 23,
-                            decoration: BoxDecoration(color: const Color(0xff34d399), shape: BoxShape.circle, border: Border.all(color: const Color(0xff080611), width: 4)),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Flexible(child: Text(age.trim().isEmpty ? name : '$name, $age', overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900))),
-                    const SizedBox(width: 7),
-                    Icon(Icons.verified_rounded, color: vipActive ? const Color(0xffffd166) : const Color(0xffb06cff), size: 22),
-                    if (vipActive) ...[
-                      const SizedBox(width: 7),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xffffb84d), Color(0xffff2bd6)]),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text('VIP', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                      ),
-                    ],
-                  ],
-                ),
-                if (city.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Center(child: Text(city, style: const TextStyle(color: Color(0xffaaa1ba), fontSize: 14))),
-                ],
-                const SizedBox(height: 7),
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: (online ? const Color(0xff34d399) : const Color(0xff6b6475)).withValues(alpha: .12), borderRadius: BorderRadius.circular(20)),
-                    child: Text(activityText(data), style: TextStyle(color: online ? const Color(0xff5ee3ad) : const Color(0xffaaa1ba), fontSize: 12, fontWeight: FontWeight.w700)),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(child: _profileAction(context, Icons.chat_bubble_rounded, 'Mesaj', const [Color(0xff7b5cff), Color(0xffff2bd6)], () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => RealChatPage(currentProfile: currentProfile, targetUid: targetUid, targetName: name)));
-                    })),
-                    const SizedBox(width: 10),
-                    Expanded(child: _profileAction(context, Icons.call_rounded, 'Səsli zəng', const [Color(0xff1d8cff), Color(0xff8b5cff)], () => startCall(context, currentProfile.uid, currentProfile.name, targetUid, name, false))),
-                    const SizedBox(width: 10),
-                    Expanded(child: _profileAction(context, Icons.videocam_rounded, 'Video', const [Color(0xffff2bd6), Color(0xffff6a8b)], () => startCall(context, currentProfile.uid, currentProfile.name, targetUid, name, true))),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(currentProfile.uid)
-                      .collection('following')
-                      .doc(targetUid)
-                      .snapshots(),
-                  builder: (context, followSnap) {
-                    final following = followSnap.data?.exists == true;
-                    return SizedBox(
-                      height: 50,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: following
-                              ? null
-                              : const LinearGradient(colors: [Color(0xff7b5cff), Color(0xffff2bd6)]),
-                          color: following ? const Color(0xff181121) : null,
-                          borderRadius: BorderRadius.circular(16),
-                          border: following ? Border.all(color: const Color(0xff4a355c)) : null,
-                        ),
-                        child: TextButton.icon(
-                          onPressed: () => _toggleFollow(context, following, name),
-                          icon: Icon(following ? Icons.check_rounded : Icons.person_add_alt_1_rounded, color: Colors.white),
-                          label: Text(
-                            following ? 'İzləyirsən' : 'İzlə',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 22),
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(color: const Color(0xff151020), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xff332444))),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Haqqımda', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 10),
-                      Text(about.trim().isEmpty ? 'Haqqında məlumat yazmayıb.' : about, style: const TextStyle(color: Color(0xffc5bdd0), height: 1.45)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(color: const Color(0xff151020), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xff332444))),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: FirebaseFirestore.instance.collection('posts').where('uid', isEqualTo: targetUid).snapshots(),
-                          builder: (_, s) => _ProfileStat(value: '${s.data?.docs.length ?? 0}', label: 'Paylaşım'),
-                        ),
-                      ),
-                      const SizedBox(height: 38, child: VerticalDivider(color: Color(0xff352945))),
-                      Expanded(
-                        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: FirebaseFirestore.instance.collection('users').doc(targetUid).collection('followers').snapshots(),
-                          builder: (_, s) => _ProfileStat(value: '${s.data?.docs.length ?? 0}', label: 'İzləyici'),
-                        ),
-                      ),
-                      const SizedBox(height: 38, child: VerticalDivider(color: Color(0xff352945))),
-                      Expanded(
-                        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: FirebaseFirestore.instance.collection('users').doc(targetUid).collection('following').snapshots(),
-                          builder: (_, s) => _ProfileStat(value: '${s.data?.docs.length ?? 0}', label: 'İzlənilən'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ),
         );
       },
     );
   }
 
-  Widget _profileAction(BuildContext context, IconData icon, String text, List<Color> colors, VoidCallback onTap) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Container(
-        height: 72,
-        decoration: BoxDecoration(gradient: LinearGradient(colors: colors), borderRadius: BorderRadius.circular(16)),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: Colors.white), const SizedBox(height: 5), Text(text, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800))]),
+  Widget _roundButton(IconData icon, String tooltip, VoidCallback onTap) =>
+      Tooltip(
+        message: tooltip,
+        child: PressableScale(
+          onTap: onTap,
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: .42),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: .14)),
+            ),
+            child: Icon(icon, color: Colors.white, size: 19),
+          ),
+        ),
+      );
+
+  /// Örtüyün üzərinə düşən əsas məlumat kartı.
+  Widget _infoCard({
+    required Map<String, dynamic> data,
+    required String name,
+    required String age,
+    required bool online,
+    required int level,
+    required bool vip,
+  }) => Container(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+    decoration: BoxDecoration(
+      color: const Color(0xff151020).withValues(alpha: .96),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: const Color(0xff2f2447)),
+      boxShadow: const [
+        BoxShadow(color: Color(0x88000000), blurRadius: 26, offset: Offset(0, 10)),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  VerifiedName(
+                    name: name,
+                    verified: data['verified'] == true || vip,
+                    fontSize: 19,
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: online
+                              ? const Color(0xff2de28a)
+                              : const Color(0xff6b6475),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          activityText(data),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: vMuted, fontSize: 11.5),
+                        ),
+                      ),
+                      if ('${data['city'] ?? ''}'.trim().isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        PlaceLabel(text: '${data['city']}'),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(currentProfile.uid)
+                  .collection('following')
+                  .doc(targetUid)
+                  .snapshots(),
+              builder: (context, followSnap) {
+                final following = followSnap.data?.exists == true;
+                return PressableScale(
+                  onTap: () => _toggleFollow(following, name),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                    decoration: BoxDecoration(
+                      gradient: following ? null : vHot,
+                      color: following ? const Color(0xff221a33) : null,
+                      borderRadius: BorderRadius.circular(20),
+                      border: following
+                          ? Border.all(color: const Color(0xff4a3a68))
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          following
+                              ? Icons.check_rounded
+                              : Icons.person_add_alt_1_rounded,
+                          size: 15,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          following ? 'İzlənilir' : 'Takip et',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // ---- kiçik statistika nişanları ----
+        Row(
+          children: [
+            GenderAgeChip(gender: genderCode(data), age: age, fontSize: 10.5),
+            const SizedBox(width: 7),
+            if (level > 0) ...[
+              LevelTag(level: level, fontSize: 10.5),
+              const SizedBox(width: 7),
+            ],
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(targetUid)
+                  .collection('followers')
+                  .snapshots(),
+              builder: (context, snap) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: vPurple.withValues(alpha: .2),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: vPurple.withValues(alpha: .55)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.favorite_rounded, size: 11, color: vPink),
+                    const SizedBox(width: 3),
+                    Text(
+                      compactCount(snap.data?.docs.length ?? 0),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // ---- əsas əməliyyatlar ----
+        Row(
+          children: [
+            _squareAction(
+              Icons.call_rounded,
+              'Səsli zəng',
+              () => startCall(
+                context,
+                currentProfile.uid,
+                currentProfile.name,
+                targetUid,
+                name,
+                false,
+              ),
+            ),
+            const SizedBox(width: 8),
+            _squareAction(
+              Icons.chat_bubble_outline_rounded,
+              'Söhbəti aç',
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RealChatPage(
+                    currentProfile: currentProfile,
+                    targetUid: targetUid,
+                    targetName: name,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            _squareAction(
+              Icons.ios_share_rounded,
+              'Profili paylaş',
+              () {
+                Clipboard.setData(
+                  ClipboardData(text: 'VIBE profili: $name (ID: $targetUid)'),
+                );
+                notifySocial(context, 'Profil məlumatı kopyalandı.');
+              },
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: GradientButton(
+                label: 'Salam de',
+                icon: Icons.favorite_rounded,
+                height: 46,
+                fontSize: 14,
+                onPressed: () => _sayHello(name),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  /// Bir toxunuşla salam göndərir və söhbəti açır.
+  Future<void> _sayHello(String name) async {
+    final chatId = chatIdFor(currentProfile.uid, targetUid);
+    final chat = FirebaseFirestore.instance.collection('chats').doc(chatId);
+    const text = 'Salam 👋';
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      batch.set(chat, {
+        'members': [currentProfile.uid, targetUid],
+        'memberNames': {
+          currentProfile.uid: currentProfile.name,
+          targetUid: name,
+        },
+        'lastMessage': text,
+        'lastSenderId': currentProfile.uid,
+        'updatedAt': Timestamp.now(),
+      }, SetOptions(merge: true));
+      batch.set(chat.collection('messages').doc(), {
+        'senderId': currentProfile.uid,
+        'text': text,
+        'type': 'text',
+        'createdAt': Timestamp.now(),
+      });
+      await batch.commit();
+    } catch (_) {
+      if (!mounted) return;
+      notifySocial(context, 'Salam göndərilmədi. Bloklanmış ola bilər.');
+      return;
+    }
+
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RealChatPage(
+          currentProfile: currentProfile,
+          targetUid: targetUid,
+          targetName: name,
+        ),
       ),
     );
   }
-}
 
-class _ProfileStat extends StatelessWidget {
-  const _ProfileStat({required this.value, required this.label});
-  final String value;
-  final String label;
-  @override
-  Widget build(BuildContext context) => Column(children: [Text(value, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(label, style: const TextStyle(color: Color(0xff9e95ac), fontSize: 11))]);
+  Widget _squareAction(IconData icon, String tooltip, VoidCallback onTap) =>
+      Tooltip(
+        message: tooltip,
+        child: PressableScale(
+          onTap: onTap,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xff211936),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xff3a2d58)),
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+        ),
+      );
+
+  // ----------------------------------------------------------
+  // TAB MƏZMUNU
+  // ----------------------------------------------------------
+
+  Widget _tabBody({
+    required String name,
+    required String about,
+    required List<String> gallery,
+    required List<String> tags,
+    required VibeStatus? status,
+    required Map<String, dynamic> data,
+  }) {
+    switch (tab) {
+      case 1:
+        return _momentsTab(name);
+      case 2:
+        return _giftsTab();
+      case 3:
+        return _friendsTab();
+      default:
+        return _profileTab(
+          about: about,
+          gallery: gallery,
+          tags: tags,
+          status: status,
+          name: name,
+        );
+    }
+  }
+
+  Widget _sectionTitle(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 16,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
+
+  Widget _profileTab({
+    required String about,
+    required List<String> gallery,
+    required List<String> tags,
+    required VibeStatus? status,
+    required String name,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (status != null) ...[
+        VibePill(status: status),
+        const SizedBox(height: 18),
+      ],
+      _sectionTitle('Özəl albüm'),
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(targetUid)
+            .collection('gallery')
+            .orderBy('createdAt', descending: true)
+            .limit(30)
+            .snapshots(),
+        builder: (context, snapshot) {
+          final docs = snapshot.data?.docs ?? const [];
+          if (docs.isEmpty) return _emptyBox('Hələ şəkil paylaşmayıb.');
+
+          return SizedBox(
+            height: 96,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: docs.length,
+              itemBuilder: (context, i) {
+                final d = docs[i].data();
+                return Padding(
+                  padding: const EdgeInsets.only(right: 9),
+                  child: PressableScale(
+                    onTap: () => _openPhoto('${d['data'] ?? d['thumb'] ?? ''}', name),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: SizedBox(
+                        width: 92,
+                        child: VibePhoto(
+                          url: '${d['thumb'] ?? ''}',
+                          name: name,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+      const SizedBox(height: 22),
+      if (tags.isNotEmpty) ...[
+        _sectionTitle('Profil etiketləri'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [for (final tag in tags) VibeChip(label: tag)],
+        ),
+        const SizedBox(height: 22),
+      ],
+      _sectionTitle('Haqqında'),
+      Text(
+        about.isEmpty ? 'Haqqında məlumat yazmayıb.' : about,
+        style: const TextStyle(color: Color(0xffc5bdd0), height: 1.5, fontSize: 13.5),
+      ),
+    ],
+  );
+
+  Widget _momentsTab(String name) =>
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('moments')
+            .where('ownerUid', isEqualTo: targetUid)
+            .limit(60)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const VibeShimmer(height: 180, radius: 18);
+          }
+          final docs = snapshot.data!.docs;
+          if (docs.isEmpty) return _emptyBox('Hələ an paylaşmayıb.');
+
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: docs.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemBuilder: (context, i) {
+              final d = docs[i].data();
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: VibePhoto(url: '${d['imageUrl'] ?? ''}', name: name),
+              );
+            },
+          );
+        },
+      );
+
+  Widget _giftsTab() => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    stream: FirebaseFirestore.instance
+        .collection('users')
+        .doc(targetUid)
+        .snapshots(),
+    builder: (context, snapshot) {
+      final d = snapshot.data?.data() ?? const <String, dynamic>{};
+      final received = d['giftReceived'] is num ? (d['giftReceived'] as num) : 0;
+      final sent = d['giftSent'] is num ? (d['giftSent'] as num) : 0;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Hədiyyə statistikası'),
+          Row(
+            children: [
+              Expanded(child: _giftBox('Alınan', compactCount(received), vPink)),
+              const SizedBox(width: 10),
+              Expanded(child: _giftBox('Göndərilən', compactCount(sent), vBlue)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Hədiyyələr səsli otaqlarda göndərilir.',
+            style: TextStyle(color: vMuted, fontSize: 12.5, height: 1.5),
+          ),
+        ],
+      );
+    },
+  );
+
+  Widget _giftBox(String label, String value, Color color) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .13),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: color.withValues(alpha: .4)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.card_giftcard_rounded, color: color, size: 22),
+        const SizedBox(height: 10),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        Text(label, style: const TextStyle(color: vMuted, fontSize: 12)),
+      ],
+    ),
+  );
+
+  Widget _friendsTab() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: FirebaseFirestore.instance
+        .collection('users')
+        .doc(targetUid)
+        .collection('followers')
+        .limit(60)
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) {
+        return const VibeShimmer(height: 120, radius: 18);
+      }
+      final docs = snapshot.data!.docs;
+      if (docs.isEmpty) return _emptyBox('Hələ izləyicisi yoxdur.');
+
+      return Column(
+        children: [
+          for (final doc in docs)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              onTap: doc.id == currentProfile.uid
+                  ? null
+                  : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PersonPage(
+                          currentProfile: currentProfile,
+                          targetUid: doc.id,
+                        ),
+                      ),
+                    ),
+              leading: CircleAvatar(
+                backgroundColor: const Color(0xff2a183f),
+                child: Text(
+                  '${doc.data()['name'] ?? '?'}'.characters.firstOrNull
+                          ?.toUpperCase() ??
+                      '?',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              title: Text(
+                '${doc.data()['name'] ?? 'İstifadəçi'}',
+                style: const TextStyle(color: Colors.white, fontSize: 14.5),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+
+  Widget _emptyBox(String text) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(vertical: 26),
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: const Color(0xff161022),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xff2a2140)),
+    ),
+    child: Text(text, style: const TextStyle(color: vMuted, fontSize: 13)),
+  );
+
+  void _openPhoto(String url, String name) => showDialog<void>(
+    context: context,
+    builder: (dialog) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: VibePhoto(url: url, name: name, fit: BoxFit.contain),
+        ),
+      ),
+    ),
+  );
+
+  void _openGiftInfo(String name) => showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: const Color(0xff151020),
+    showDragHandle: true,
+    builder: (sheet) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$name üçün hədiyyə',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Hədiyyələr səsli otaqlarda göndərilir. Otağa birlikdə gir və '
+              'səhnədəki istifadəçiyə hədiyyə at.',
+              style: TextStyle(color: vMuted, height: 1.5, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            GradientButton(
+              label: 'Otaqlara keç',
+              icon: Icons.mic_rounded,
+              onPressed: () => Navigator.pop(sheet),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 // ============================================================
@@ -2610,6 +4208,44 @@ class _RealChatPageState extends State<RealChatPage> {
   bool typingSent = false;
   bool voiceOpen = false;
   late final VoiceMessageService voiceService = VoiceMessageService();
+
+  /// Cavab verilən mesaj: {id, name, text}
+  Map<String, String>? replyTo;
+
+  /// Söhbəti canlandıran mini oyunlar.
+  static const truths = <String>[
+    'Doğruluq 🤫 Ən son kimə "gülməli video" göndərmisən?',
+    'Doğruluq 🤫 Telefonunda ən çox açdığın tətbiq hansıdır?',
+    'Doğruluq 🤫 Özündə ən çox bəyəndiyin xüsusiyyət nədir?',
+    'Doğruluq 🤫 Ən son nəyə görə çox güldün?',
+    'Doğruluq 🤫 Gizli istedadın var? Nədir?',
+  ];
+
+  static const dares = <String>[
+    'Cəsarət 😈 Növbəti mesajını yalnız emoji ilə yaz!',
+    'Cəsarət 😈 Səsli mesajda ən sevdiyin mahnının bir sətrini oxu 🎤',
+    'Cəsarət 😈 Qalereyandakı sonuncu şəkli təsvir et (göndərmədən) 📸',
+    'Cəsarət 😈 Mənə 10 saniyəlik ən yaxşı zarafatını danış 😂',
+    'Cəsarət 😈 Adımı sadəcə emojilərlə yaz!',
+  ];
+
+  static const wouldYouRather = <String>[
+    'Sən hansını seçərsən? 🤔 Dəniz kənarında səhər, yoxsa dağda gün batımı?',
+    'Sən hansını seçərsən? 🤔 Bir il musiqisiz, yoxsa bir il serialsız?',
+    'Sən hansını seçərsən? 🤔 Uçmaq bacarığı, yoxsa görünməzlik?',
+    'Sən hansını seçərsən? 🤔 Həmişə gec qalmaq, yoxsa həmişə 1 saat tez gəlmək?',
+    'Sən hansını seçərsən? 🤔 Pizza, yoxsa dönər? 🍕🌯',
+  ];
+
+  /// Söhbət boş olanda göstərilən söhbət açarları.
+  static const iceBreakers = <String>[
+    'Salam 👋 Günün necə keçir?',
+    'Bir söz de, sənə mahnı tapım 🎧',
+    'Ən son nəyə ürəkdən güldün? 😂',
+    'Qəhvə yoxsa çay? ☕',
+    'Bu həftə ən yaxşı anın hansı oldu? ✨',
+    'Sənə bir sual: dəniz yoxsa dağ? 🌊⛰️',
+  ];
 
   final List<String> emojis = [
     '😀',
@@ -2777,6 +4413,54 @@ class _RealChatPageState extends State<RealChatPage> {
     }
   }
 
+  /// Sağa sürüşdürəndə və ya menyudan cavab rejimini açır.
+  void _startReply(String id, String name, String preview) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      replyTo = {'id': id, 'name': name, 'text': preview};
+    });
+    messageFocusNode.requestFocus();
+  }
+
+  /// Mesaja iki dəfə toxunanda sürətli ürək reaksiyası.
+  void _quickReact(
+    DocumentReference<Map<String, dynamic>> ref,
+    Offset position,
+  ) {
+    showFloatingEmoji(context, position, '❤️');
+    _setReaction(ref, '❤️');
+  }
+
+  /// Gün ayırıcısı üçün başlıq.
+  String _dayLabel(DateTime day) {
+    const months = [
+      'yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun',
+      'iyul', 'avqust', 'sentyabr', 'oktyabr', 'noyabr', 'dekabr',
+    ];
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final that = DateTime(day.year, day.month, day.day);
+    final difference = today.difference(that).inDays;
+
+    if (difference == 0) return 'Bu gün';
+    if (difference == 1) return 'Dünən';
+    if (day.year != now.year) {
+      return '${day.day} ${months[day.month - 1]} ${day.year}';
+    }
+    return '${day.day} ${months[day.month - 1]}';
+  }
+
+  /// Mesajın qısa mətn xülasəsi (cavab önizləməsi üçün).
+  String _previewOf(Map<String, dynamic> data) {
+    final type = '${data['type'] ?? 'text'}';
+    if (type == 'audio') return '🎤 Səsli mesaj';
+    if (type == 'sticker') return '${data['text'] ?? ''} Stiker';
+    if (type == 'domino') return 'Domino oyunu';
+    if (type == 'photo') return 'Şəkil';
+    return '${data['text'] ?? ''}';
+  }
+
   Future<void> _deleteMessage(
     DocumentReference<Map<String, dynamic>> ref,
   ) async {
@@ -2791,6 +4475,7 @@ class _RealChatPageState extends State<RealChatPage> {
   void _openMessageActions(
     DocumentReference<Map<String, dynamic>> ref,
     bool mine,
+    Map<String, dynamic> data,
   ) {
     showModalBottomSheet(
       context: context,
@@ -2827,8 +4512,29 @@ class _RealChatPageState extends State<RealChatPage> {
                     ),
                 ],
               ),
-              if (mine) ...[
-                const Divider(height: 24, color: Color(0xff352447)),
+              const Divider(height: 24, color: Color(0xff352447)),
+              ListTile(
+                leading: const Icon(Icons.reply_rounded, color: Color(0xff9d7dff)),
+                title: const Text('Cavab ver', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  _startReply(
+                    ref.id,
+                    mine ? 'Sən' : widget.targetName,
+                    _previewOf(data),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.copy_rounded, color: Color(0xff8fd4ff)),
+                title: const Text('Mətni kopyala', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  Clipboard.setData(ClipboardData(text: '${data['text'] ?? ''}'));
+                  notifySocial(context, 'Mətn kopyalandı.');
+                },
+              ),
+              if (mine)
                 ListTile(
                   leading: const Icon(Icons.delete_outline_rounded, color: Color(0xffff657b)),
                   title: const Text('Mesajı sil', style: TextStyle(color: Colors.white)),
@@ -2837,7 +4543,6 @@ class _RealChatPageState extends State<RealChatPage> {
                     _deleteMessage(ref);
                   },
                 ),
-              ],
             ],
           ),
         ),
@@ -2884,6 +4589,9 @@ class _RealChatPageState extends State<RealChatPage> {
   }) async {
     if (sending) return false;
 
+    // İcma qaydaları: uyğunsuz məzmun göndərilmir.
+    if (type == 'text' && !guardContent(context, text)) return false;
+
     setState(() {
       sending = true;
     });
@@ -2906,15 +4614,24 @@ class _RealChatPageState extends State<RealChatPage> {
         'updatedAt': Timestamp.now(),
       }, SetOptions(merge: true));
 
+      final reply = replyTo;
+
       batch.set(message, {
         'senderId': widget.currentProfile.uid,
         'text': text,
         'type': type,
         'createdAt': Timestamp.now(),
         'clientCreatedAt': DateTime.now().millisecondsSinceEpoch,
+        if (reply != null) 'replyId': reply['id'],
+        if (reply != null) 'replyName': reply['name'],
+        if (reply != null) 'replyText': reply['text'],
       });
 
       await batch.commit();
+
+      if (mounted && reply != null) {
+        setState(() => replyTo = null);
+      }
 
       try {
         await FirebaseFirestore.instance
@@ -2931,6 +4648,14 @@ class _RealChatPageState extends State<RealChatPage> {
           'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (_) {}
+
+      // Cihaz bildirişi (Supabase Edge Function deploy edilibsə).
+      unawaited(sendPushToUser(
+        toUid: widget.targetUid,
+        title: widget.currentProfile.name,
+        body: lastMessage,
+        fromName: widget.currentProfile.name,
+      ));
 
       return true;
     } catch (_) {
@@ -3031,6 +4756,276 @@ class _RealChatPageState extends State<RealChatPage> {
     );
   }
 
+  /// Təsadüfi oyun sualını mesaj kimi göndərir.
+  Future<void> _sendFun(List<String> pool) async {
+    Navigator.pop(context);
+    final text = pool[math.Random().nextInt(pool.length)];
+    await sendContent(text: text, type: 'text', lastMessage: text);
+  }
+
+  /// "+" düyməsi: stiker, oyun və digər əlavələr.
+  /// Şəkli tam ekranda açır — böyük nüsxə ayrıca sənəddən gəlir.
+  void _openPhoto(
+    DocumentReference<Map<String, dynamic>> messageRef,
+    String thumb,
+  ) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: .92),
+      builder: (dialog) => Stack(
+        children: [
+          Center(
+            child: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              future: messageRef.collection('media').doc('full').get(),
+              builder: (_, snap) {
+                final full = '${snap.data?.data()?['data'] ?? ''}';
+                final source = full.isNotEmpty ? full : thumb;
+                final provider = vibeImageProvider(source);
+                if (provider == null) {
+                  return const Icon(Icons.broken_image_rounded,
+                      color: vMuted, size: 48);
+                }
+                return InteractiveViewer(
+                  maxScale: 4,
+                  child: Image(image: provider, fit: BoxFit.contain),
+                );
+              },
+            ),
+          ),
+          Positioned(
+            top: 40,
+            right: 12,
+            child: IconButton(
+              onPressed: () => Navigator.pop(dialog),
+              icon: const Icon(Icons.close_rounded, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Söhbətə şəkil göndərir.
+  ///
+  /// Şəkil sıxılıb Firestore-da data URI kimi saxlanılır (pullu Storage
+  /// tələb etmir) — kiçik nüsxə mesajda, böyüyü ayrıca sənəddə.
+  Future<void> _sendPhoto(ImageSource source) async {
+    if (sending) return;
+
+    final picked = await pickStoredImage(
+      source: source,
+      fullWidth: 1080,
+      thumbWidth: 320,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => sending = true);
+    try {
+      final chat = FirebaseFirestore.instance.collection('chats').doc(chatId);
+      final message = chat.collection('messages').doc();
+      final batch = FirebaseFirestore.instance.batch();
+
+      batch.set(chat, {
+        'members': [widget.currentProfile.uid, widget.targetUid],
+        'memberNames': {
+          widget.currentProfile.uid: widget.currentProfile.name,
+          widget.targetUid: widget.targetName,
+        },
+        'lastMessage': '📷 Şəkil',
+        'lastSenderId': widget.currentProfile.uid,
+        'updatedAt': Timestamp.now(),
+      }, SetOptions(merge: true));
+
+      batch.set(message, {
+        'senderId': widget.currentProfile.uid,
+        'text': '',
+        'type': 'photo',
+        'photo': picked.thumb,
+        'createdAt': Timestamp.now(),
+        'clientCreatedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      // Tam ölçülü nüsxə ayrıca — siyahı sürətli qalsın.
+      batch.set(message.collection('media').doc('full'), {'data': picked.full});
+
+      await batch.commit();
+
+      unawaited(sendPushToUser(
+        toUid: widget.targetUid,
+        title: widget.currentProfile.name,
+        body: '📷 Şəkil göndərdi',
+        fromName: widget.currentProfile.name,
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Şəkil göndərilmədi: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
+  /// Söhbətdəki dostla domino oyununu başladır.
+  ///
+  /// Oyun yaradılır, söhbətə dəvət mesajı düşür və hər iki tərəf
+  /// həmin mesajdan oyuna girə bilir.
+  Future<void> _startDomino() async {
+    if (sending) return;
+    setState(() => sending = true);
+
+    try {
+      final matchId = await createDominoMatch(
+        myUid: widget.currentProfile.uid,
+        myName: widget.currentProfile.name,
+        opponentUid: widget.targetUid,
+        opponentName: widget.targetName,
+      );
+
+      final chat = FirebaseFirestore.instance.collection('chats').doc(chatId);
+      final batch = FirebaseFirestore.instance.batch();
+
+      batch.set(chat, {
+        'members': [widget.currentProfile.uid, widget.targetUid],
+        'memberNames': {
+          widget.currentProfile.uid: widget.currentProfile.name,
+          widget.targetUid: widget.targetName,
+        },
+        'lastMessage': 'Domino oyunu',
+        'lastSenderId': widget.currentProfile.uid,
+        'updatedAt': Timestamp.now(),
+      }, SetOptions(merge: true));
+
+      batch.set(chat.collection('messages').doc(), {
+        'senderId': widget.currentProfile.uid,
+        'text': 'Domino oynayaq?',
+        'type': 'domino',
+        'matchId': matchId,
+        'createdAt': Timestamp.now(),
+        'clientCreatedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      await batch.commit();
+
+      unawaited(sendPushToUser(
+        toUid: widget.targetUid,
+        title: widget.currentProfile.name,
+        body: 'Səni domino oyununa dəvət edir',
+        fromName: widget.currentProfile.name,
+      ));
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DominoPage(
+            matchId: matchId,
+            profile: widget.currentProfile,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Oyun başlamadı: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
+  void openMoreSheet() {
+    messageFocusNode.unfocus();
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xff120d1d),
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(12, 0, 12, 10),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Söhbəti canlandır 🎉',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: Color(0xff48e08a)),
+                title: const Text('Şəkil göndər', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Qalereyadan seç', style: TextStyle(color: vMuted, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  _sendPhoto(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_rounded, color: Color(0xff22a7ff)),
+                title: const Text('Şəkil çək', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Kamera ilə indi çək', style: TextStyle(color: vMuted, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  _sendPhoto(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.auto_awesome_rounded, color: Color(0xffff5bd6)),
+                title: const Text('Stiker göndər', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Böyük emoji stikerlər', style: TextStyle(color: vMuted, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  openStickerPicker();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.casino_rounded, color: Color(0xff48e08a)),
+                title: const Text('Domino oyna',
+                    style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Dostunla növbə ilə — real oyun',
+                    style: TextStyle(color: vMuted, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  _startDomino();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.psychology_alt_rounded, color: Color(0xff8fd4ff)),
+                title: const Text('Doğruluq', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Təsadüfi sual göndər', style: TextStyle(color: vMuted, fontSize: 12)),
+                onTap: () => _sendFun(truths),
+              ),
+              ListTile(
+                leading: const Icon(Icons.local_fire_department_rounded, color: Color(0xffff8a3d)),
+                title: const Text('Cəsarət', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Kiçik bir tapşırıq at', style: TextStyle(color: vMuted, fontSize: 12)),
+                onTap: () => _sendFun(dares),
+              ),
+              ListTile(
+                leading: const Icon(Icons.casino_rounded, color: Color(0xff48e08a)),
+                title: const Text('Sən hansını seçərsən?', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('İki variantdan biri', style: TextStyle(color: vMuted, fontSize: 12)),
+                onTap: () => _sendFun(wouldYouRather),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void openStickerPicker() {
     FocusScope.of(context).unfocus();
 
@@ -3114,6 +5109,8 @@ class _RealChatPageState extends State<RealChatPage> {
           online = isReallyOnline(data);
         }
 
+        final peerVibe = VibeStatus.from(userSnapshot.data?.data());
+
         return Scaffold(
           backgroundColor: const Color(0xff080611),
           appBar: AppBar(
@@ -3123,17 +5120,49 @@ class _RealChatPageState extends State<RealChatPage> {
             elevation: 0,
             shadowColor: Colors.transparent,
             titleSpacing: 4,
-            title: Row(
-              children: [
-                CircleAvatar(
-                  radius: 19,
-                  backgroundColor: const Color(0xff2a183f),
-                  child: Text(
-                    widget.targetName.isNotEmpty
-                        ? widget.targetName[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            title: InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PersonPage(
+                    currentProfile: widget.currentProfile,
+                    targetUid: widget.targetUid,
                   ),
+                ),
+              ),
+              child: Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 19,
+                      backgroundColor: const Color(0xff2a183f),
+                      child: Text(
+                        widget.targetName.isNotEmpty
+                            ? widget.targetName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    if (peerVibe != null)
+                      Positioned(
+                        right: -4,
+                        bottom: -3,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: peerVibe.mood.color,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xff0d0917), width: 2),
+                          ),
+                          child: Text(
+                            peerVibe.mood.emoji,
+                            style: const TextStyle(fontSize: 9),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 9),
                 Expanded(
@@ -3166,6 +5195,40 @@ class _RealChatPageState extends State<RealChatPage> {
                                       .difference((typingAt[widget.targetUid] as Timestamp).toDate())
                                       .inSeconds
                                   .abs() < 8;
+                          final roomId =
+                              '${userSnapshot.data?.data()?['activeRoomId'] ?? ''}';
+
+                          // Qarşı tərəf səsli otaqdadırsa, oraya keçid göstəririk.
+                          if (roomId.isNotEmpty && !isTyping) {
+                            return InkWell(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PartyRoomPage(
+                                    profile: widget.currentProfile,
+                                    roomId: roomId,
+                                  ),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.graphic_eq_rounded,
+                                      size: 12, color: Color(0xff8b5cff)),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Səsli söhbətdə',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xff8b5cff),
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
                           return Text(
                             isTyping ? 'yazır…' : status,
                             overflow: TextOverflow.ellipsis,
@@ -3185,6 +5248,7 @@ class _RealChatPageState extends State<RealChatPage> {
                   ),
                 ),
               ],
+            ),
             ),
             actions: [
               IconButton(
@@ -3217,7 +5281,11 @@ class _RealChatPageState extends State<RealChatPage> {
               ),
             ],
           ),
-          body: Column(
+          body: StreamBuilder<BlockState>(
+            stream: watchBlockState(widget.currentProfile.uid, widget.targetUid),
+            builder: (context, blockSnap) {
+              final block = blockSnap.data ?? BlockState.none;
+              return Column(
             children: [
               Expanded(
                 child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -3246,19 +5314,63 @@ class _RealChatPageState extends State<RealChatPage> {
                     final messages = snapshot.data!.docs;
 
                     if (messages.isEmpty) {
-                      return Center(
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 30, 24, 20),
                         child: Column(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.chat_bubble_outline_rounded,
-                              size: 50,
-                              color: const Color(0xff8f86a3),
+                            Container(
+                              width: 74,
+                              height: 74,
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: vHot,
+                                boxShadow: [
+                                  BoxShadow(color: Color(0x55ff2bd6), blurRadius: 24),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.waving_hand_rounded,
+                                size: 34,
+                                color: Colors.white,
+                              ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
                             Text(
                               '${widget.targetName} ilə söhbətə başla',
-                              style: const TextStyle(color: Colors.grey),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Aşağıdakılardan birinə toxun — buz dərhal əriyir 💜',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: vMuted, fontSize: 12.5, height: 1.45),
+                            ),
+                            const SizedBox(height: 14),
+                            VibePillStream(uid: widget.targetUid, compact: false),
+                            const SizedBox(height: 22),
+                            Wrap(
+                              spacing: 9,
+                              runSpacing: 9,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                for (final prompt in iceBreakers)
+                                  VibeChip(
+                                    label: prompt,
+                                    onTap: sending
+                                        ? null
+                                        : () => sendContent(
+                                            text: prompt,
+                                            type: 'text',
+                                            lastMessage: prompt,
+                                          ),
+                                  ),
+                              ],
                             ),
                           ],
                         ),
@@ -3283,10 +5395,119 @@ class _RealChatPageState extends State<RealChatPage> {
                         final reactions = (data['reactions'] as Map?) ?? const {};
                         final reactionValues = reactions.values.map((e) => '$e').where((e) => e.isNotEmpty).toList();
 
+                        // --- gün ayırıcısı ---
+                        DateTime? dayOf(int i) {
+                          if (i < 0 || i >= messages.length) return null;
+                          final value = messages[i].data()['createdAt'];
+                          return value is Timestamp ? value.toDate() : null;
+                        }
+
+                        final thisDay = dayOf(index);
+                        final olderDay = dayOf(index + 1);
+                        final showDay = thisDay != null &&
+                            (olderDay == null ||
+                                thisDay.year != olderDay.year ||
+                                thisDay.month != olderDay.month ||
+                                thisDay.day != olderDay.day);
+
+                        // --- cavab + jestlər ---
+                        final replyName = '${data['replyName'] ?? ''}';
+                        final replyText = '${data['replyText'] ?? ''}';
+
+                        Offset doubleTapAt = Offset.zero;
+
+                        Widget decorate(Widget bubble) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (showDay)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: .06),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: Colors.white.withValues(alpha: .08)),
+                                    ),
+                                    child: Text(
+                                      _dayLabel(thisDay),
+                                      style: const TextStyle(
+                                        color: Color(0xffb6adc7),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            GestureDetector(
+                              onDoubleTapDown: (details) => doubleTapAt = details.globalPosition,
+                              onDoubleTap: () => _quickReact(messageRef, doubleTapAt),
+                              onHorizontalDragEnd: (details) {
+                                final velocity = details.primaryVelocity ?? 0;
+                                if (velocity > 220) {
+                                  _startReply(
+                                    messageRef.id,
+                                    mine ? 'Sən' : widget.targetName,
+                                    _previewOf(data),
+                                  );
+                                }
+                              },
+                              child: Column(
+                                crossAxisAlignment:
+                                    mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                children: [
+                                  if (replyText.isNotEmpty)
+                                    Container(
+                                      margin: const EdgeInsets.only(bottom: 3),
+                                      padding: const EdgeInsets.fromLTRB(10, 6, 12, 6),
+                                      constraints: const BoxConstraints(maxWidth: 280),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: .05),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border(
+                                          left: BorderSide(
+                                            color: mine ? const Color(0xffff65dc) : const Color(0xff8b5cff),
+                                            width: 3,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            replyName.isEmpty ? 'Cavab' : replyName,
+                                            style: const TextStyle(
+                                              color: Color(0xffd0b6ff),
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          Text(
+                                            replyText,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Color(0xffa89fbd),
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  bubble,
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+
                         if (type == 'audio') {
                           final path = '${data['audioPath'] ?? ''}';
                           final duration = data['durationMs'];
-                          return Align(
+                          return decorate(Align(
                             alignment: mine
                                 ? Alignment.centerRight
                                 : Alignment.centerLeft,
@@ -3313,31 +5534,176 @@ class _RealChatPageState extends State<RealChatPage> {
                                 load: () => voiceService.download(path),
                               ),
                             ),
-                          );
+                          ));
                         }
 
-                        if (type == 'sticker') {
-                          return Align(
+                        if (type == 'domino') {
+                          final matchId = '${data['matchId'] ?? ''}';
+                          return decorate(Align(
                             alignment: mine
                                 ? Alignment.centerRight
                                 : Alignment.centerLeft,
                             child: Container(
                               margin: const EdgeInsets.only(bottom: 10),
-                              padding: const EdgeInsets.all(5),
-                              child: Text(
-                                text,
-                                style: const TextStyle(fontSize: 58),
+                              padding: const EdgeInsets.all(14),
+                              constraints: const BoxConstraints(maxWidth: 250),
+                              decoration: BoxDecoration(
+                                color: vPanel,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: vLine),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(Icons.casino_rounded,
+                                          color: Color(0xff48e08a), size: 20),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Domino',
+                                        style: TextStyle(
+                                          color: vInk,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    mine
+                                        ? 'Dəvət göndərdin'
+                                        : 'Səni oyuna dəvət edir',
+                                    style: const TextStyle(
+                                      color: vMuted,
+                                      fontSize: 12.5,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  GradientButton(
+                                    label: 'Oyuna keç',
+                                    height: 40,
+                                    fontSize: 13.5,
+                                    gradient: vBrand,
+                                    onPressed: matchId.isEmpty
+                                        ? null
+                                        : () => Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => DominoPage(
+                                                  matchId: matchId,
+                                                  profile:
+                                                      widget.currentProfile,
+                                                ),
+                                              ),
+                                            ),
+                                  ),
+                                ],
                               ),
                             ),
-                          );
+                          ));
                         }
 
-                        return Align(
+                        if (type == 'photo') {
+                          final thumb = '${data['photo'] ?? ''}';
+                          return decorate(Align(
+                            alignment: mine
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: GestureDetector(
+                              onTap: () => _openPhoto(messageRef, thumb),
+                              onLongPress: () =>
+                                  _openMessageActions(messageRef, mine, data),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                constraints: const BoxConstraints(
+                                  maxWidth: 240,
+                                  maxHeight: 300,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(color: vLine),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: thumb.isEmpty
+                                    ? const SizedBox(
+                                        width: 180,
+                                        height: 180,
+                                        child: Icon(Icons.broken_image_rounded,
+                                            color: vMuted),
+                                      )
+                                    : Image(
+                                        image: vibeImageProvider(thumb)!,
+                                        fit: BoxFit.cover,
+                                      ),
+                              ),
+                            ),
+                          ));
+                        }
+
+                        if (type == 'sticker') {
+                          return decorate(Align(
+                            alignment: mine
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: GestureDetector(
+                              onLongPress: () =>
+                                  _openMessageActions(messageRef, mine, data),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(5),
+                                child: Text(
+                                  text,
+                                  style: const TextStyle(fontSize: 58),
+                                ),
+                              ),
+                            ),
+                          ));
+                        }
+
+                        // Yalnız emojidən ibarət qısa mesajlar böyük görünür.
+                        final emojiOnly = text.trim().isNotEmpty &&
+                            text.trim().length <= 8 &&
+                            !RegExp(r'[0-9A-Za-zƏəĞğİıÖöŞşÜüÇç]').hasMatch(text);
+
+                        if (emojiOnly) {
+                          return decorate(Align(
+                            alignment: mine
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: GestureDetector(
+                              onLongPress: () =>
+                                  _openMessageActions(messageRef, mine, data),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(6, 2, 6, 10),
+                                child: Column(
+                                  crossAxisAlignment: mine
+                                      ? CrossAxisAlignment.end
+                                      : CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(text, style: const TextStyle(fontSize: 46)),
+                                    if (reactionValues.isNotEmpty)
+                                      Text(
+                                        reactionValues.join(' '),
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ));
+                        }
+
+                        return decorate(Align(
                           alignment: mine
                               ? Alignment.centerRight
                               : Alignment.centerLeft,
                           child: GestureDetector(
-                            onLongPress: () => _openMessageActions(messageRef, mine),
+                            onLongPress: () => _openMessageActions(messageRef, mine, data),
                             child: Container(
                             constraints: const BoxConstraints(maxWidth: 310),
                             margin: const EdgeInsets.only(bottom: 8),
@@ -3435,7 +5801,7 @@ class _RealChatPageState extends State<RealChatPage> {
                             ),
                           ),
                           ),
-                        );
+                        ));
                       },
                     );
                   },
@@ -3445,7 +5811,17 @@ class _RealChatPageState extends State<RealChatPage> {
               // ==========================
               // MESAJ YAZMA PANELİ
               // ==========================
-              if (voiceOpen)
+              BlockBanner(
+                state: block,
+                name: widget.targetName,
+                onUnblock: () => unblockUser(
+                  myUid: widget.currentProfile.uid,
+                  targetUid: widget.targetUid,
+                ),
+              ),
+              if (block.blocked)
+                const SizedBox.shrink()
+              else if (voiceOpen)
                 VoiceComposer(
                   newId: () => FirebaseFirestore.instance
                       .collection('chats')
@@ -3481,18 +5857,68 @@ class _RealChatPageState extends State<RealChatPage> {
                         ),
                       ],
                     ),
-                    child: Row(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                      if (replyTo != null)
+                        Container(
+                          margin: const EdgeInsets.fromLTRB(6, 2, 6, 8),
+                          padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: .05),
+                            borderRadius: BorderRadius.circular(14),
+                            border: const Border(
+                              left: BorderSide(color: Color(0xffff65dc), width: 3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '${replyTo!['name']} mesajına cavab',
+                                      style: const TextStyle(
+                                        color: Color(0xffd0b6ff),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${replyTo!['text']}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Color(0xffa89fbd),
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Cavabı ləğv et',
+                                onPressed: () => setState(() => replyTo = null),
+                                icon: const Icon(Icons.close_rounded,
+                                    color: Color(0xff9d94ae), size: 19),
+                              ),
+                            ],
+                          ),
+                        ),
+                      Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
+                        IconButton(
+                          tooltip: 'Stiker və oyunlar',
+                          onPressed: openMoreSheet,
+                          icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xffff5bd6)),
+                        ),
                         IconButton(
                           tooltip: 'Emoji',
                           onPressed: openEmojiPicker,
                           icon: const Icon(Icons.emoji_emotions_outlined, color: Color(0xffc8b9dd)),
-                        ),
-                        IconButton(
-                          tooltip: 'Stiker',
-                          onPressed: openStickerPicker,
-                          icon: const Icon(Icons.auto_awesome_outlined, color: Color(0xffff5bd6)),
                         ),
 
                         IconButton(
@@ -3555,9 +5981,13 @@ class _RealChatPageState extends State<RealChatPage> {
                         ),
                       ],
                     ),
+                      ],
+                    ),
                   ),
                 ),
             ],
+              );
+            },
           ),
         );
       },

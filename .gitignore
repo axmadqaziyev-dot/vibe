@@ -46,3 +46,13 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# İmzalama sirləri — heç vaxt repoya düşməməlidir.
+android/key.properties
+**/*.jks
+**/*.keystore
+ios/Runner/GoogleService-Info.plist.bak
+service-account*.json
+*-firebase-adminsdk-*.json
+tools/node_modules/
+tools/kocur.ps1

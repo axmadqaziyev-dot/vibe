@@ -35,25 +35,34 @@ service firebase.storage {
     // PROFILE GALLERY / PROFILE PHOTO SOURCE
     match /profile_media/{uid}/{fileName} {
       allow read: if signedIn();
-      allow create, update, delete: if isOwner(uid)
+      allow create, update: if isOwner(uid)
         && request.resource.size <= 10485760
         && request.resource.contentType.matches('image/.*');
+
+      // Silmədə request.resource olmur — ayrı qayda lazımdır.
+      allow delete: if isOwner(uid);
     }
 
     // MOMENTS
     match /moments/{uid}/{fileName} {
       allow read: if signedIn();
-      allow create, update, delete: if isOwner(uid)
+      allow create, update: if isOwner(uid)
         && request.resource.size <= 15728640
         && request.resource.contentType.matches('image/.*');
+
+      // Silmədə request.resource olmur — ayrı qayda lazımdır.
+      allow delete: if isOwner(uid);
     }
 
     // VIDEOS
     match /videos/{uid}/{fileName} {
       allow read: if signedIn();
-      allow create, update, delete: if isOwner(uid)
+      allow create, update: if isOwner(uid)
         && request.resource.size <= 209715200
         && request.resource.contentType.matches('video/.*');
+
+      // Silmədə request.resource olmur — ayrı qayda lazımdır.
+      allow delete: if isOwner(uid);
     }
   }
 }

@@ -1,109 +1,105 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
+import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'vip.dart';
 
-const _bg = Color(0xff070510);
-const _panel = Color(0xff151020);
-const _muted = Color(0xffa89fbd);
-const _pink = Color(0xffff2bd6);
-const _purple = Color(0xff8b5cff);
-
+/// VIP pilləsi və medallar səhifəsi.
 class VibeLevelsPage extends StatelessWidget {
-  const VibeLevelsPage({super.key, required this.profile});
+  const VibeLevelsPage({super.key, required this.profile, this.database});
+
   final UserProfile profile;
+  final FirebaseFirestore? database;
 
   @override
   Widget build(BuildContext context) {
-    final ref = FirebaseFirestore.instance.collection('users').doc(profile.uid);
+    final db = database ?? FirebaseFirestore.instance;
+    final ref = db.collection('users').doc(profile.uid);
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: vBg,
       appBar: AppBar(
-        backgroundColor: const Color(0xff0b0711),
+        backgroundColor: vBg,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         title: const Text(
-          'Level & Medallar',
-          style: TextStyle(fontWeight: FontWeight.w900),
+          'VIP və medallar',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
         ),
       ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: ref.snapshots(),
-        builder: (_, snap) {
-          final d = snap.data?.data() ?? {};
-          final sent = int.tryParse('${d['giftSent'] ?? 0}') ?? 0;
-          final received = int.tryParse('${d['giftReceived'] ?? 0}') ?? 0;
-          final score = sent + received;
-          final level = 1 + (score ~/ 500);
-          final current = score % 500;
-          final progress = current / 500.0;
+        builder: (context, snapshot) {
+          final data = snapshot.data?.data() ?? const <String, dynamic>{};
+          final score = vipScore(data);
+          final tier = tierForScore(score);
+          final next = nextTier(score);
+          final progress = tierProgress(score);
+          final earned = earnedMedals(data).map((m) => m.id).toSet();
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xff2f1744), Color(0xff5a1b5f)],
-                  ),
-                  borderRadius: BorderRadius.circular(26),
-                  border: Border.all(color: const Color(0xff704a8f)),
-                ),
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 44,
-                      backgroundColor: _purple,
-                      child: Text(
-                        '$level',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Level $level',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '$current / 500 XP',
-                      style: const TextStyle(color: _muted),
-                    ),
-                    const SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: LinearProgressIndicator(
-                        minHeight: 10,
-                        value: progress,
-                        backgroundColor: const Color(0xff261a31),
-                        valueColor: const AlwaysStoppedAnimation(_pink),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
+              _tierCard(tier, next, score, progress),
+              const SizedBox(height: 22),
+
               const Text(
-                'Medallar',
+                'PİLLƏLƏR',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
+                  color: vMuted,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
                 ),
               ),
-              const SizedBox(height: 12),
-              _medal('🌱', 'Yeni VIBE', level >= 1, 'Level 1'),
-              _medal('🔥', 'Aktiv üzv', level >= 5, 'Level 5'),
-              _medal('💜', 'Social Star', level >= 10, 'Level 10'),
-              _medal('👑', 'VIBE Elite', level >= 20, 'Level 20'),
-              _medal('💎', 'Legend', level >= 50, 'Level 50'),
+              const SizedBox(height: 10),
+              for (final item in vipTiers.where((t) => t.level > 0))
+                _tierRow(item, score),
+
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  const Text(
+                    'MEDALLAR',
+                    style: TextStyle(
+                      color: vMuted,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${earned.length} / ${allMedals.length}',
+                    style: const TextStyle(color: vMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 14,
+                runSpacing: 16,
+                children: [
+                  for (final medal in allMedals)
+                    MedalChip(medal: medal, earned: earned.contains(medal.id)),
+                ],
+              ),
+
+              const SizedBox(height: 22),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .04),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Text(
+                  'Xal hədiyyə göndərəndə və alanda artır. '
+                  'Pillə qalxdıqca nişanın, giriş effektin və kəşf lentindəki '
+                  'yerin yaxşılaşır.',
+                  style: TextStyle(color: vMuted, fontSize: 12.5, height: 1.5),
+                ),
+              ),
             ],
           );
         },
@@ -111,22 +107,121 @@ class VibeLevelsPage extends StatelessWidget {
     );
   }
 
-  Widget _medal(String emoji, String title, bool unlocked, String requirement) {
+  Widget _tierCard(VipTier tier, VipTier? next, int score, double progress) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          colors: [
+            tier.colors.first.withValues(alpha: .35),
+            tier.colors.last.withValues(alpha: .18),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: tier.color.withValues(alpha: .55)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 86,
+            height: 86,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(colors: tier.colors),
+              boxShadow: [
+                BoxShadow(
+                  color: tier.color.withValues(alpha: .5),
+                  blurRadius: 24,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.workspace_premium_rounded,
+                color: Colors.white, size: 40),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            tier.name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$score xal',
+            style: const TextStyle(color: vMuted, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: Colors.black.withValues(alpha: .35),
+              valueColor: AlwaysStoppedAnimation(tier.color),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            next == null
+                ? 'Ən yüksək pillədəsən'
+                : '${next.name} pilləsinə ${next.minScore - score} xal qalıb',
+            style: const TextStyle(color: vInk, fontSize: 12.5),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final perk in tier.perks)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: .3),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    perk,
+                    style: const TextStyle(color: vInk, fontSize: 11.5),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tierRow(VipTier tier, int score) {
+    final reached = score >= tier.minScore;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: vPanel,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: unlocked ? _purple : const Color(0xff342743),
+          color: reached ? tier.color.withValues(alpha: .6) : vLine,
         ),
       ),
       child: Row(
         children: [
-          Text(
-            unlocked ? emoji : '🔒',
-            style: const TextStyle(fontSize: 30),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(colors: tier.colors),
+            ),
+            child: Icon(
+              reached ? Icons.check_rounded : Icons.lock_outline_rounded,
+              color: Colors.white,
+              size: 17,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -134,22 +229,30 @@ class VibeLevelsPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  tier.name,
                   style: TextStyle(
-                    color: unlocked ? Colors.white : Colors.white38,
-                    fontWeight: FontWeight.w900,
+                    color: reached ? Colors.white : vMuted,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 3),
                 Text(
-                  requirement,
-                  style: const TextStyle(color: _muted, fontSize: 12),
+                  tier.perks.join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: vMuted, fontSize: 11.5),
                 ),
               ],
             ),
           ),
-          if (unlocked)
-            const Icon(Icons.check_circle_rounded, color: Color(0xff35e18b)),
+          Text(
+            '${tier.minScore}',
+            style: TextStyle(
+              color: reached ? tier.color : vMuted,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       ),
     );

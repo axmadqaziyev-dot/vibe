@@ -1,0 +1,9 @@
+{
+  "name": "vibe-migrate",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "firebase-admin": "^12.5.0"
+  }
+}

@@ -1,9 +1,14 @@
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'media_upload.dart';
 import 'user_profile.dart';
+
+/// Seçilən video pulsuz yaddaş üçün çox böyükdür.
+class _VideoTooLarge implements Exception {
+  const _VideoTooLarge();
+}
 
 class VideoUploadButton extends StatefulWidget {
   const VideoUploadButton({
@@ -35,15 +40,20 @@ class _VideoUploadButtonState extends State<VideoUploadButton> {
     setState(() => uploading = true);
     try {
       final Uint8List bytes = await picked.readAsBytes();
-      final videoId = FirebaseFirestore.instance.collection('videos').doc().id;
-      final ref = FirebaseStorage.instance
-          .ref('videos/${widget.profile.uid}/$videoId.mp4');
 
-      await ref.putData(
-        bytes,
-        SettableMetadata(contentType: 'video/mp4'),
+      // Telefondan seçilən video çox böyük ola bilər — pulsuz yaddaşı
+      // qorumaq üçün 90 MB-dan yuxarısını qəbul etmirik.
+      if (bytes.lengthInBytes > 90 * 1024 * 1024) {
+        throw const _VideoTooLarge();
+      }
+
+      final videoId = FirebaseFirestore.instance.collection('videos').doc().id;
+      final url = await MediaUpload.upload(
+        bucket: MediaUpload.videoBucket,
+        path: '${widget.profile.uid}/$videoId.mp4',
+        bytes: bytes,
+        contentType: 'video/mp4',
       );
-      final url = await ref.getDownloadURL();
 
       await FirebaseFirestore.instance.collection('videos').doc(videoId).set({
         'id': videoId,
@@ -64,8 +74,20 @@ class _VideoUploadButtonState extends State<VideoUploadButton> {
       }
     } catch (e) {
       if (mounted) {
+        final String message;
+        if (e is _VideoTooLarge) {
+          message = 'Video çox böyükdür. 90 MB-a qədər video paylaşa bilərsən.';
+        } else if (e is MediaBucketMissing) {
+          message = 'Video yaddaşı hazır deyil: Supabase panelində '
+              '"${e.bucket}" adlı public bucket yaradılmalıdır.';
+        } else {
+          message = 'Video yüklənmədi: $e';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Video yüklənmədi: $e')),
+          SnackBar(
+            duration: const Duration(seconds: 5),
+            content: Text(message),
+          ),
         );
       }
     } finally {

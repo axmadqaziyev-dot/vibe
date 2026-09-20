@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'media_upload.dart';
 import 'package:flutter/material.dart';
 import 'user_profile.dart';
 
@@ -105,7 +106,11 @@ Future<void> showVideoManageSheet(
 
                 if (url.isNotEmpty) {
                   try {
-                    await FirebaseStorage.instance.refFromURL(url).delete();
+                    // Yeni videolar Supabase-dədir, köhnələr Firebase-də.
+                    final removed = await MediaUpload.deleteByUrl(url);
+                    if (!removed) {
+                      await FirebaseStorage.instance.refFromURL(url).delete();
+                    }
                   } catch (_) {}
                 }
 

@@ -2,12 +2,33 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSCameraUsageDescription</key><string>Video zəng üçün kamera lazımdır.</string><key>NSMicrophoneUsageDescription</key><string>Səsli və video zəng üçün mikrofon lazımdır.</string><key>CADisableMinimumFrameDurationOnPhone</key>
+	<key>NSCameraUsageDescription</key>
+	<string>Profil şəkli çəkmək və video zəng etmək üçün kameraya icazə lazımdır.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Səsli mesaj, səsli otaq və zəng üçün mikrofona icazə lazımdır.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Profil şəkli, an və video paylaşmaq üçün qalereyaya icazə lazımdır.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Şəkilləri cihazına yadda saxlamaq üçün qalereyaya icazə lazımdır.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.719591915896-nrtakci8kj23p7ij326buh74bnrem76m</string>
+			</array>
+		</dict>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Flutter Application 1</string>
+	<string>VIBE</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +36,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>flutter_application_1</string>
+	<string>VIBE</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
