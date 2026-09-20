@@ -159,9 +159,51 @@ class _PartyRoomsPageState extends State<PartyRoomsPage> {
     }
   }
 
+  /// Otağa necə girmək istədiyini soruşur.
+  ///
+  /// Adamların əksəriyyəti otağa girməyə çəkinir, çünki girən kimi
+  /// siyahıda görünür. Gizli dinləmə həmin maneəni götürür.
+  void _roomEntryMenu(DocumentSnapshot<Map<String, dynamic>> doc) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xff151020),
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.login_rounded, color: _pink),
+              title: const Text('Otağa gir',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Siyahıda görünürsən, danışa bilərsən',
+                  style: TextStyle(color: _muted, fontSize: 12)),
+              onTap: () {
+                Navigator.pop(sheet);
+                _openRoom(doc);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.headphones_rounded, color: _blue),
+              title: const Text('Gizli qulaq as',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Heç kim səni görmür, sonra üzə çıxa bilərsən',
+                  style: TextStyle(color: _muted, fontSize: 12)),
+              onTap: () {
+                Navigator.pop(sheet);
+                _openRoom(doc, listenOnly: true);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _openRoom(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) async {
+    DocumentSnapshot<Map<String, dynamic>> doc, {
+    bool listenOnly = false,
+  }) async {
     final data = doc.data() ?? {};
     if (data['locked'] == true && data['hostId'] != widget.profile.uid) {
       final ok = await showDialog<bool>(
@@ -173,7 +215,11 @@ class _PartyRoomsPageState extends State<PartyRoomsPage> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PartyRoomPage(profile: widget.profile, roomId: doc.id),
+        builder: (_) => PartyRoomPage(
+          profile: widget.profile,
+          roomId: doc.id,
+          listenOnly: listenOnly,
+        ),
       ),
     );
   }
@@ -307,6 +353,8 @@ class _PartyRoomsPageState extends State<PartyRoomsPage> {
                     return InkWell(
                       borderRadius: BorderRadius.circular(24),
                       onTap: () => _openRoom(doc),
+                      // Uzun basmaq gizli dinləməni təklif edir.
+                      onLongPress: () => _roomEntryMenu(doc),
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -462,10 +510,18 @@ class PartyRoomPage extends StatefulWidget {
     super.key,
     required this.profile,
     required this.roomId,
+    this.listenOnly = false,
   });
 
   final UserProfile profile;
   final String roomId;
+
+  /// Gizli dinləmə.
+  ///
+  /// Adamların əksəriyyəti otağa girməyə çəkinir, çünki girən kimi
+  /// siyahıda görünür. Bu rejimdə adın heç yerdə çıxmır, mikrofon
+  /// bağlıdır — sadəcə qulaq asırsan. İstəyəndə üzə çıxa bilirsən.
+  final bool listenOnly;
 
   @override
   State<PartyRoomPage> createState() => _PartyRoomPageState();
@@ -473,6 +529,9 @@ class PartyRoomPage extends StatefulWidget {
 
 class _PartyRoomPageState extends State<PartyRoomPage> {
   final message = TextEditingController();
+
+  /// Hazırda gizli dinləyirikmi.
+  late bool hidden = widget.listenOnly;
 
   /// Uçan ürəklər üçün vəziyyət.
   final List<int> flyingHearts = <int>[];
@@ -610,16 +669,21 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         'name': widget.profile.name,
         'vip': vip,
         'photoUrl': '${userData['photoUrl'] ?? ''}',
+        // Gizli dinləyici siyahıda görünmür, yalnız sayılır.
+        'hidden': hidden,
         'joinedAt': FieldValue.serverTimestamp(),
         'lastSeen': FieldValue.serverTimestamp(),
       });
 
-      await room.collection('events').add({
-        'type': vip ? 'vip_enter' : 'enter',
-        'uid': widget.profile.uid,
-        'name': widget.profile.name,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // Gizli girişdə giriş effekti oynamır — gizli olmağın mənası budur.
+      if (!hidden) {
+        await room.collection('events').add({
+          'type': vip ? 'vip_enter' : 'enter',
+          'uid': widget.profile.uid,
+          'name': widget.profile.name,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
 
       final count = await room.collection('members').count().get();
       await room.set(
@@ -632,14 +696,88 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
 
       // Profildə "hazırda səsli otaqdadır" nişanı — söhbət başlığında
       // görünür və oradan birbaşa otağa keçmək olur.
+      if (!hidden) {
+        final roomSnap = await room.get();
+        await me.set({
+          'activeRoomId': widget.roomId,
+          'activeRoomName': '${roomSnap.data()?['name'] ?? 'Səsli otaq'}',
+          'activeRoomAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    } catch (_) {}
+  }
+
+
+  /// Gizli dinləməkdən üzə çıxır.
+  ///
+  /// Otağa yenidən girmək lazım deyil: səs onsuz da açıqdır, yalnız
+  /// görünürlük dəyişir.
+  Future<void> _reveal() async {
+    if (!hidden) return;
+
+    setState(() => hidden = false);
+
+    try {
+      await room.collection('members').doc(widget.profile.uid).set(
+        {'hidden': false, 'lastSeen': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+
+      await room.collection('events').add({
+        'type': 'enter',
+        'uid': widget.profile.uid,
+        'name': widget.profile.name,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
       final roomSnap = await room.get();
       await me.set({
         'activeRoomId': widget.roomId,
         'activeRoomName': '${roomSnap.data()?['name'] ?? 'Səsli otaq'}',
         'activeRoomAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => hidden = true);
+    }
   }
+
+  /// Gizli rejimdə altda çıxan zolaq.
+  Widget _hiddenBar() => Container(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+        decoration: BoxDecoration(
+          color: _blue.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _blue.withValues(alpha: .45)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.visibility_off_rounded, size: 17, color: _blue),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Gizli dinləyirsən — siyahıda görünmürsən',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: _reveal,
+              child: const Text(
+                'Üzə çıx',
+                style: TextStyle(
+                  color: _blue,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 
   Future<void> _leavePresence() async {
     try {
@@ -1546,6 +1684,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                       _seatInvite(d),
                       _listeners(d, canModerate),
                       const SizedBox(height: 4),
+                      if (hidden) _hiddenBar(),
                       Expanded(child: _chat(d)),
                       _bottomBar(d),
                     ],
@@ -2933,7 +3072,13 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
       }).toList();
 
       if (live.isEmpty) return const SizedBox.shrink();
-      final shown = live.take(8).toList();
+
+      // Gizli dinləyicilər üzdə görünmür — gizli olmağın mənası budur.
+      // Amma sayılırlar: "40 qulaq asır" yazısı otağı canlı göstərir və
+      // içəri girməyə cəsarət verir.
+      final visible = live.where((doc) => doc.data()['hidden'] != true).toList();
+      final hiddenCount = live.length - visible.length;
+      final shown = visible.take(8).toList();
 
       return SizedBox(
         height: 38,
@@ -2989,6 +3134,20 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
+                  if (hiddenCount > 0) ...[
+                    const SizedBox(width: 7),
+                    const Icon(Icons.headphones_rounded,
+                        size: 13, color: _blue),
+                    const SizedBox(width: 3),
+                    Text(
+                      '$hiddenCount',
+                      style: const TextStyle(
+                        color: _blue,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
