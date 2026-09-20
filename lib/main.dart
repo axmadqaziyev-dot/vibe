@@ -75,17 +75,21 @@ Future<void> main() async {
     publishableKey: 'sb_publishable_P6hJ0hoQXAz_rZ6lWBwTLA_dLT-edZB',
   );
 
-  if (kIsWeb) {
-    final prefs = await SharedPreferences.getInstance();
-
-    await FirebaseAuth.instance.setPersistence(
-      (prefs.getBool('rememberMe') ?? true)
-          ? Persistence.LOCAL
-          : Persistence.SESSION,
-    );
-  }
-
   final prefs = await SharedPreferences.getInstance();
+
+  // Vebdə setPersistence yalnız istifadəçi "məni xatırla"nı söndürəndə
+  // çağırılır.
+  //
+  // Əvvəl hər açılışda çağırılırdı — həmçinin LOCAL üçün, halbuki LOCAL
+  // onsuz da standartdır. O çağırış giriş vəziyyəti bərpa olunmamış işə
+  // düşür və istifadəçini çıxara bilir: yeni versiya gələndə səhifə
+  // yenilənir və adam özünü giriş ekranında tapır.
+  //
+  // İndi standart hal heç nəyə toxunmur; yalnız "xatırlama" seçimi
+  // söndürüləndə sessiya rejiminə keçirilir.
+  if (kIsWeb && prefs.getBool('rememberMe') == false) {
+    await FirebaseAuth.instance.setPersistence(Persistence.SESSION);
+  }
 
   if (!kIsWeb && prefs.getBool('rememberMe') == false) {
     await FirebaseAuth.instance.signOut();
@@ -1557,8 +1561,12 @@ class _LoginPageState extends State<LoginPage> {
 
       Navigator.popUntil(context, (route) => route.isFirst);
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'invalid-credential') {
-        showMessage('Email və ya şifrə yanlışdır.');
+      // Hesab Google/Apple ilə açılıbsa, onun ayrıca şifrəsi olmur.
+      // Firebase isə "yanlış şifrə" ilə "şifrə yoxdur" halını fərqləndirmir
+      // (e-poçt sorğusu təhlükəsizlik üçün bağlıdır), ona görə hər iki
+      // ehtimalı istifadəçiyə özümüz izah edirik.
+      if (e.code == 'invalid-credential' || e.code == 'wrong-password') {
+        _showWrongPasswordHelp();
       } else {
         showMessage('Giriş xətası: ${e.message}');
       }
@@ -1575,6 +1583,57 @@ class _LoginPageState extends State<LoginPage> {
 
   void showMessage(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// Şifrə tutmayanda çıxan izah.
+  ///
+  /// Snackbar əvəzinə pəncərə göstəririk: adam çox vaxt hesabını Google ilə
+  /// açıb, sonra e-poçt və şifrə ilə girməyə çalışır. "Şifrə yanlışdır"
+  /// mətni bunu izah etmir və adam dövrə vurur — şifrə bərpası da işləmir,
+  /// çünki bərpa ediləcək şifrə yoxdur.
+  void _showWrongPasswordHelp() {
+    showDialog<void>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: const Color(0xff151020),
+        title: const Text(
+          'Giriş alınmadı',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
+        content: const Text(
+          'E-poçt və ya şifrə yanlışdır.\n\n'
+          'Hesabını Google və ya Apple ilə açmısansa, onun ayrıca şifrəsi '
+          'yoxdur. Bu halda şifrə bərpası da işləmir — aşağıdakı düymə ilə gir.',
+          style: TextStyle(color: Color(0xffa89fbd), height: 1.45),
+        ),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialog);
+              _resetPassword();
+            },
+            child: const Text(
+              'Şifrəni unutdum',
+              style: TextStyle(color: Color(0xffa89fbd)),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialog);
+              _signInWithGoogle();
+            },
+            child: const Text(
+              'Google ilə gir',
+              style: TextStyle(
+                color: Color(0xffff2bd6),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Nömrə ilə giriş — SMS kodu ilə.
@@ -2375,155 +2434,326 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Qeydiyyat')),
-      body: ListView(
-        padding: const EdgeInsets.all(22),
-        children: [
-          TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'Ad',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: ageController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Yaş',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: cityController,
-            decoration: const InputDecoration(
-              labelText: 'Şəhər',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: aboutController,
-            maxLines: 3,
-            maxLength: 150,
-            decoration: const InputDecoration(
-              labelText: 'Haqqımda',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: passwordController,
-            obscureText: hidePassword,
-            decoration: InputDecoration(
-              labelText: 'Şifrə',
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                onPressed: () {
-                  setState(() {
-                    hidePassword = !hidePassword;
-                  });
-                },
-                icon: Icon(
-                  hidePassword ? Icons.visibility : Icons.visibility_off,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          // App Store 1.2: qeydiyyatda şərtlərin açıq qəbulu tələb olunur.
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: vBg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Hesab yarat',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+      ),
+      extendBodyBehindAppBar: true,
+      body: AuroraBackground(
+        child: SafeArea(
+          child: ListView(
+            // Başlıq şəffafdır və məzmun onun altından keçir; ilk sətir
+            // başlığın altında qalmasın deyə yuxarıdan boşluq buraxılır.
+            padding: const EdgeInsets.fromLTRB(18, kToolbarHeight + 6, 18, 28),
             children: [
-              Checkbox(
-                value: acceptedTerms,
-                onChanged: (value) =>
-                    setState(() => acceptedTerms = value ?? false),
+              const Text(
+                'Bir neçə sətir — sonra VIBE səninkidir.',
+                style: TextStyle(color: vMuted, fontSize: 13.5, height: 1.4),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
+              const SizedBox(height: 20),
+
+              _section(
+                title: 'Səni tanıyaq',
+                icon: Icons.person_rounded,
+                children: [
+                  _field(
+                    controller: nameController,
+                    label: 'Ad',
+                    icon: Icons.badge_rounded,
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 11),
+
+                  // Yaş və şəhər yan-yana: ikisi də qısadır, ayrı sətir
+                  // tutmaları formanı lazımsız uzadırdı.
+                  Row(
                     children: [
-                      const Text(
-                        '18 yaşım tamamdır və ',
-                        style: TextStyle(color: Color(0xffb7aecb), fontSize: 13),
-                      ),
-                      GestureDetector(
-                        onTap: () => LegalPage.openTerms(context),
-                        child: const Text(
-                          'istifadə şərtlərini',
-                          style: TextStyle(
-                            color: Color(0xffff65dc),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            decoration: TextDecoration.underline,
-                          ),
+                      SizedBox(
+                        width: 104,
+                        child: _field(
+                          controller: ageController,
+                          label: 'Yaş',
+                          icon: Icons.cake_rounded,
+                          keyboardType: TextInputType.number,
                         ),
                       ),
-                      const Text(
-                        ' və ',
-                        style: TextStyle(color: Color(0xffb7aecb), fontSize: 13),
-                      ),
-                      GestureDetector(
-                        onTap: () => LegalPage.openRules(context),
-                        child: const Text(
-                          'icma qaydalarını',
-                          style: TextStyle(
-                            color: Color(0xffff65dc),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            decoration: TextDecoration.underline,
-                          ),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: _field(
+                          controller: cityController,
+                          label: 'Şəhər',
+                          icon: Icons.place_rounded,
+                          textCapitalization: TextCapitalization.words,
                         ),
-                      ),
-                      const Text(
-                        ' qəbul edirəm. Uyğunsuz məzmuna sıfır dözümlülük var.',
-                        style: TextStyle(color: Color(0xffb7aecb), fontSize: 13),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 11),
+                  _field(
+                    controller: aboutController,
+                    label: 'Haqqımda',
+                    hint: 'Nəyi sevirsən, nədən danışmağı xoşlayırsan?',
+                    icon: Icons.chat_bubble_rounded,
+                    maxLines: 3,
+                    maxLength: 150,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              _section(
+                title: 'Giriş məlumatları',
+                icon: Icons.lock_rounded,
+                children: [
+                  _field(
+                    controller: emailController,
+                    label: 'E-poçt',
+                    icon: Icons.alternate_email_rounded,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 11),
+                  _field(
+                    controller: passwordController,
+                    label: 'Şifrə',
+                    hint: 'Ən azı 6 simvol',
+                    icon: Icons.key_rounded,
+                    obscureText: hidePassword,
+                    suffix: IconButton(
+                      onPressed: () =>
+                          setState(() => hidePassword = !hidePassword),
+                      icon: Icon(
+                        hidePassword
+                            ? Icons.visibility_rounded
+                            : Icons.visibility_off_rounded,
+                        color: vMuted,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+              _termsCard(),
+              const SizedBox(height: 16),
+
+              GradientButton(
+                label: loading ? 'Yaradılır…' : 'Qeydiyyatdan keç',
+                icon: Icons.arrow_forward_rounded,
+                gradient: vBrand,
+                height: 54,
+                onPressed: loading ? null : register,
+              ),
+
+              const SizedBox(height: 10),
+              Center(
+                child: TextButton(
+                  onPressed: () => LegalPage.openPrivacy(context),
+                  child: const Text(
+                    'Məxfilik siyasəti',
+                    style: TextStyle(color: Color(0xff9d94ae), fontSize: 12.5),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 54,
-            child: FilledButton(
-              onPressed: loading ? null : register,
-              child: loading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text(
-                      'Qeydiyyatdan keç',
-                      style: TextStyle(fontSize: 18),
-                    ),
-            ),
+        ),
+      ),
+    );
+  }
+
+  /// Başlıqlı qutu — sahələri mənaya görə qruplaşdırır.
+  ///
+  /// Əvvəl altı sahə ardıcıl düzülmüşdü və forma sonu görünməyən bir siyahı
+  /// kimi oxunurdu. İki qrup adamın gözünə "bu qədərmiş" deyir.
+  Widget _section({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 15),
+      decoration: BoxDecoration(
+        color: vPanel.withValues(alpha: .72),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: vLine),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 15, color: vPink),
+              const SizedBox(width: 7),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: .2,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Center(
-            child: TextButton(
-              onPressed: () => LegalPage.openPrivacy(context),
-              child: const Text(
-                'Məxfilik siyasəti',
-                style: TextStyle(color: Color(0xff9d94ae), fontSize: 12.5),
+          const SizedBox(height: 13),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  /// Formanın bütün sahələri eyni görünsün deyə tək yerdən qurulur.
+  Widget _field({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? hint,
+    TextInputType? keyboardType,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    bool obscureText = false,
+    int maxLines = 1,
+    int? maxLength,
+    Widget? suffix,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      textCapitalization: textCapitalization,
+      obscureText: obscureText,
+      maxLines: obscureText ? 1 : maxLines,
+      maxLength: maxLength,
+      style: const TextStyle(color: Colors.white, fontSize: 15),
+      cursorColor: vPink,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        hintStyle: const TextStyle(color: Color(0xff6f6786), fontSize: 13),
+        labelStyle: const TextStyle(color: vMuted, fontSize: 14),
+        floatingLabelStyle: const TextStyle(color: vPink, fontSize: 13),
+        prefixIcon: Padding(
+          // Çox sətirli sahədə ikon mətnin ilk sətri ilə eyni xətdə dursun.
+          padding: EdgeInsets.only(bottom: maxLines > 1 ? 44 : 0),
+          child: Icon(icon, size: 19, color: vMuted),
+        ),
+        suffixIcon: suffix,
+        filled: true,
+        fillColor: vPanelHigh,
+        counterStyle: const TextStyle(color: Color(0xff6f6786), fontSize: 11),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 15,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: vLine),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: vLine),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: vPink, width: 1.4),
+        ),
+      ),
+    );
+  }
+
+  /// Şərtlərin qəbulu.
+  ///
+  /// App Store 1.2 bəndi bunu tələb edir. Bütün qutuya basmaq işarəni
+  /// dəyişir — kiçik kvadratı tutmağa çalışmaq telefonda əziyyətlidir.
+  Widget _termsCard() {
+    return GestureDetector(
+      onTap: () => setState(() => acceptedTerms = !acceptedTerms),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: acceptedTerms
+              ? vPink.withValues(alpha: .10)
+              : vPanel.withValues(alpha: .72),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: acceptedTerms ? vPink.withValues(alpha: .55) : vLine,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: acceptedTerms ? vPink : Colors.transparent,
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(
+                  color: acceptedTerms ? vPink : const Color(0xff5c5474),
+                  width: 1.6,
+                ),
+              ),
+              child: acceptedTerms
+                  ? const Icon(Icons.check_rounded,
+                      size: 15, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text(
+                    '18 yaşım tamamdır və ',
+                    style: TextStyle(color: Color(0xffb7aecb), fontSize: 12.5),
+                  ),
+                  GestureDetector(
+                    onTap: () => LegalPage.openTerms(context),
+                    child: const Text(
+                      'istifadə şərtlərini',
+                      style: TextStyle(
+                        color: Color(0xffff65dc),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xffff65dc),
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    ' və ',
+                    style: TextStyle(color: Color(0xffb7aecb), fontSize: 12.5),
+                  ),
+                  GestureDetector(
+                    onTap: () => LegalPage.openRules(context),
+                    child: const Text(
+                      'icma qaydalarını',
+                      style: TextStyle(
+                        color: Color(0xffff65dc),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xffff65dc),
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    ' qəbul edirəm. Uyğunsuz məzmuna sıfır dözümlülük var.',
+                    style: TextStyle(color: Color(0xffb7aecb), fontSize: 12.5),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
