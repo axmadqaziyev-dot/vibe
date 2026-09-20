@@ -213,7 +213,10 @@
     // Flutter ilk kadrı çəkəndə Dart tərəfdən çağırılır.
     // Açılış ekranı ən azı bu qədər görünsün — yoxsa yanıb-sönür.
     var vibeSplashShownAt = Date.now();
-    var VIBE_SPLASH_MIN_MS = 900;
+
+    // Ekranın yanıb-sönməməsi üçün kiçik bir dayanma.
+    // Əvvəl 900 idi — tətbiq hazır olsa belə o qədər gözlənilirdi.
+    var VIBE_SPLASH_MIN_MS = 250;
 
     window.vibeHideSplash = function () {
       var splash = document.getElementById('vibe-splash');

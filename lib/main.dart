@@ -54,8 +54,8 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Çökmələri və hadisələri toplamağa başla.
-  await Telemetry.start();
+  // Çökmələri və hadisələri toplamağa başla — gözləmədən.
+  Telemetry.start();
 
   // Push: arxa plan handler-i runApp-dan ƏVVƏL qeydə alınmalıdır.
   if (!kIsWeb) {

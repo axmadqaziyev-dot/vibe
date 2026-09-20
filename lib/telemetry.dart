@@ -19,13 +19,13 @@ class Telemetry {
       _analytics ??= FirebaseAnalytics.instance;
 
   /// `main()`-də Firebase hazır olandan sonra çağırılır.
-  static Future<void> start() async {
+  ///
+  /// Gözləmir: xəta tutucuları dərhal qurulur, platformaya gedən sorğu isə
+  /// arxa planda qalır. Əvvəl bu sorğu gözlənilirdi və açılışı ləngidirdi.
+  static void start() {
     if (!_supported) return;
 
     try {
-      await FirebaseCrashlytics.instance
-          .setCrashlyticsCollectionEnabled(!kDebugMode);
-
       // Flutter-in tutduğu bütün widget xətaları.
       FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
 
@@ -34,6 +34,11 @@ class Telemetry {
         FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
         return true;
       };
+
+      unawaited(
+        FirebaseCrashlytics.instance
+            .setCrashlyticsCollectionEnabled(!kDebugMode),
+      );
     } catch (_) {
       // Telemetriya qurulmasa da tətbiq normal işləməlidir.
     }
