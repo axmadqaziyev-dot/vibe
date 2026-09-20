@@ -71,11 +71,6 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
       _say('Bir anda ən çox $_maxImages şəkil paylaşa bilərsən.');
       return;
     }
-    if (video != null) {
-      _say('Şəkil və video birlikdə paylaşılmır. Əvvəlcə videonu sil.');
-      return;
-    }
-
     final image = await pickStoredImage(
       source: source,
       fullWidth: 720,
@@ -94,11 +89,6 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
   }
 
   Future<void> _addVideo() async {
-    if (photos.isNotEmpty) {
-      _say('Video ilə şəkil birlikdə paylaşılmır. Əvvəlcə şəkilləri sil.');
-      return;
-    }
-
     final picked = await ImagePicker().pickVideo(
       source: ImageSource.gallery,
       maxDuration: const Duration(minutes: 2),

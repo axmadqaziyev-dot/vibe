@@ -662,59 +662,9 @@ class _MomentCardState extends State<MomentCard> {
                       ),
                     ),
                   ],
-                  if (videoUrl.isNotEmpty) ...[
+                  if (videoUrl.isNotEmpty || photos.isNotEmpty) ...[
                     const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: MomentVideo(url: videoUrl),
-                    ),
-                  ] else if (photos.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: AspectRatio(
-                        aspectRatio: 4 / 3,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            GestureDetector(
-                              onTap: _openDetail,
-                              onDoubleTap: _toggleLike,
-                              child: PageView.builder(
-                                controller: controller,
-                                itemCount: photos.length,
-                                onPageChanged: (i) => setState(() => page = i),
-                                itemBuilder: (context, i) =>
-                                    VibePhoto(url: photos[i], name: ownerName),
-                              ),
-                            ),
-                            if (photos.length > 1)
-                              Positioned(
-                                right: 10,
-                                top: 10,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 9,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: .55),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    '${page + 1}/${photos.length}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    _media(videoUrl, photos, ownerName),
                   ],
                   const SizedBox(height: 8),
                   _actions(ownerName, caption),
@@ -992,6 +942,70 @@ class _MomentCardState extends State<MomentCard> {
         const SnackBar(content: Text('Alınmadı. Bağlantını yoxla.')),
       );
     }
+  }
+
+
+  /// Video və şəkillər bir karuseldə.
+  ///
+  /// Əvvəl ya video, ya şəkil göstərilirdi və ikisini birlikdə paylaşmaq
+  /// qadağan idi. İndi video birinci səhifədə, şəkillər onun ardınca gəlir —
+  /// istifadəçi barmağı ilə keçir.
+  Widget _media(String videoUrl, List<String> photos, String ownerName) {
+    final total = (videoUrl.isEmpty ? 0 : 1) + photos.length;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: AspectRatio(
+        aspectRatio: 4 / 3,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            PageView.builder(
+              controller: controller,
+              itemCount: total,
+              onPageChanged: (i) => setState(() => page = i),
+              itemBuilder: (context, i) {
+                // Birinci səhifə video, qalanları şəkil.
+                if (videoUrl.isNotEmpty && i == 0) {
+                  return MomentVideo(url: videoUrl);
+                }
+
+                final index = videoUrl.isEmpty ? i : i - 1;
+
+                return GestureDetector(
+                  onTap: _openDetail,
+                  onDoubleTap: _toggleLike,
+                  child: VibePhoto(url: photos[index], name: ownerName),
+                );
+              },
+            ),
+            if (total > 1)
+              Positioned(
+                right: 10,
+                top: 10,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: .55),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${page + 1}/$total',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Profil şəkli — onlayn nişanı ilə.
