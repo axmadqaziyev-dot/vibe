@@ -15,6 +15,8 @@ import 'blocking.dart';
 import 'instant_match.dart';
 import 'vibe_levels.dart';
 import 'vibe_status.dart';
+import 'tonight.dart';
+import 'tonight_card.dart';
 import 'countries.dart';
 import 'country_picker.dart';
 import 'user_profile.dart';
@@ -43,6 +45,9 @@ class _SocialHomeState extends State<SocialHome> {
 
   /// Boş = bütün ölkələr.
   String countryFilter = '';
+
+  /// Mənim bu axşamkı niyyətim — siyahını ona görə sıralayırıq.
+  Tonight? myTonight;
   bool searching = false;
   Timer? timer;
 
@@ -242,6 +247,18 @@ class _SocialHomeState extends State<SocialHome> {
                 final da = a.data();
                 final dbb = b.data();
 
+                // Niyyət seçilibsə uyğunluq hər şeydən öncə gəlir:
+                // adam nə istədiyini deyibsə, siyahı ona cavab verməlidir.
+                if (myTonight != null) {
+                  final ta = tonightOf(da['tonight']);
+                  final tb = tonightOf(dbb['tonight']);
+
+                  final ma = ta == null ? -1.0 : tonightMatch(myTonight!, ta);
+                  final mb = tb == null ? -1.0 : tonightMatch(myTonight!, tb);
+
+                  if (ma != mb) return mb.compareTo(ma);
+                }
+
                 if (topTab == 1) {
                   final ka = distanceKm(me, da);
                   final kb = distanceKm(me, dbb);
@@ -277,6 +294,12 @@ class _SocialHomeState extends State<SocialHome> {
                     _hero(),
                     const SizedBox(height: 16),
                     MyVibeCard(uid: widget.profile.uid, database: widget.database),
+                    const SizedBox(height: 12),
+                    TonightCard(
+                      uid: widget.profile.uid,
+                      database: widget.database,
+                      onChanged: (value) => setState(() => myTonight = value),
+                    ),
                     const SizedBox(height: 16),
                     PillTabs(
                       labels: pillLabels,
@@ -323,9 +346,14 @@ class _SocialHomeState extends State<SocialHome> {
                                 ),
                             itemBuilder: (context, index) {
                               final doc = people[index];
+                              final theirs = tonightOf(doc.data()['tonight']);
+
                               return DiscoverCard(
                                 data: doc.data(),
                                 me: me,
+                                matched: myTonight != null &&
+                                    theirs != null &&
+                                    tonightMatch(myTonight!, theirs) >= 1,
                                 favorite: favorites.contains(doc.id),
                                 onFavorite: () => _toggleFavorite(doc.id),
                                 onTap: () => Navigator.push(
@@ -557,6 +585,7 @@ class DiscoverCard extends StatelessWidget {
     required this.onChat,
     this.favorite = false,
     this.onFavorite,
+    this.matched = false,
   });
 
   final Map<String, dynamic> data;
@@ -565,6 +594,9 @@ class DiscoverCard extends StatelessWidget {
   final VoidCallback onChat;
   final bool favorite;
   final VoidCallback? onFavorite;
+
+  /// Bu axşamkı niyyətim onunkuna tam uyğun gəlirsə kart işıqlanır.
+  final bool matched;
 
   @override
   Widget build(BuildContext context) {
@@ -582,18 +614,28 @@ class DiscoverCard extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: online
-                ? const Color(0xff3ddc97).withValues(alpha: .55)
-                : const Color(0xff2a2340),
+            color: matched
+                ? const Color(0xffffd458)
+                : online
+                    ? const Color(0xff3ddc97).withValues(alpha: .55)
+                    : const Color(0xff2a2340),
+            width: matched ? 1.6 : 1,
           ),
-          boxShadow: online
+          boxShadow: matched
               ? [
                   BoxShadow(
-                    color: const Color(0xff2de28a).withValues(alpha: .18),
-                    blurRadius: 14,
+                    color: const Color(0xffffd458).withValues(alpha: .28),
+                    blurRadius: 16,
                   ),
                 ]
-              : null,
+              : online
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xff2de28a).withValues(alpha: .18),
+                        blurRadius: 14,
+                      ),
+                    ]
+                  : null,
         ),
         child: Stack(
           fit: StackFit.expand,
