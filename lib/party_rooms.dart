@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'user_profile.dart';
+import 'battle.dart';
 import 'rankings.dart';
 import 'vibe_ranking.dart';
 import 'game_center.dart';
@@ -1677,6 +1678,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                       ] else
                         _seatGrid(seats, d, canModerate),
                       const SizedBox(height: 8),
+                      _battleBanner(d),
                       _gameBanner(game),
                       _liveEventStrip(),
                       const SizedBox(height: 6),
@@ -2307,6 +2309,333 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
             ),
           );
         },
+      ),
+    );
+  }
+
+
+  // ============================================================
+  // SÖZ DÖYÜŞÜ
+  // ============================================================
+
+  /// Döyüş gedirsə vəziyyətini qaytarır.
+  Map<String, dynamic>? _battleOf(Map<String, dynamic> d) {
+    final battle = d['battle'];
+    if (battle is! Map || battle['active'] != true) return null;
+    return Map<String, dynamic>.from(battle);
+  }
+
+  /// Bir kürsünün məlumatı.
+  Map<String, dynamic> _seatData(Map<String, dynamic> d, int seat) {
+    final seats = Map<String, dynamic>.from(d['seats'] ?? {});
+    final value = seats['$seat'];
+    return value is Map ? Map<String, dynamic>.from(value) : {};
+  }
+
+  /// Mikrofonda oturanların kürsü nömrələri.
+  List<int> _speakerSeats(Map<String, dynamic> d) {
+    final seats = Map<String, dynamic>.from(d['seats'] ?? {});
+    final list = <int>[];
+
+    seats.forEach((key, value) {
+      if (value is! Map) return;
+      if ('${value['uid'] ?? ''}'.isEmpty) return;
+      final index = int.tryParse(key);
+      if (index != null) list.add(index);
+    });
+
+    list.sort();
+    return list;
+  }
+
+  /// Sənəddəki siyahını kürsü nömrələrinə çevirir.
+  List<int> _battleSpeakers(Map<String, dynamic> battle) {
+    final raw = battle['speakers'];
+    if (raw is! List) return const [];
+    return raw.map((e) => int.tryParse('$e') ?? 0).toList();
+  }
+
+  /// Döyüşü başladır.
+  Future<void> _startBattle(Map<String, dynamic> d) async {
+    final speakers = _speakerSeats(d);
+
+    if (speakers.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Döyüş üçün mikrofonda ən azı iki nəfər olmalıdır.'),
+        ),
+      );
+      return;
+    }
+
+    final mode = await showDialog<BattleMode>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: const Color(0xff151020),
+        title: const Text(
+          'Söz döyüşü',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ekranda söz çıxır. Mikrofondakılar növbə ilə o sözün üstündə '
+              'deyir. Dinləyicilər hədiyyə ilə tərəf tutur.',
+              style: TextStyle(color: _muted, height: 1.45, fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            for (final value in BattleMode.values)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Text(value.emoji, style: const TextStyle(fontSize: 22)),
+                title: Text(
+                  value.label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                subtitle: Text(
+                  value.hint,
+                  style: const TextStyle(color: _muted, fontSize: 12),
+                ),
+                onTap: () => Navigator.pop(dialog, value),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    if (mode == null || !mounted) return;
+
+    try {
+      // Toxum otaqda saxlanılır: bütün cihazlar eyni sözü görməlidir.
+      final seed = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+      await room.update({
+        'battle': {
+          'active': true,
+          'mode': mode.id,
+          'seed': seed,
+          'turn': 0,
+          'speakers': speakers,
+          'turnEndsAt': Timestamp.fromDate(
+            DateTime.now().add(const Duration(seconds: battleTurnSeconds)),
+          ),
+          'startedBy': widget.profile.uid,
+        },
+      });
+
+      await room.collection('messages').add({
+        'uid': widget.profile.uid,
+        'name': widget.profile.name,
+        'text': '${mode.emoji} ${mode.label} başladı! '
+            'Söz: "${battleWordFor(mode, seed)}"',
+        'type': 'system',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Döyüş başlamadı.')),
+        );
+      }
+    }
+  }
+
+  /// Növbəti danışana keçir. Yalnız hostun cihazı çağırır ki,
+  /// hər iştirakçı eyni anda növbəni çevirməsin.
+  Future<void> _nextTurn(Map<String, dynamic> battle) async {
+    final speakers = _battleSpeakers(battle);
+    final turn = (int.tryParse('${battle['turn'] ?? 0}') ?? 0) + 1;
+
+    try {
+      if (battleFinished(speakers, turn)) {
+        await _endBattle();
+        return;
+      }
+
+      await room.set({
+        'battle': {
+          ...battle,
+          'turn': turn,
+          'turnEndsAt': Timestamp.fromDate(
+            DateTime.now().add(const Duration(seconds: battleTurnSeconds)),
+          ),
+        },
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  Future<void> _endBattle() async {
+    try {
+      await room.update({
+        'battle': {'active': false},
+      });
+
+      await room.collection('messages').add({
+        'uid': widget.profile.uid,
+        'name': widget.profile.name,
+        'text': '🏁 Söz döyüşü bitdi!',
+        'type': 'system',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) _spawnHearts(8);
+    } catch (_) {}
+  }
+
+  /// Döyüş zolağı — söz, növbə və geri sayım.
+  Widget _battleBanner(Map<String, dynamic> d) {
+    final battle = _battleOf(d);
+    if (battle == null) return const SizedBox.shrink();
+
+    final mode = battleModeFrom(battle['mode']);
+    final seed = int.tryParse('${battle['seed'] ?? 0}') ?? 0;
+    final turn = int.tryParse('${battle['turn'] ?? 0}') ?? 0;
+    final speakers = _battleSpeakers(battle);
+
+    final endsAt = battle['turnEndsAt'];
+    final left = endsAt is Timestamp
+        ? endsAt.toDate().difference(DateTime.now())
+        : Duration.zero;
+
+    final isHost = d['hostId'] == widget.profile.uid;
+
+    // Vaxt bitdi — hostun cihazı növbəni çevirir.
+    if (left.isNegative && isHost) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _nextTurn(battle);
+      });
+    }
+
+    final seat = battleSpeakerAt(speakers, turn);
+    final seatData = seat < 0 ? const <String, dynamic>{} : _seatData(d, seat);
+    final name = '${seatData['name'] ?? ''}';
+    final mine = '${seatData['uid'] ?? ''}' == widget.profile.uid;
+
+    final seconds = left.isNegative ? 0 : left.inSeconds;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 13),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              _purple.withValues(alpha: .32),
+              _pink.withValues(alpha: .22),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _pink.withValues(alpha: .6)),
+          boxShadow: [
+            BoxShadow(color: _pink.withValues(alpha: .18), blurRadius: 18),
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Text(mode.emoji, style: const TextStyle(fontSize: 15)),
+                const SizedBox(width: 7),
+                Text(
+                  mode.label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '${battleRoundAt(speakers, turn)}/$battleRounds dövrə',
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+                const Spacer(),
+                if (isHost)
+                  PressableScale(
+                    onTap: _endBattle,
+                    child: const Text(
+                      'Bitir',
+                      style: TextStyle(
+                        color: Color(0xffffc9d3),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Söz — zolağın ən görünən yeri.
+            Text(
+              '"${battleWordFor(mode, seed)}"',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                letterSpacing: .5,
+              ),
+            ),
+
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    mine
+                        ? 'Növbə səndədir — danış!'
+                        : name.isEmpty
+                            ? 'Növbə gözlənilir'
+                            : 'Növbə: $name',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: mine ? const Color(0xff48e08a) : Colors.white,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: .45),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$seconds san',
+                    style: TextStyle(
+                      color: seconds <= 5
+                          ? const Color(0xffff657b)
+                          : Colors.white,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: (seconds / battleTurnSeconds).clamp(0.0, 1.0),
+                minHeight: 5,
+                backgroundColor: Colors.white12,
+                valueColor: AlwaysStoppedAnimation(
+                  seconds <= 5 ? const Color(0xffff657b) : _pink,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2963,6 +3292,11 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Dəvət kopyalandı.')),
                     );
+                  }),
+                  _tool(Icons.mic_external_on_rounded, 'Söz döyüşü',
+                      const Color(0xffff8a3d), () {
+                    Navigator.pop(sheet);
+                    _startBattle(d);
                   }),
                   _tool(Icons.sports_esports_rounded, 'Oyunlar', _pink, () {
                     Navigator.pop(sheet);
