@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tətbiq ikonunun fonu.
+
+  Adaptiv ikon iki qatdan ibarətdir: fon və ön plan. Ön plan şəffaf fonda
+  ağ "V" hərfidir, ona görə fon VIBE-in bənövşəyi-çəhrayı keçidi olmalıdır —
+  düz rəng olsa ikon köhnə versiyadan fərqli görünərdi.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="315"
+        android:startColor="#8B5CFF"
+        android:endColor="#FF2BD6"
+        android:type="linear" />
+</shape>
