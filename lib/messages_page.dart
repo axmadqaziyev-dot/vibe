@@ -34,16 +34,31 @@ class SocialMessages extends StatefulWidget {
 }
 
 class _SocialMessagesState extends State<SocialMessages> {
-  static const filters = ['Hamısı', 'Online', 'Oxunmamış', 'İzlədiklərim'];
+  static const filters = [
+    'Hamısı',
+    'Online',
+    'Oxunmamış',
+    'İzlədiklərim',
+    'Ən çox yazışılan',
+  ];
+
+  /// İnsanlar sekməsinin alt bölmələri.
+  static const peopleTabs = ['Hamısı', 'İzlədiklərim', 'İzləyicilər', 'Dostlar'];
 
   int tab = 0; // 0 = Mesajlar, 1 = İnsanlar
   int filter = 0;
+  int peopleTab = 0;
+
+  /// Toplu silmə rejimi.
+  bool selecting = false;
+  final Set<String> selected = <String>{};
   String query = '';
   bool searching = false;
   Timer? timer;
 
   final Set<String> blockedIds = <String>{};
   Set<String> following = <String>{};
+  Set<String> followers = <String>{};
   StreamSubscription<Set<String>>? blockSub;
 
   FirebaseFirestore get db => widget.database ?? FirebaseFirestore.instance;
@@ -60,15 +75,17 @@ class _SocialMessagesState extends State<SocialMessages> {
   void initState() {
     super.initState();
     _watchBlocked();
-    db
-        .collection('users')
-        .doc(widget.profile.uid)
-        .collection('following')
-        .snapshots()
-        .listen((snap) {
-          if (!mounted) return;
-          setState(() => following = snap.docs.map((e) => e.id).toSet());
-        }, onError: (Object _) {});
+    final me = db.collection('users').doc(widget.profile.uid);
+
+    me.collection('following').snapshots().listen((snap) {
+      if (!mounted) return;
+      setState(() => following = snap.docs.map((e) => e.id).toSet());
+    }, onError: (Object _) {});
+
+    me.collection('followers').snapshots().listen((snap) {
+      if (!mounted) return;
+      setState(() => followers = snap.docs.map((e) => e.id).toSet());
+    }, onError: (Object _) {});
 
     timer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted) setState(() {});
@@ -102,10 +119,17 @@ class _SocialMessagesState extends State<SocialMessages> {
         if (searching) _searchField(),
         const SizedBox(height: 4),
         PillTabs(
-          labels: filters,
-          index: filter,
-          onChanged: (i) => setState(() => filter = i),
+          labels: tab == 0 ? filters : peopleTabs,
+          index: tab == 0 ? filter : peopleTab,
+          onChanged: (i) => setState(() {
+            if (tab == 0) {
+              filter = i;
+            } else {
+              peopleTab = i;
+            }
+          }),
         ),
+        if (selecting) _selectionBar(),
         const SizedBox(height: 14),
         Expanded(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -156,6 +180,11 @@ class _SocialMessagesState extends State<SocialMessages> {
           icon: Icons.add_circle_outline_rounded,
           tooltip: 'Yeni söhbət',
           onTap: () => setState(() => tab = 1),
+        ),
+        TopIconButton(
+          icon: Icons.menu_rounded,
+          tooltip: 'Daha çox',
+          onTap: _openTools,
         ),
       ],
     ),
@@ -250,6 +279,16 @@ class _SocialMessagesState extends State<SocialMessages> {
 
           final list = snapshot.data!.docs.toList()
             ..sort((a, b) {
+              // "Ən çox yazışılan" sekməsində mesaj sayına, qalanında vaxta.
+              if (filter == 4) {
+                int count(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
+                    doc.data()['messageCount'] is num
+                        ? (doc.data()['messageCount'] as num).toInt()
+                        : 0;
+                final diff = count(b).compareTo(count(a));
+                if (diff != 0) return diff;
+              }
+
               final ta = (a.data()['updatedAt'] as Timestamp?)?.seconds ?? 0;
               final tb = (b.data()['updatedAt'] as Timestamp?)?.seconds ?? 0;
               return tb.compareTo(ta);
@@ -268,6 +307,7 @@ class _SocialMessagesState extends State<SocialMessages> {
             if (filter == 1 && !isReallyOnline(p)) return false;
             if (filter == 2 && !unread) return false;
             if (filter == 3 && !following.contains(peer)) return false;
+            // 4 = ən çox yazışılan: süzgəc deyil, sıralamadır (aşağıda).
 
             if (query.isNotEmpty) {
               final haystack = '${p['name']} ${d['lastMessage']}'.toLowerCase();
@@ -324,6 +364,216 @@ class _SocialMessagesState extends State<SocialMessages> {
         },
       );
 
+
+  // ----------------------------------------------------------
+  // ALƏTLƏR
+  // ----------------------------------------------------------
+
+  /// Başlıqdakı ☰ menyusu.
+  void _openTools() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xff151020),
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.person_add_alt_1_rounded,
+                  color: vMuted),
+              title: const Text('Yeni söhbət',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text('İnsanlar siyahısından seç',
+                  style: TextStyle(color: vMuted, fontSize: 12)),
+              onTap: () {
+                Navigator.pop(sheet);
+                setState(() => tab = 1);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.mark_chat_read_outlined,
+                  color: vMuted),
+              title: const Text('Hamısını oxunmuş et',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(sheet);
+                _markAllRead();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_sweep_outlined,
+                  color: Color(0xffff657b)),
+              title: const Text(
+                'Toplu silmə',
+                style: TextStyle(
+                  color: Color(0xffff657b),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              subtitle: const Text('Bir neçə söhbəti seçib sil',
+                  style: TextStyle(color: vMuted, fontSize: 12)),
+              onTap: () {
+                Navigator.pop(sheet);
+                setState(() {
+                  tab = 0;
+                  selecting = true;
+                  selected.clear();
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Seçim rejimindəki üst zolaq.
+  Widget _selectionBar() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 9, 8, 9),
+          decoration: BoxDecoration(
+            color: vPink.withValues(alpha: .12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: vPink.withValues(alpha: .45)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  selected.isEmpty
+                      ? 'Silmək üçün söhbət seç'
+                      : '${selected.length} söhbət seçildi',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (selected.isNotEmpty)
+                TextButton(
+                  onPressed: _deleteSelected,
+                  child: const Text(
+                    'Sil',
+                    style: TextStyle(
+                      color: Color(0xffff657b),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              TextButton(
+                onPressed: () => setState(() {
+                  selecting = false;
+                  selected.clear();
+                }),
+                child: const Text('İmtina', style: TextStyle(color: vMuted)),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  /// Bütün söhbətləri oxunmuş sayır.
+  ///
+  /// Oxunma vəziyyəti söhbət sənədindəki `readAt` xəritəsindədir; hər
+  /// söhbət üçün öz açarımızı indiki vaxta qoyuruq.
+  Future<void> _markAllRead() async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final snap = await db
+          .collection('chats')
+          .where('members', arrayContains: widget.profile.uid)
+          .get();
+
+      final batch = db.batch();
+      for (final doc in snap.docs) {
+        batch.set(doc.reference, {
+          'readAt': {widget.profile.uid: Timestamp.now()},
+        }, SetOptions(merge: true));
+      }
+      await batch.commit();
+
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Hamısı oxunmuş sayıldı.')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+    }
+  }
+
+  /// Seçilmiş söhbətləri silir.
+  ///
+  /// Söhbət sənədi tamamilə silinmir — qarşı tərəfin yazışması da itərdi.
+  /// Bunun əvəzinə özümüzü üzvlükdən çıxarırıq: söhbət bizim siyahıdan
+  /// gedir, qarşı tərəfdə qalır.
+  Future<void> _deleteSelected() async {
+    final ids = selected.toList();
+    if (ids.isEmpty) return;
+
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: const Color(0xff151020),
+        title: Text(
+          '${ids.length} söhbət silinsin?',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: const Text(
+          'Söhbətlər sənin siyahından gedəcək. Qarşı tərəfdə qalacaq.',
+          style: TextStyle(color: vMuted, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text('İmtina', style: TextStyle(color: vMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text(
+              'Sil',
+              style: TextStyle(
+                color: Color(0xffff657b),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (yes != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final batch = db.batch();
+      for (final id in ids) {
+        batch.set(db.collection('chats').doc(id), {
+          'members': FieldValue.arrayRemove([widget.profile.uid]),
+        }, SetOptions(merge: true));
+      }
+      await batch.commit();
+
+      if (!mounted) return;
+      setState(() {
+        selecting = false;
+        selected.clear();
+      });
+
+      messenger.showSnackBar(
+        SnackBar(content: Text('${ids.length} söhbət silindi.')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Silinmədi.')));
+    }
+  }
+
   Widget _chatTile(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
     Map<String, Map<String, dynamic>> profiles,
@@ -367,14 +617,35 @@ class _SocialMessagesState extends State<SocialMessages> {
                 .abs() <
             8;
 
+    final picked = selected.contains(doc.id);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: PressableScale(
-        onTap: () => openChat(context, widget.profile, uid, name),
+        onTap: selecting
+            ? () => setState(() {
+                  picked ? selected.remove(doc.id) : selected.add(doc.id);
+                })
+            : () => openChat(context, widget.profile, uid, name),
+        // Uzun basmaq seçim rejimini açır — telefonlarda gözlənilən davranış.
+        onLongPress: () => setState(() {
+          selecting = true;
+          selected.add(doc.id);
+        }),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
             children: [
+              if (selecting) ...[
+                Icon(
+                  picked
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: picked ? vPink : vMuted,
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+              ],
               ChatAvatar(data: p, name: name, size: 52),
               const SizedBox(width: 13),
               Expanded(
@@ -539,8 +810,14 @@ class _SocialMessagesState extends State<SocialMessages> {
       if (blockedIds.contains(entry.key)) return false;
 
       final d = entry.value;
-      if (filter == 1 && !isReallyOnline(d)) return false;
-      if (filter == 3 && !following.contains(entry.key)) return false;
+
+      // Alt sekmələr: izlədiklərim / izləyicilər / qarşılıqlı (dostlar).
+      if (peopleTab == 1 && !following.contains(entry.key)) return false;
+      if (peopleTab == 2 && !followers.contains(entry.key)) return false;
+      if (peopleTab == 3 &&
+          !(following.contains(entry.key) && followers.contains(entry.key))) {
+        return false;
+      }
       if (query.isNotEmpty &&
           !'${d['name']} ${d['city']}'.toLowerCase().contains(query)) {
         return false;

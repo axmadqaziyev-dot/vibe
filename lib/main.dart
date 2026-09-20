@@ -4037,6 +4037,8 @@ class _PersonPageState extends State<PersonPage> {
         },
         'lastMessage': text,
         'lastSenderId': currentProfile.uid,
+        // "Ən çox yazışılan" süzgəci bu sayğaca görə sıralayır.
+        'messageCount': FieldValue.increment(1),
         'updatedAt': Timestamp.now(),
       }, SetOptions(merge: true));
       batch.set(chat.collection('messages').doc(), {
@@ -4841,6 +4843,8 @@ class _RealChatPageState extends State<RealChatPage> {
         },
         'lastMessage': lastMessage,
         'lastSenderId': widget.currentProfile.uid,
+        // "Ən çox yazışılan" süzgəci bu sayğaca görə sıralayır.
+        'messageCount': FieldValue.increment(1),
         'updatedAt': Timestamp.now(),
       }, SetOptions(merge: true));
 
@@ -5063,6 +5067,8 @@ class _RealChatPageState extends State<RealChatPage> {
         },
         'lastMessage': '📷 Şəkil',
         'lastSenderId': widget.currentProfile.uid,
+        // "Ən çox yazışılan" süzgəci bu sayğaca görə sıralayır.
+        'messageCount': FieldValue.increment(1),
         'updatedAt': Timestamp.now(),
       }, SetOptions(merge: true));
 
@@ -5124,6 +5130,8 @@ class _RealChatPageState extends State<RealChatPage> {
         },
         'lastMessage': 'Domino oyunu',
         'lastSenderId': widget.currentProfile.uid,
+        // "Ən çox yazışılan" süzgəci bu sayğaca görə sıralayır.
+        'messageCount': FieldValue.increment(1),
         'updatedAt': Timestamp.now(),
       }, SetOptions(merge: true));
 
