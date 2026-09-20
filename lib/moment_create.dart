@@ -127,6 +127,17 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
     try {
       final id = FirebaseFirestore.instance.collection('moments').doc().id;
 
+      // Ölkəni profildən bir dəfə oxuyuruq: tövsiyə lenti hər an üçün
+      // müəllifin profilinə ayrıca sorğu göndərməsin deyə an sənədinə yazılır.
+      var ownerCountry = '';
+      try {
+        final me = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.profile.uid)
+            .get();
+        ownerCountry = '${me.data()?['countryCode'] ?? ''}';
+      } catch (_) {}
+
       String? videoUrl;
       if (videoBytes != null) {
         videoUrl = await MediaUpload.upload(
@@ -147,6 +158,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
         if (photos.isNotEmpty) 'imageUrl': photos.first.full,
         if (photos.isNotEmpty) 'thumbUrl': photos.first.thumb,
         if (videoUrl != null) 'videoUrl': videoUrl,
+        if (ownerCountry.isNotEmpty) 'ownerCountry': ownerCountry,
         'createdAt': Timestamp.now(),
         'visibility': 'public',
         'likeCount': 0,

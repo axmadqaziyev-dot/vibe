@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'user_profile.dart';
 import 'moment_create.dart';
+import 'moment_ranking.dart';
 import 'moment_detail.dart';
 import 'blocking.dart';
 import 'gift_sheet.dart';
@@ -30,7 +31,7 @@ class MomentsPage extends StatefulWidget {
 }
 
 class _MomentsPageState extends State<MomentsPage> {
-  static const tabs = ['Anlar', 'Takip etdiklərim', 'Populyar'];
+  static const tabs = ['Tövsiyə', 'İzlədiklərim', 'Populyar'];
 
   int tab = 0;
   Set<String> following = <String>{};
@@ -40,6 +41,12 @@ class _MomentsPageState extends State<MomentsPage> {
 
   /// Səssizə alınmış adamlar — bloklamadan, sadəcə lentdə görünmürlər.
   Set<String> mutedUsers = <String>{};
+
+  /// İzlədiklərimin izlədikləri — "dostun dostu" siqnalı üçün.
+  Set<String> friendsOfFriends = <String>{};
+
+  /// Öz ölkəm — eyni ölkədən paylaşım tövsiyədə yuxarı qalxır.
+  String myCountry = '';
 
   /// Firestore kompozit indeksi hazır deyilsə, sadə sorğuya keçirik —
   /// ekran xəta vermir, sıralama kodda aparılır.
@@ -65,9 +72,41 @@ class _MomentsPageState extends State<MomentsPage> {
 
     // Üç siyahı da lentin süzgəcidir; hər biri öz axını ilə gəlir ki,
     // biri xəta versə qalanı işləməyə davam etsin.
-    _watch(me.collection('following'), (ids) => following = ids);
+    _watch(me.collection('following'), (ids) {
+      following = ids;
+      _loadFriendsOfFriends(ids);
+    });
     _watch(me.collection('hiddenMoments'), (ids) => hiddenMoments = ids);
     _watch(me.collection('mutedUsers'), (ids) => mutedUsers = ids);
+
+    me.get().then((snap) {
+      if (!mounted) return;
+      setState(() => myCountry = '${snap.data()?['countryCode'] ?? ''}');
+    }).catchError((Object _) {});
+  }
+
+  /// İzlədiyim adamların izlədiklərini toplayır.
+  ///
+  /// Hər biri üçün ayrıca sorğu gedir, ona görə say məhdudlaşdırılıb:
+  /// tövsiyə lenti bir siqnala görə onlarla sorğu göndərməməlidir.
+  Future<void> _loadFriendsOfFriends(Set<String> ids) async {
+    final sample = ids.take(20);
+    final found = <String>{};
+
+    for (final uid in sample) {
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('following')
+            .limit(30)
+            .get();
+        found.addAll(snap.docs.map((e) => e.id));
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    setState(() => friendsOfFriends = found);
   }
 
   void _watch(
@@ -78,6 +117,52 @@ class _MomentsPageState extends State<MomentsPage> {
       if (!mounted) return;
       setState(() => apply(snap.docs.map((e) => e.id).toSet()));
     }, onError: (Object _) {});
+  }
+
+
+  /// Tövsiyə sırası.
+  ///
+  /// Balın necə hesablandığı `moment_ranking.dart` faylındadır — orada
+  /// hər çəkinin səbəbi yazılıb və testlərlə örtülüb.
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _recommend(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    final now = DateTime.now();
+
+    double score(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+      final d = doc.data();
+      final created = d['createdAt'];
+
+      final ageHours = created is Timestamp
+          ? now.difference(created.toDate()).inMinutes / 60
+          // Tarixi olmayan sənəd köhnə sayılır ki, başa keçməsin.
+          : 999.0;
+
+      final owner = '${d['ownerUid'] ?? ''}';
+      final country = '${d['ownerCountry'] ?? ''}';
+
+      int count(String key) =>
+          d[key] is num ? (d[key] as num).toInt() : 0;
+
+      return momentScore(MomentSignals(
+        ageHours: ageHours,
+        likes: count('likeCount'),
+        comments: count('commentCount'),
+        gifts: count('giftCount'),
+        fromFollowed: following.contains(owner),
+        friendOfFriend:
+            friendsOfFriends.contains(owner) && !following.contains(owner),
+        sameCountry: myCountry.isNotEmpty && country == myCountry,
+      ));
+    }
+
+    final sorted = [...docs]
+      ..sort((a, b) => score(b).compareTo(score(a)));
+
+    return spreadAuthors(
+      sorted,
+      (doc) => '${doc.data()['ownerUid'] ?? ''}',
+    );
   }
 
   void _create() => Navigator.push(
@@ -188,17 +273,21 @@ class _MomentsPageState extends State<MomentsPage> {
                     );
                   }
 
+                  // Tövsiyə lenti: bal hesablanır, sonra eyni müəllifin
+                  // paylaşımları arda-arda yığılmasın deyə yayılır.
+                  final ordered = tab == 0 ? _recommend(docs) : docs;
+
                   return ListView.builder(
                     padding: const EdgeInsets.fromLTRB(0, 6, 0, 24),
-                    itemCount: docs.isEmpty ? 2 : docs.length + 1,
+                    itemCount: ordered.isEmpty ? 2 : ordered.length + 1,
                     itemBuilder: (context, index) {
                       if (index == 0) {
                         return _storyRow(all);
                       }
 
-                      if (docs.isEmpty) return _emptyFeed();
+                      if (ordered.isEmpty) return _emptyFeed();
 
-                      final doc = docs[index - 1];
+                      final doc = ordered[index - 1];
                       return MomentCard(
                         key: ValueKey(doc.id),
                         momentId: doc.id,
