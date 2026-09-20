@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'user_profile.dart';
 import 'moment_create.dart';
 import 'moment_ranking.dart';
+import 'share_sheet.dart';
 import 'moment_detail.dart';
 import 'blocking.dart';
 import 'gift_sheet.dart';
@@ -1302,36 +1303,18 @@ class _MomentCardState extends State<MomentCard> {
         },
       ),
       const Spacer(),
+      // Əvvəl bu düymə yalnız "anı aç / şərh yaz" verirdi — paylaşma
+      // düyməsində gözlənilən bu deyil. İndi yönləndirmə vərəqi açılır:
+      // dostlara göndər, kopyala və ya telefonun öz pəncərəsi ilə paylaş.
       _pill(
         icon: Icons.ios_share_rounded,
         label: '',
-        onTap: () => showModalBottomSheet<void>(
-          context: context,
-          backgroundColor: const Color(0xff120d1d),
-          showDragHandle: true,
-          builder: (sheet) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.open_in_full_rounded, color: vPurple),
-                  title: const Text('Anı aç', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    Navigator.pop(sheet);
-                    _openDetail();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.mode_comment_outlined, color: vBlue),
-                  title: const Text('Şərh yaz', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    Navigator.pop(sheet);
-                    _openComments();
-                  },
-                ),
-              ],
-            ),
-          ),
+        onTap: () => showShareSheet(
+          context,
+          profile: widget.profile,
+          title: 'VIBE · $ownerName',
+          body: '${widget.data['caption'] ?? ''}',
+          database: widget.database,
         ),
       ),
     ],
