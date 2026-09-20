@@ -4,11 +4,14 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'user_profile.dart';
 import 'moment_create.dart';
 import 'moment_detail.dart';
+import 'blocking.dart';
 import 'gift_sheet.dart';
+import 'media_upload.dart';
 import 'moment_video.dart';
 import 'moment_comments.dart';
 import 'main.dart' show PersonPage, isReallyOnline;
@@ -32,6 +35,12 @@ class _MomentsPageState extends State<MomentsPage> {
   int tab = 0;
   Set<String> following = <String>{};
 
+  /// "Maraqlandırmır" deyilən anlar.
+  Set<String> hiddenMoments = <String>{};
+
+  /// Səssizə alınmış adamlar — bloklamadan, sadəcə lentdə görünmürlər.
+  Set<String> mutedUsers = <String>{};
+
   /// Firestore kompozit indeksi hazır deyilsə, sadə sorğuya keçirik —
   /// ekran xəta vermir, sıralama kodda aparılır.
   bool fallback = false;
@@ -49,15 +58,26 @@ class _MomentsPageState extends State<MomentsPage> {
   @override
   void initState() {
     super.initState();
-    FirebaseFirestore.instance
+
+    final me = FirebaseFirestore.instance
         .collection('users')
-        .doc(widget.profile.uid)
-        .collection('following')
-        .snapshots()
-        .listen((snap) {
-          if (!mounted) return;
-          setState(() => following = snap.docs.map((e) => e.id).toSet());
-        }, onError: (Object _) {});
+        .doc(widget.profile.uid);
+
+    // Üç siyahı da lentin süzgəcidir; hər biri öz axını ilə gəlir ki,
+    // biri xəta versə qalanı işləməyə davam etsin.
+    _watch(me.collection('following'), (ids) => following = ids);
+    _watch(me.collection('hiddenMoments'), (ids) => hiddenMoments = ids);
+    _watch(me.collection('mutedUsers'), (ids) => mutedUsers = ids);
+  }
+
+  void _watch(
+    CollectionReference<Map<String, dynamic>> ref,
+    void Function(Set<String>) apply,
+  ) {
+    ref.snapshots().listen((snap) {
+      if (!mounted) return;
+      setState(() => apply(snap.docs.map((e) => e.id).toSet()));
+    }, onError: (Object _) {});
   }
 
   void _create() => Navigator.push(
@@ -82,6 +102,17 @@ class _MomentsPageState extends State<MomentsPage> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => VideoSearchPage(profile: widget.profile),
+                    ),
+                  ),
+                ),
+                TopIconButton(
+                  icon: Icons.bookmark_border_rounded,
+                  tooltip: 'Yadda saxlananlar',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          SavedMomentsPage(profile: widget.profile),
                     ),
                   ),
                 ),
@@ -133,10 +164,18 @@ class _MomentsPageState extends State<MomentsPage> {
                   }
 
                   final docs = all.where((doc) {
+                    final owner = '${doc.data()['ownerUid'] ?? ''}';
+                    final mine = owner == widget.profile.uid;
+
+                    // Gizlədilən an və səssizə alınmış adam lentdə olmur.
+                    // Öz paylaşımına bu süzgəclər tətbiq edilmir.
+                    if (!mine) {
+                      if (hiddenMoments.contains(doc.id)) return false;
+                      if (mutedUsers.contains(owner)) return false;
+                    }
+
                     if (tab == 1) {
-                      final owner = '${doc.data()['ownerUid'] ?? ''}';
-                      return following.contains(owner) ||
-                          owner == widget.profile.uid;
+                      return following.contains(owner) || mine;
                     }
                     return true;
                   }).toList();
@@ -676,14 +715,445 @@ class _MomentCardState extends State<MomentCard> {
           ),
           const Spacer(),
           GestureDetector(
-            onTap: _openDetail,
+            onTap: () => _openMenu(ownerName),
+            behavior: HitTestBehavior.opaque,
             child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              // Barmaq üçün kifayət qədər sahə: ikonun özü 18 pikseldir.
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Icon(Icons.more_horiz_rounded, color: vMuted, size: 18),
             ),
           ),
         ],
       );
+
+  /// Üç nöqtə menyusu.
+  ///
+  /// Əvvəl bu düymə sadəcə anın səhifəsini açırdı — silmək, arxivləmək,
+  /// şikayət etmək kimi heç nə yox idi.
+  Future<void> _openMenu(String ownerName) async {
+    final ownerUid = '${widget.data['ownerUid'] ?? ''}';
+    final mine = ownerUid == widget.profile.uid;
+
+    // Bir sorğu: etiket "Yadda saxla" yoxsa "Yaddaşdan çıxar" olmalıdır.
+    var saved = false;
+    try {
+      saved = (await _savedRef.get()).exists;
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    final pinned = widget.data['pinned'] == true;
+    final archived = '${widget.data['visibility'] ?? ''}' == 'archived';
+    final hidden = widget.data['hideCounts'] == true;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xff151020),
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _menuItem(
+              sheet,
+              icon: Icons.link_rounded,
+              label: 'Bağlantını kopyala',
+              onTap: () => _copyLink(ownerName),
+            ),
+            _menuItem(
+              sheet,
+              icon: saved
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              label: saved ? 'Yaddaşdan çıxar' : 'Yadda saxla',
+              onTap: () => _toggleSave(saved, ownerName),
+            ),
+
+            if (mine) ...[
+              _menuItem(
+                sheet,
+                icon: pinned
+                    ? Icons.push_pin_rounded
+                    : Icons.push_pin_outlined,
+                label: pinned
+                    ? 'Profilin başından götür'
+                    : 'Profilin başına sancaqla',
+                onTap: () => _setField('pinned', !pinned,
+                    pinned ? 'Sancaq götürüldü.' : 'Profilin başına sancaqlandı.'),
+              ),
+              _menuItem(
+                sheet,
+                icon: archived
+                    ? Icons.unarchive_outlined
+                    : Icons.archive_outlined,
+                label: archived ? 'Arxivdən çıxar' : 'Arxivlə',
+                note: archived
+                    ? 'Yenidən hamıya görünəcək'
+                    : 'Yalnız sən görəcəksən',
+                onTap: () => _setField(
+                  'visibility',
+                  archived ? 'public' : 'archived',
+                  archived ? 'Arxivdən çıxarıldı.' : 'Arxivləndi.',
+                ),
+              ),
+              _menuItem(
+                sheet,
+                icon: hidden
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                label: hidden
+                    ? 'Bəyənmə saylarını göstər'
+                    : 'Bəyənmə saylarını gizlə',
+                onTap: () => _setField('hideCounts', !hidden,
+                    hidden ? 'Saylar göründü.' : 'Saylar gizləndi.'),
+              ),
+              _menuItem(
+                sheet,
+                icon: Icons.delete_outline_rounded,
+                label: 'Sil',
+                note: 'Geri qaytarmaq olmur',
+                danger: true,
+                onTap: _confirmDelete,
+              ),
+            ] else ...[
+              _menuItem(
+                sheet,
+                icon: Icons.visibility_off_outlined,
+                label: 'Maraqlandırmır',
+                note: 'Bu an lentindən çıxsın',
+                onTap: _notInterested,
+              ),
+              _menuItem(
+                sheet,
+                icon: Icons.volume_off_rounded,
+                label: 'Səssizə al',
+                note: 'Paylaşımları görünməsin, xəbəri olmasın',
+                onTap: () => _mute(ownerUid, ownerName),
+              ),
+              _menuItem(
+                sheet,
+                icon: Icons.flag_outlined,
+                label: 'Şikayət et',
+                danger: true,
+                onTap: () => _report(ownerUid),
+              ),
+              _menuItem(
+                sheet,
+                icon: Icons.block_rounded,
+                label: '$ownerName-i blokla',
+                note: 'Paylaşımları sənə görünməyəcək',
+                onTap: () => _block(ownerUid, ownerName),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Menyu sətirləri eyni görünsün deyə tək yerdən qurulur.
+  Widget _menuItem(
+    BuildContext sheet, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    String? note,
+    bool danger = false,
+  }) {
+    final color = danger ? const Color(0xffff657b) : Colors.white;
+
+    return ListTile(
+      leading: Icon(icon, color: danger ? const Color(0xffff657b) : vMuted),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: danger ? FontWeight.w800 : FontWeight.w600,
+        ),
+      ),
+      subtitle: note == null
+          ? null
+          : Text(note, style: const TextStyle(color: vMuted, fontSize: 12)),
+      onTap: () {
+        Navigator.pop(sheet);
+        onTap();
+      },
+    );
+  }
+
+
+  /// Bu istifadəçinin yaddaşında bu anın sənədi.
+  DocumentReference<Map<String, dynamic>> get _savedRef => db
+      .collection('users')
+      .doc(widget.profile.uid)
+      .collection('savedMoments')
+      .doc(moment.id);
+
+  Future<void> _toggleSave(bool saved, String ownerName) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      if (saved) {
+        await _savedRef.delete();
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Yaddaşdan çıxarıldı.')),
+        );
+      } else {
+        // Ad və şəkil burada saxlanılır ki, siyahını göstərmək üçün
+        // hər an üçün ayrıca sorğu getməsin.
+        await _savedRef.set({
+          'momentId': moment.id,
+          'ownerUid': '${widget.data['ownerUid'] ?? ''}',
+          'ownerName': ownerName,
+          'caption': '${widget.data['caption'] ?? ''}',
+          'thumbUrl': '${widget.data['thumbUrl'] ?? widget.data['imageUrl'] ?? ''}',
+          'createdAt': Timestamp.now(),
+        });
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Yadda saxlanıldı.')),
+        );
+      }
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+    }
+  }
+
+  /// Anı yalnız bu istifadəçinin lentindən çıxarır.
+  ///
+  /// Şikayətdən fərqi var: heç kimə bildiriş getmir, an silinmir,
+  /// sadəcə bir daha bu adamın qarşısına çıxmır.
+  Future<void> _notInterested() async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await db
+          .collection('users')
+          .doc(widget.profile.uid)
+          .collection('hiddenMoments')
+          .doc(moment.id)
+          .set({'createdAt': Timestamp.now()});
+
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Bu an bir daha göstərilməyəcək.')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+    }
+  }
+
+  /// Adamın paylaşımlarını lentdən çıxarır.
+  ///
+  /// Bloklamaqdan fərqi: qarşı tərəf bunu bilmir, yazışma da bağlanmır.
+  Future<void> _mute(String ownerUid, String ownerName) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await db
+          .collection('users')
+          .doc(widget.profile.uid)
+          .collection('mutedUsers')
+          .doc(ownerUid)
+          .set({'name': ownerName, 'createdAt': Timestamp.now()});
+
+      messenger.showSnackBar(
+        SnackBar(content: Text('$ownerName səssizə alındı.')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+    }
+  }
+
+  /// Anın mətnini və tətbiq ünvanını lövhəyə kopyalayır.
+  ///
+  /// Birbaşa ana aparan bağlantı hələ yoxdur — tətbiqdə dərin keçid
+  /// qurulmayıb. Ona görə tətbiqin ünvanı və anın mətni kopyalanır,
+  /// mövcud olmayan səhifəyə aparan saxta ünvan yazmırıq.
+  Future<void> _copyLink(String ownerName) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final caption = '${widget.data['caption'] ?? ''}'.trim();
+
+    final text = [
+      'VIBE · $ownerName',
+      if (caption.isNotEmpty) caption,
+      'https://vibe-f9d13.web.app',
+    ].join('\n');
+
+    await Clipboard.setData(ClipboardData(text: text));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Kopyalandı.')),
+    );
+  }
+
+  /// Anın bir sahəsini dəyişir.
+  Future<void> _setField(String field, Object value, String done) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await moment.set({field: value}, SetOptions(merge: true));
+      messenger.showSnackBar(SnackBar(content: Text(done)));
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Alınmadı. Bağlantını yoxla.')),
+      );
+    }
+  }
+
+  Future<void> _confirmDelete() async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: const Color(0xff151020),
+        title: const Text(
+          'Anı silmək?',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
+        content: const Text(
+          'Şəkillər, bəyənmələr və şərhlər də silinəcək. Geri qaytarmaq olmur.',
+          style: TextStyle(color: vMuted, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text('İmtina', style: TextStyle(color: vMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text(
+              'Sil',
+              style: TextStyle(
+                color: Color(0xffff657b),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (yes != true || !mounted) return;
+    await _delete();
+  }
+
+  /// Anı və ona bağlı hər şeyi silir.
+  ///
+  /// Firestore alt kolleksiyaları özü silmir — bəyənmə və şərhlər sənəd
+  /// gedəndən sonra da qalır və yer tutur, ona görə əvvəlcə onlar təmizlənir.
+  /// Şəkillər Supabase-dədir, onlar da silinməlidir ki, anbar dolmasın.
+  Future<void> _delete() async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      for (final name in ['likes', 'comments']) {
+        final docs = await moment.collection(name).get();
+        for (final doc in docs.docs) {
+          await doc.reference.delete();
+        }
+      }
+
+      await moment.delete();
+
+      // Fayllar sənəddən sonra silinir: sənəd getdisə an onsuz da görünmür.
+      final urls = <String>[
+        for (final key in ['images', 'thumbs'])
+          ...((widget.data[key] as List?) ?? const []).map((e) => e.toString()),
+        '${widget.data['videoUrl'] ?? ''}',
+      ].where((u) => u.trim().isNotEmpty).toList();
+
+      for (final url in urls) {
+        try {
+          await MediaUpload.deleteByUrl(url.trim());
+        } catch (_) {}
+      }
+
+      messenger.showSnackBar(const SnackBar(content: Text('An silindi.')));
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Silinmədi. Bağlantını yoxla.')),
+      );
+    }
+  }
+
+  Future<void> _report(String ownerUid) async {
+    const reasons = [
+      'Spam',
+      'Uyğunsuz məzmun',
+      'Təhqir və ya zorakılıq',
+      'Saxta profil',
+      'Digər',
+    ];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xff151020),
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'Anı şikayət et',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            for (final reason in reasons)
+              ListTile(
+                leading: const Icon(Icons.flag_outlined,
+                    color: Color(0xffff657b)),
+                title:
+                    Text(reason, style: const TextStyle(color: Colors.white)),
+                onTap: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  Navigator.pop(sheet);
+
+                  try {
+                    await db.collection('reports').add({
+                      'type': 'moment',
+                      'momentId': moment.id,
+                      'ownerUid': ownerUid,
+                      'reporterUid': widget.profile.uid,
+                      'reason': reason,
+                      'status': 'new',
+                      'createdAt': Timestamp.now(),
+                    });
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Şikayət göndərildi.')),
+                    );
+                  } catch (_) {
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Şikayət göndərilmədi.')),
+                    );
+                  }
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _block(String ownerUid, String ownerName) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await blockUser(
+        myUid: widget.profile.uid,
+        myName: widget.profile.name,
+        targetUid: ownerUid,
+        targetName: ownerName,
+        database: db,
+      );
+      messenger.showSnackBar(
+        SnackBar(content: Text('$ownerName bloklandı.')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Bloklanmadı.')));
+    }
+  }
+
 
   /// Anın sahibinə hədiyyə göndərir.
   Future<void> _sendGiftToOwner(String ownerName) async {
@@ -831,4 +1301,139 @@ class _MomentsError extends StatelessWidget {
       ),
     ),
   );
+}
+
+
+/// Yadda saxlanılan anlar.
+///
+/// Menyudakı "Yadda saxla" buraya yazır. Siyahı öz sənədindəki nüsxədən
+/// qurulur — hər sətir üçün ayrıca ana sorğu getmir, çünki an silinmiş də
+/// ola bilər və o zaman sorğu boşa gedərdi.
+class SavedMomentsPage extends StatelessWidget {
+  const SavedMomentsPage({
+    super.key,
+    required this.profile,
+    this.database,
+  });
+
+  final UserProfile profile;
+  final FirebaseFirestore? database;
+
+  FirebaseFirestore get db => database ?? FirebaseFirestore.instance;
+
+  @override
+  Widget build(BuildContext context) {
+    final saved = db
+        .collection('users')
+        .doc(profile.uid)
+        .collection('savedMoments')
+        .orderBy('createdAt', descending: true);
+
+    return Scaffold(
+      backgroundColor: vBg,
+      appBar: AppBar(
+        backgroundColor: const Color(0xff0b0711),
+        title: const Text(
+          'Yadda saxlananlar',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+      ),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: saved.snapshots(),
+        builder: (context, snap) {
+          if (snap.hasError) {
+            return const Center(
+              child: Text(
+                'Siyahı yüklənmədi.',
+                style: TextStyle(color: Colors.white70),
+              ),
+            );
+          }
+
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator(color: vPink));
+          }
+
+          final docs = snap.data!.docs;
+          if (docs.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(28),
+                child: Text(
+                  'Hələ heç nə saxlamamısan.\n'
+                  'Anın üç nöqtəsinə basıb "Yadda saxla" seç.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: vMuted, height: 1.5),
+                ),
+              ),
+            );
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+            itemCount: docs.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final data = docs[index].data();
+              final thumb = '${data['thumbUrl'] ?? ''}';
+              final caption = '${data['caption'] ?? ''}'.trim();
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: vPanel,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: vLine),
+                ),
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: thumb.isEmpty
+                          ? const ColoredBox(
+                              color: vPanelHigh,
+                              child: Icon(Icons.image_outlined, color: vMuted),
+                            )
+                          : Image.network(thumb, fit: BoxFit.cover),
+                    ),
+                  ),
+                  title: Text(
+                    '${data['ownerName'] ?? 'VIBE'}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  subtitle: Text(
+                    caption.isEmpty ? 'Şəkil' : caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: vMuted, fontSize: 12.5),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.bookmark_remove_outlined,
+                        color: vMuted),
+                    tooltip: 'Yaddaşdan çıxar',
+                    onPressed: () => docs[index].reference.delete(),
+                  ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MomentDetailPage(
+                        momentId: '${data['momentId'] ?? docs[index].id}',
+                        profile: profile,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 }

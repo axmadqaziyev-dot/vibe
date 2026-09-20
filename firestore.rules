@@ -40,6 +40,20 @@ service cloud.firestore {
 
       // Qalan hər şey (media, qalereya, pul kisəsi, tokenlər, bloklananlar…)
       // yalnız sahibi tərəfindən dəyişdirilə bilər.
+      // savedMoments / hiddenMoments / mutedUsers — yalniz sahibi ucun.
+      // Bunlar sexsi siyahilardir: kimi sessize almagini basqasi gormemelidir.
+      match /savedMoments/{docId} {
+        allow read, write: if isMe(userId);
+      }
+
+      match /hiddenMoments/{docId} {
+        allow read, write: if isMe(userId);
+      }
+
+      match /mutedUsers/{docId} {
+        allow read, write: if isMe(userId);
+      }
+
       match /{subCollection}/{docId} {
         allow read: if signedIn();
         allow write: if isMe(userId);
