@@ -4,7 +4,9 @@
 # Damgalama addimi burada oldugu ucun unudulmur. O olmasa main.dart.js
 # damgasiz qalir ve brahzer onu her acilisda yeniden yukleyir.
 
-$ErrorActionPreference = "Stop"
+# ErrorActionPreference = "Stop" qoymuruq: PowerShell 5.1 xarici programin
+# stderr-e yazdigi adi xeberdarligi da xeta sayir ve yigimi dayandirir.
+# Ugur yoxlamasi $LASTEXITCODE ile aparilir.
 
 $flutter = "C:\src\flutter\bin\flutter.bat"
 if (-not (Test-Path $flutter)) { $flutter = "flutter" }
