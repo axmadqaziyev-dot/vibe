@@ -52,6 +52,7 @@ import 'push_notifications.dart';
 import 'server_time.dart';
 import 'image_save.dart';
 import 'location_share.dart';
+import 'share_sheet.dart';
 import 'post_links.dart' show openPostLink;
 import 'map_tile.dart';
 import 'push_send.dart';
@@ -4517,6 +4518,9 @@ class _RealChatPageState extends State<RealChatPage> {
   bool peerTyping = false;
   DateTime? peerTypingSince;
 
+  /// Söhbətin başına sancaqlanmış mesaj.
+  Map<String, dynamic>? pinned;
+
   /// Nişan bu qədər saxlanılır. Tətbiq sərt bağlananda sahə sənəddə
   /// `true` qalır — onsuz "yazır…" həmişəlik asılardı.
   static const _typingWindow = Duration(seconds: 12);
@@ -4644,6 +4648,13 @@ class _RealChatPageState extends State<RealChatPage> {
       final data = snap.data();
       final next = chatThemeOf(data?['theme']);
       final lock = readChatLock(data);
+
+      final pin = data?['pinned'];
+      final nextPin = pin is Map ? Map<String, dynamic>.from(pin) : null;
+      if (nextPin?['id'] != pinned?['id']) {
+        pinned = nextPin;
+        if (mounted) setState(() {});
+      }
 
       final typingMap = data?['typing'];
       final typingNow =
@@ -4961,41 +4972,293 @@ class _RealChatPageState extends State<RealChatPage> {
                 ],
               ),
               const Divider(height: 24, color: Color(0xff352447)),
-              ListTile(
-                leading: const Icon(Icons.reply_rounded, color: Color(0xff9d7dff)),
-                title: const Text('Cavab ver', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(sheet);
-                  _startReply(
-                    ref.id,
-                    mine ? 'Sən' : widget.targetName,
-                    _previewOf(data),
-                  );
-                },
+
+              _action(
+                sheet,
+                icon: Icons.reply_rounded,
+                color: const Color(0xff9d7dff),
+                label: 'Cavab ver',
+                onTap: () => _startReply(
+                  ref.id,
+                  mine ? 'Sən' : widget.targetName,
+                  _previewOf(data),
+                ),
               ),
-              ListTile(
-                leading: const Icon(Icons.copy_rounded, color: Color(0xff8fd4ff)),
-                title: const Text('Mətni kopyala', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(sheet);
-                  Clipboard.setData(ClipboardData(text: '${data['text'] ?? ''}'));
-                  notifySocial(context, 'Mətn kopyalandı.');
-                },
+
+              _action(
+                sheet,
+                icon: Icons.forward_rounded,
+                color: const Color(0xff2de28a),
+                label: 'Yönləndir',
+                onTap: () => _forward(data),
               ),
-              if (mine)
-                ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded, color: Color(0xffff657b)),
-                  title: const Text('Mesajı sil', style: TextStyle(color: Colors.white)),
+
+              if ('${data['text'] ?? ''}'.trim().isNotEmpty)
+                _action(
+                  sheet,
+                  icon: Icons.copy_rounded,
+                  color: const Color(0xff8fd4ff),
+                  label: 'Mətni kopyala',
                   onTap: () {
-                    Navigator.pop(sheet);
-                    _deleteMessage(ref);
+                    Clipboard.setData(
+                      ClipboardData(text: '${data['text'] ?? ''}'),
+                    );
+                    notifySocial(context, 'Mətn kopyalandı.');
                   },
+                ),
+
+              // Şəkli cihaza endirmək.
+              if ('${data['type'] ?? ''}' == 'photo' &&
+                  data['viewOnce'] != true)
+                _action(
+                  sheet,
+                  icon: Icons.download_rounded,
+                  color: const Color(0xffffd458),
+                  label: 'Yadda saxla',
+                  onTap: () => _saveMessagePhoto(ref, data),
+                ),
+
+              // Öz mətn mesajını düzəltmək.
+              if (mine && '${data['type'] ?? 'text'}' == 'text')
+                _action(
+                  sheet,
+                  icon: Icons.edit_rounded,
+                  color: const Color(0xff9d7dff),
+                  label: 'Yenidən düzəlt',
+                  onTap: () => _editMessage(ref, '${data['text'] ?? ''}'),
+                ),
+
+              _action(
+                sheet,
+                icon: Icons.push_pin_rounded,
+                color: const Color(0xff22a7ff),
+                label: 'Söhbətin başına sancaqla',
+                onTap: () => _pinMessage(ref.id, data),
+              ),
+
+              // Yalnız məndə silinir — qarşı tərəfdə qalır.
+              _action(
+                sheet,
+                icon: Icons.visibility_off_rounded,
+                color: const Color(0xff9d94ae),
+                label: 'Özümdən sil',
+                onTap: () => _hideForMe(ref),
+              ),
+
+              if (mine)
+                _action(
+                  sheet,
+                  icon: Icons.delete_outline_rounded,
+                  color: const Color(0xffff657b),
+                  label: 'Hər kəsdən sil',
+                  onTap: () => _deleteMessage(ref),
+                ),
+
+              if (!mine)
+                _action(
+                  sheet,
+                  icon: Icons.flag_rounded,
+                  color: const Color(0xffff657b),
+                  label: 'Şikayət et',
+                  onTap: () => _reportMessage(ref, data),
                 ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Menyu sətri.
+  ///
+  /// Hər sətir vərəqi özü bağlayır — əvvəl bu, hər yerdə əl ilə
+  /// yazılırdı və birini yazmağı unutmaq asandır.
+  Widget _action(
+    BuildContext sheet, {
+    required IconData icon,
+    required Color color,
+    required String label,
+    required VoidCallback onTap,
+  }) =>
+      ListTile(
+        leading: Icon(icon, color: color),
+        title: Text(label, style: const TextStyle(color: Colors.white)),
+        onTap: () {
+          Navigator.pop(sheet);
+          onTap();
+        },
+      );
+
+  /// Mesajı başqasına yönləndirir.
+  Future<void> _forward(Map<String, dynamic> data) async {
+    final payload = Map<String, dynamic>.from(data);
+
+    // Şəklin tam nüsxəsi ayrıca sənəddədir — o da köçürülməlidir,
+    // yoxsa yönləndirilən şəkil açılmır.
+    if ('${data['type'] ?? ''}' == 'photo') {
+      try {
+        final full = await FirebaseFirestore.instance
+            .collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .doc('${data['id'] ?? ''}')
+            .get();
+        payload['_full'] = '${full.data()?['data'] ?? ''}';
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    await showShareSheet(
+      context,
+      profile: widget.currentProfile,
+      title: 'Yönləndirilən mesaj',
+      body: _previewOf(data),
+      forward: payload,
+    );
+  }
+
+  /// Söhbətdəki şəkli cihaza endirir.
+  Future<void> _saveMessagePhoto(
+    DocumentReference<Map<String, dynamic>> ref,
+    Map<String, dynamic> data,
+  ) async {
+    var source = '${data['photo'] ?? ''}';
+
+    try {
+      final full = await ref.collection('media').doc('full').get();
+      final value = '${full.data()?['data'] ?? ''}';
+      if (value.isNotEmpty) source = value;
+    } catch (_) {}
+
+    if (source.isEmpty || !mounted) return;
+    await _saveMedia(source, 'vibe-sekil.jpg');
+  }
+
+  /// Öz mətn mesajını düzəldir.
+  ///
+  /// Düzəliş işarələnir: qarşı tərəf mətnin sonradan dəyişdiyini
+  /// bilməlidir, yoxsa yazışma etibarsız olur.
+  Future<void> _editMessage(
+    DocumentReference<Map<String, dynamic>> ref,
+    String current,
+  ) async {
+    final controller = TextEditingController(text: current);
+
+    final text = await showDialog<String>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: const Color(0xff151020),
+        title: const Text(
+          'Mesajı düzəlt',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 4,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Mesaj',
+            hintStyle: TextStyle(color: vMuted),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Ləğv et', style: TextStyle(color: vMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, controller.text.trim()),
+            child: const Text('Saxla'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+
+    if (text == null || text.isEmpty || text == current) return;
+    if (!mounted) return;
+
+    if (!guardContent(context, text)) return;
+
+    try {
+      await ref.set({
+        'text': text,
+        'editedAt': Timestamp.now(),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      if (mounted) notifySocial(context, 'Mesaj düzəlmədi.');
+    }
+  }
+
+  /// Mesajı söhbətin başına sancaqlayır.
+  Future<void> _pinMessage(String id, Map<String, dynamic> data) async {
+    try {
+      await FirebaseFirestore.instance.collection('chats').doc(chatId).set({
+        'pinned': {
+          'id': id,
+          'text': _previewOf(data),
+          'by': widget.currentProfile.uid,
+          'at': Timestamp.now(),
+        },
+      }, SetOptions(merge: true));
+
+      if (mounted) notifySocial(context, 'Sancaqlandı.');
+    } catch (_) {
+      if (mounted) notifySocial(context, 'Sancaqlanmadı.');
+    }
+  }
+
+  Future<void> _unpin() async {
+    try {
+      await FirebaseFirestore.instance.collection('chats').doc(chatId).set(
+        {'pinned': FieldValue.delete()},
+        SetOptions(merge: true),
+      );
+    } catch (_) {}
+  }
+
+  /// Mesajı yalnız özümdən gizlədir.
+  ///
+  /// Silmək deyil: qarşı tərəfdə qalır. "Hər kəsdən sil" ayrı
+  /// əməliyyatdır və yalnız öz mesajına aiddir.
+  Future<void> _hideForMe(
+    DocumentReference<Map<String, dynamic>> ref,
+  ) async {
+    try {
+      await ref.set({
+        'hiddenFor': FieldValue.arrayUnion([widget.currentProfile.uid]),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      if (mounted) notifySocial(context, 'Gizlədilmədi.');
+    }
+  }
+
+  /// Mesajdan şikayət edir.
+  Future<void> _reportMessage(
+    DocumentReference<Map<String, dynamic>> ref,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      await FirebaseFirestore.instance.collection('reports').add({
+        'kind': 'message',
+        'chatId': chatId,
+        'messageId': ref.id,
+        'text': _previewOf(data),
+        'authorUid': widget.targetUid,
+        'byUid': widget.currentProfile.uid,
+        'open': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        notifySocial(context, 'Şikayət göndərildi. Baxacağıq.');
+      }
+    } catch (_) {
+      if (mounted) notifySocial(context, 'Şikayət göndərilmədi.');
+    }
   }
 
   Future<void> sendMessage() async {
@@ -6149,6 +6412,43 @@ class _RealChatPageState extends State<RealChatPage> {
               final block = blockSnap.data ?? BlockState.none;
               return Column(
             children: [
+              // Sancaqlanmış mesaj söhbətin başında qalır.
+              //
+              // Uzun yazışmada vacib bir şeyi (ünvan, saat, qərar)
+              // tapmaq üçün yüzlərlə mesajı sürüşdürmək lazım gəlirdi.
+              if (pinned != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(14, 9, 8, 9),
+                  color: const Color(0xff1a1330),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.push_pin_rounded,
+                          size: 15, color: Color(0xff22a7ff)),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          '${pinned!['text'] ?? ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xffd8d1e6),
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ),
+                      PressableScale(
+                        onTap: _unpin,
+                        child: const Padding(
+                          padding: EdgeInsets.all(6),
+                          child: Icon(Icons.close_rounded,
+                              size: 16, color: vMuted),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               Expanded(
                 child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: FirebaseFirestore.instance
@@ -6173,7 +6473,13 @@ class _RealChatPageState extends State<RealChatPage> {
                       return const Center(child: CircularProgressIndicator(color: Color(0xffff2bd6)));
                     }
 
-                    final messages = snapshot.data!.docs;
+                    // "Özümdən sil" — mesaj qarşı tərəfdə qalır,
+                    // məndə görünmür.
+                    final messages = snapshot.data!.docs.where((doc) {
+                      final hidden = doc.data()['hiddenFor'];
+                      if (hidden is! List) return true;
+                      return !hidden.contains(widget.currentProfile.uid);
+                    }).toList();
 
                     if (messages.isEmpty) {
                       return SingleChildScrollView(
@@ -6815,6 +7121,26 @@ class _RealChatPageState extends State<RealChatPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                if (data['forwarded'] == true)
+                                  const Padding(
+                                    padding: EdgeInsets.only(bottom: 4),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.forward_rounded,
+                                            size: 12, color: Colors.white54),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Yönləndirilib',
+                                          style: TextStyle(
+                                            color: Colors.white54,
+                                            fontSize: 10.5,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 Text(
                                   text,
                                   style: const TextStyle(
@@ -6822,6 +7148,18 @@ class _RealChatPageState extends State<RealChatPage> {
                                     fontSize: 16,
                                   ),
                                 ),
+                                if (data['editedAt'] != null)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      'düzəldilib',
+                                      style: TextStyle(
+                                        color: Colors.white38,
+                                        fontSize: 10,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
                                 if (reactionValues.isNotEmpty) ...[
                                   const SizedBox(height: 6),
                                   Wrap(
@@ -6907,7 +7245,7 @@ class _RealChatPageState extends State<RealChatPage> {
                 ),
               ),
 
-              // Hədd yaxınlaşır — bağlanmadan əvvəl xəbərdarlıq.
+              // Xəbərdarlıq zolağı.
               if (chatLock == null &&
                   !block.blocked &&
                   filterVerdict.level == FilterLevel.warn &&

@@ -16,11 +16,19 @@ import 'user_profile.dart';
 /// Kənar paylaşımda ünvan kimi tətbiqin özünün linki gedir: birbaşa
 /// paylaşıma aparan dərin keçid hələ qurulmayıb, ona görə açılmayan
 /// ünvan yazmırıq.
+/// Paylaşma və yönləndirmə vərəqi.
+///
+/// [forward] verilibsə mesaj olduğu kimi köçürülür: şəkil şəkil
+/// qalır, konum konum qalır. Verilməyibsə adi mətn paylaşımıdır.
+///
+/// İki ayrı ekran yazmaq olardı, amma adam seçmə hissəsi tam eynidir
+/// — təkrar yazsaq, biri düzələndə o biri geridə qalardı.
 Future<void> showShareSheet(
   BuildContext context, {
   required UserProfile profile,
   required String title,
   required String body,
+  Map<String, dynamic>? forward,
   FirebaseFirestore? database,
 }) {
   return showModalBottomSheet<void>(
@@ -32,6 +40,7 @@ Future<void> showShareSheet(
       maxHeight: MediaQuery.sizeOf(context).height * .8,
     ),
     builder: (sheet) => _ShareSheet(
+      forward: forward,
       profile: profile,
       title: title,
       body: body,
@@ -45,6 +54,7 @@ class _ShareSheet extends StatefulWidget {
     required this.profile,
     required this.title,
     required this.body,
+    this.forward,
     this.database,
   });
 
@@ -55,6 +65,9 @@ class _ShareSheet extends StatefulWidget {
 
   /// Paylaşımın mətni.
   final String body;
+
+  /// Yönləndirilən mesajın məzmunu. `null`-dırsa adi paylaşımdır.
+  final Map<String, dynamic>? forward;
 
   final FirebaseFirestore? database;
 
@@ -160,27 +173,64 @@ class _ShareSheetState extends State<_ShareSheet> {
             widget.profile.uid: widget.profile.name,
             uid: name,
           },
+          'unread': {uid: FieldValue.increment(1)},
           'lastMessage': widget.title,
           'lastSenderId': widget.profile.uid,
           'messageCount': FieldValue.increment(1),
           'updatedAt': Timestamp.now(),
         }, SetOptions(merge: true));
 
-        batch.set(chat.collection('messages').doc(), {
-          'senderId': widget.profile.uid,
-          'text': _shareText,
-          // Adi mətn kimi göndərilir: söhbət ekranı yalnız tanıdığı
-          // növləri ayrıca çəkir, naməlum növ boş görünə bilər.
-          'type': 'text',
-          'createdAt': Timestamp.now(),
-        });
+        final message = chat.collection('messages').doc();
+        final payload = widget.forward;
+
+        if (payload == null) {
+          batch.set(message, {
+            'senderId': widget.profile.uid,
+            'text': _shareText,
+            // Adi mətn kimi göndərilir: söhbət ekranı yalnız tanıdığı
+            // növləri ayrıca çəkir, naməlum növ boş görünə bilər.
+            'type': 'text',
+            'createdAt': Timestamp.now(),
+          });
+        } else {
+          // Mesaj olduğu kimi köçürülür.
+          //
+          // Cavab və reaksiya köçürülmür: onlar köhnə söhbətə aiddir
+          // və yeni yerdə mənasız görünərdi.
+          batch.set(message, {
+            ...payload,
+            // Köməkçi sahədir, mesajda yeri yoxdur.
+            '_full': FieldValue.delete(),
+            'senderId': widget.profile.uid,
+            'forwarded': true,
+            'replyId': FieldValue.delete(),
+            'replyName': FieldValue.delete(),
+            'replyText': FieldValue.delete(),
+            'reactions': FieldValue.delete(),
+            'openedAt': FieldValue.delete(),
+            'createdAt': Timestamp.now(),
+            'clientCreatedAt': DateTime.now().millisecondsSinceEpoch,
+          });
+
+          final full = '${payload['_full'] ?? ''}';
+          if (full.isNotEmpty) {
+            batch.set(
+              message.collection('media').doc('full'),
+              {'data': full},
+            );
+          }
+        }
       }
 
       await batch.commit();
 
       navigator.pop();
       messenger.showSnackBar(
-        SnackBar(content: Text('${picked.length} nəfərə göndərildi.')),
+        SnackBar(
+          content: Text(widget.forward == null
+              ? '${picked.length} nəfərə göndərildi.'
+              : '${picked.length} nəfərə yönləndirildi.'),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -201,13 +251,13 @@ class _ShareSheetState extends State<_ShareSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(18, 0, 18, 10),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Yönləndir',
-                  style: TextStyle(
+                  widget.forward == null ? 'Paylaş' : 'Yönləndir',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
