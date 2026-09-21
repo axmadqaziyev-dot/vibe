@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'call_log.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -711,6 +713,14 @@ class _CallPageState extends State<CallPage> {
   bool muted = false;
   bool camera = true;
 
+  /// Zəngin son bilinən vəziyyəti — qeydi buna görə yazırıq.
+  String lastStatus = 'ringing';
+
+  /// Zəngin tərəfləri. Söhbətə qeyd yazmaq üçün lazımdır.
+  String callerUid = '';
+  String calleeUid = '';
+  String callerName = '';
+
   bool remoteSet = false;
   bool applying = false;
   bool ended = false;
@@ -737,6 +747,12 @@ class _CallPageState extends State<CallPage> {
         final data = doc.data();
 
         if (data == null || ended) return;
+
+        // Tərəflər və vəziyyət — zəng bitəndə qeyd üçün lazımdır.
+        callerUid = '${data['caller'] ?? ''}';
+        calleeUid = '${data['callee'] ?? ''}';
+        callerName = '${data['callerName'] ?? ''}';
+        lastStatus = '${data['status'] ?? lastStatus}';
 
         if (['ended', 'declined', 'busy'].contains(data['status'])) {
           await finish(write: false);
@@ -1090,9 +1106,41 @@ class _CallPageState extends State<CallPage> {
       } catch (_) {}
     }
 
+    await _writeLog(seconds);
+
     if (mounted) {
       Navigator.of(context).pop();
     }
+  }
+
+  /// Zəngi söhbətə yazır.
+  ///
+  /// Yalnız zəng edən tərəf yazır — səbəbi `call_log.dart`-da
+  /// izah olunub.
+  Future<void> _writeLog(int seconds) async {
+    if (!widget.caller) return;
+
+    final outcome = connectedAt != null
+        ? CallOutcome.answered
+        : switch (lastStatus) {
+            'declined' => CallOutcome.declined,
+            'busy' => CallOutcome.declined,
+            // Qarşı tərəf hələ zəng ekranındadırsa, deməli biz
+            // dayandırdıq.
+            'ringing' => CallOutcome.cancelled,
+            _ => CallOutcome.missed,
+          };
+
+    await writeCallLog(
+      callId: widget.ref.id,
+      callerUid: callerUid,
+      callerName: callerName,
+      calleeUid: calleeUid,
+      calleeName: widget.name,
+      video: widget.video,
+      outcome: outcome,
+      seconds: seconds,
+    );
   }
 
   @override

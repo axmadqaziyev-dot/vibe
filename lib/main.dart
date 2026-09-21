@@ -12,6 +12,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import 'firebase_options.dart';
+import 'call_log.dart';
 import 'calls.dart';
 import 'social_ui.dart';
 import 'preferences.dart';
@@ -4490,6 +4491,25 @@ class _RealChatPageState extends State<RealChatPage> {
   /// Hansı vaxta qədər "oxundu" yazmışıq — təkrar yazının qarşısını alır.
   DateTime? markedReadUpTo;
 
+  /// Qarşı tərəf yazır?
+  ///
+  /// Nişanın təzəliyi **bizim öz saatımızla** ölçülür: nişanı ilk
+  /// dəfə görəndə vaxtı yazırıq. Əvvəl sənəddəki server vaxtı ilə
+  /// telefonun saatı müqayisə olunurdu — telefonun saatı bir neçə
+  /// saniyə fərqlidirsə, "yazır…" heç vaxt görünmürdü. İki quşun
+  /// işləməməsi də eyni səbəbdən idi.
+  bool peerTyping = false;
+  DateTime? peerTypingSince;
+
+  /// Nişan bu qədər saxlanılır. Tətbiq sərt bağlananda sahə sənəddə
+  /// `true` qalır — onsuz "yazır…" həmişəlik asılardı.
+  static const _typingWindow = Duration(seconds: 12);
+
+  bool get showTyping =>
+      peerTyping &&
+      peerTypingSince != null &&
+      DateTime.now().difference(peerTypingSince!) < _typingWindow;
+
   /// İki kilid yazısının üst-üstə düşməməsi üçün.
   bool locking = false;
 
@@ -4608,6 +4628,16 @@ class _RealChatPageState extends State<RealChatPage> {
       final data = snap.data();
       final next = chatThemeOf(data?['theme']);
       final lock = readChatLock(data);
+
+      final typingMap = data?['typing'];
+      final typingNow =
+          typingMap is Map && typingMap[widget.targetUid] == true;
+
+      if (typingNow != peerTyping) {
+        peerTyping = typingNow;
+        peerTypingSince = typingNow ? DateTime.now() : null;
+        if (mounted) setState(() {});
+      }
 
       // Kilid sənəddədir: qarşı tərəf bağlanmaya səbəb olsa da,
       // hər iki ekran eyni anda bağlanır.
@@ -5657,23 +5687,11 @@ class _RealChatPageState extends State<RealChatPage> {
                           color: Colors.white,
                         ),
                       ),
-                      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                        stream: FirebaseFirestore.instance
-                            .collection('chats')
-                            .doc(chatId)
-                            .snapshots(),
-                        builder: (context, chatSnap) {
-                          final chat = chatSnap.data?.data() ?? {};
-                          final typing = chat['typing'];
-                          final typingAt = chat['typingAt'];
-                          final isTyping = typing is Map &&
-                              typing[widget.targetUid] == true &&
-                              typingAt is Map &&
-                              typingAt[widget.targetUid] is Timestamp &&
-                              DateTime.now()
-                                      .difference((typingAt[widget.targetUid] as Timestamp).toDate())
-                                      .inSeconds
-                                  .abs() < 8;
+                      Builder(
+                        builder: (context) {
+                          // Nişan söhbət sənədinin dinləyicisindən gəlir —
+                          // burada ayrıca axın açmağa ehtiyac yoxdur.
+                          final isTyping = showTyping;
                           // Nişan yalnız təzə olanda göstərilir.
                           //
                           // Tətbiq düzgün bağlanmasa sahə silinmir; belə
@@ -6189,6 +6207,96 @@ class _RealChatPageState extends State<RealChatPage> {
                                           ),
                                         ),
                                       ),
+                              ),
+                            ),
+                          ));
+                        }
+
+                        // --- zəng qeydi ---
+                        //
+                        // Zəng söhbətdə iz qoymalıdır: cavabsız zəngi
+                        // sabah görmək lazımdır. Toxunanda yenidən
+                        // zəng edir — cavabsız zəngdən sonra adamın
+                        // ilk istədiyi budur.
+                        if (type == 'call') {
+                          final video = data['callVideo'] == true;
+                          final outcome = outcomeFromName(data['callOutcome']);
+                          final missed = outcome != CallOutcome.answered;
+
+                          return decorate(Align(
+                            alignment: mine
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: PressableScale(
+                              onTap: () => startCall(
+                                context,
+                                widget.currentProfile.uid,
+                                widget.currentProfile.name,
+                                widget.targetUid,
+                                widget.targetName,
+                                video,
+                              ),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.fromLTRB(13, 9, 15, 9),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xff1b1426),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: missed && !mine
+                                        ? const Color(0xff5a2433)
+                                        : const Color(0xff352447),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      video
+                                          ? (missed
+                                              ? Icons.videocam_off_rounded
+                                              : Icons.videocam_rounded)
+                                          : (missed
+                                              ? Icons.phone_missed_rounded
+                                              : Icons.phone_in_talk_rounded),
+                                      size: 17,
+                                      color: missed
+                                          ? const Color(0xffff8a9b)
+                                          : const Color(0xff2de28a),
+                                    ),
+                                    const SizedBox(width: 9),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          callLogText(
+                                            video: video,
+                                            outcome: outcome,
+                                            seconds: int.tryParse(
+                                                    '${data['callSeconds'] ?? 0}') ??
+                                                0,
+                                            mine: mine,
+                                          ),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        const Text(
+                                          'Yenidən zəng et',
+                                          style: TextStyle(
+                                            color: vMuted,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ));

@@ -740,17 +740,17 @@ class _SocialMessagesState extends State<SocialMessages> {
         ) ??
         0;
 
+    // Nişanın özü kifayətdir.
+    //
+    // Əvvəl burada sənəddəki **server** vaxtı ilə telefonun saatı
+    // müqayisə olunurdu. İki müxtəlif saatdır: telefonun saatı bir
+    // neçə saniyə fərqlidirsə, "yazır…" heç vaxt görünmürdü.
+    //
+    // Yazan tərəf nişanı 1,4 saniyə sonra özü söndürür, söhbətdən
+    // çıxanda da söndürür — ona görə burada vaxt yoxlamasına ehtiyac
+    // qalmır.
     final typing = d['typing'];
-    final typingAt = d['typingAt'];
-    final isTyping = typing is Map &&
-        typing[uid] == true &&
-        typingAt is Map &&
-        typingAt[uid] is Timestamp &&
-        DateTime.now()
-                .difference((typingAt[uid] as Timestamp).toDate())
-                .inSeconds
-                .abs() <
-            8;
+    final isTyping = typing is Map && typing[uid] == true;
 
     final picked = selected.contains(doc.id);
 
