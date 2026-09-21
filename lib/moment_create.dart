@@ -12,6 +12,7 @@ import 'package:record/record.dart';
 import 'package:cross_file/cross_file.dart';
 import 'voice/audio_file.dart';
 import 'voice/waveform.dart';
+import 'photo_pick.dart';
 import 'video_pick.dart';
 import 'media_upload.dart';
 import 'telemetry.dart';
@@ -109,21 +110,71 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
       _say('Bir anda ən çox $_maxImages şəkil paylaşa bilərsən.');
       return;
     }
-    final image = await pickStoredImage(
-      source: source,
-      fullWidth: 720,
-      thumbWidth: 220,
-      fullQuality: 68,
-    );
-    if (image == null || !mounted) return;
 
-    if (usedBytes + image.full.length + image.thumb.length >
-        _maxTotalImageBytes) {
+    // Kamera bir şəkil verir — orada paketin seçicisi qalır.
+    if (source == ImageSource.camera) {
+      final image = await pickStoredImage(
+        source: source,
+        fullWidth: 720,
+        thumbWidth: 220,
+        fullQuality: 68,
+      );
+      if (image == null || !mounted) return;
+      _acceptPhotos([image]);
+      return;
+    }
+
+    // Qalereya: bir dəfəyə bir neçə şəkil.
+    //
+    // Əvvəl hər şəkil üçün qalereya yenidən açılırdı — dörd şəkil
+    // üçün dörd dəfə. Instagram-da bir dəfə girib hamısını seçirsən.
+    final picked = await pickGalleryPhotos(max: _maxImages - photos.length);
+    if (picked.isEmpty || !mounted) return;
+
+    final images = <StoredImage>[];
+    for (final file in picked) {
+      final image = compressToStoredImage(
+        file.bytes,
+        fullWidth: 720,
+        thumbWidth: 220,
+        fullQuality: 68,
+      );
+      if (image != null) images.add(image);
+    }
+
+    if (images.isEmpty) {
+      _say('Şəkil oxunmadı.');
+      return;
+    }
+
+    _acceptPhotos(images);
+  }
+
+  /// Seçilmiş şəkilləri həcm həddini aşmadan əlavə edir.
+  void _acceptPhotos(List<StoredImage> images) {
+    var used = usedBytes;
+    final added = <StoredImage>[];
+
+    for (final image in images) {
+      if (photos.length + added.length >= _maxImages) break;
+
+      final size = image.full.length + image.thumb.length;
+      if (used + size > _maxTotalImageBytes) break;
+
+      used += size;
+      added.add(image);
+    }
+
+    if (added.isEmpty) {
       _say('Şəkillər çox böyükdür. Birini silib yenidən sına.');
       return;
     }
 
-    setState(() => photos.add(image));
+    setState(() => photos.addAll(added));
+
+    if (added.length < images.length) {
+      _say('${added.length} şəkil əlavə olundu, qalanı sığmadı.');
+    }
   }
 
   Future<void> _addVideo() async {

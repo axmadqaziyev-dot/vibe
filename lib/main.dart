@@ -48,6 +48,7 @@ import 'legal.dart';
 import 'push_notifications.dart';
 import 'push_send.dart';
 import 'moment_create.dart';
+import 'photo_pick.dart';
 import 'app/i18n.dart';
 import 'telemetry.dart';
 import 'home_discover.dart';
@@ -5244,12 +5245,43 @@ class _RealChatPageState extends State<RealChatPage> {
   Future<void> _sendPhoto(ImageSource source) async {
     if (sending) return;
 
-    final picked = await pickStoredImage(
-      source: source,
-      fullWidth: 1080,
-      thumbWidth: 320,
-    );
-    if (picked == null || !mounted) return;
+    // Kamera bir şəkil verir.
+    if (source == ImageSource.camera) {
+      final one = await pickStoredImage(
+        source: source,
+        fullWidth: 1080,
+        thumbWidth: 320,
+      );
+      if (one == null || !mounted) return;
+      await _pushPhoto(one);
+      return;
+    }
+
+    // Qalereya: bir dəfəyə dördə qədər şəkil. Əvvəl hər şəkil üçün
+    // qalereya yenidən açılırdı.
+    final files = await pickGalleryPhotos(max: 4);
+    if (files.isEmpty || !mounted) return;
+
+    for (final file in files) {
+      if (!mounted) return;
+
+      final image = compressToStoredImage(
+        file.bytes,
+        fullWidth: 1080,
+        thumbWidth: 320,
+      );
+      if (image == null) continue;
+
+      await _pushPhoto(image);
+    }
+  }
+
+  /// Bir şəkli söhbətə yazır.
+  Future<void> _pushPhoto(StoredImage picked) async {
+    if (chatLock != null) {
+      notifySocial(context, 'Bu söhbət dayandırılıb.');
+      return;
+    }
 
     setState(() => sending = true);
     try {
