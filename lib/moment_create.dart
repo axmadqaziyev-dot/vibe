@@ -11,6 +11,7 @@ import 'package:record/record.dart';
 import 'package:cross_file/cross_file.dart';
 import 'voice/audio_file.dart';
 import 'voice/waveform.dart';
+import 'video_pick.dart';
 import 'media_upload.dart';
 import 'telemetry.dart';
 import 'ui/vibe_chrome.dart';
@@ -43,7 +44,8 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
   final focus = FocusNode();
 
   final List<StoredImage> photos = [];
-  XFile? video;
+  /// Seçilmiş videonun adı — yalnız "video varmı" yoxlaması üçün.
+  String? videoName;
   Uint8List? videoBytes;
   bool posting = false;
 
@@ -77,7 +79,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
       !recording &&
       (caption.text.trim().isNotEmpty ||
           photos.isNotEmpty ||
-          video != null ||
+          videoName != null ||
           audioBytes != null);
 
   int get usedBytes =>
@@ -113,14 +115,12 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
   }
 
   Future<void> _addVideo() async {
-    final picked = await ImagePicker().pickVideo(
-      source: ImageSource.gallery,
-      maxDuration: const Duration(minutes: 2),
-    );
+    // Öz seçicimiz: vebdə paketin uzun accept siyahısı iOS Safari-də
+    // qalereyanı gizlədib birbaşa Faylları açırdı.
+    final picked = await pickGalleryVideo();
     if (picked == null || !mounted) return;
 
-    final data = await picked.readAsBytes();
-    if (!mounted) return;
+    final data = picked.bytes;
 
     if (data.lengthInBytes > 60 * 1024 * 1024) {
       _say('Video çox böyükdür. 60 MB-a qədər video paylaşa bilərsən.');
@@ -128,7 +128,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
     }
 
     setState(() {
-      video = picked;
+      videoName = picked.name;
       videoBytes = data;
     });
   }
@@ -312,7 +312,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
                             ),
                           ),
                           if (photos.isNotEmpty) _photoStrip(),
-                          if (video != null) _videoCard(),
+                          if (videoName != null) _videoCard(),
                           if (recording || audioBytes != null) _audioPreview(),
                           const SizedBox(height: 4),
                           _attachRow(),
@@ -416,7 +416,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
           ),
           IconButton(
             onPressed: () => setState(() {
-              video = null;
+              videoName = null;
               videoBytes = null;
             }),
             icon: const Icon(Icons.close_rounded, color: vMuted, size: 18),
