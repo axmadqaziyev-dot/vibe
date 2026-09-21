@@ -5138,9 +5138,12 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         return;
       }
 
+      // Mövcud qovluqdan istifadə olunur: yeni bucket yaratmaq
+      // Supabase panelində əlavə addımdır və onsuz funksiya işləməzdi.
       final url = await MediaUpload.upload(
-        bucket: 'rooms',
-        path: '${widget.roomId}/bg_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        bucket: MediaUpload.videoBucket,
+        path: 'rooms/${widget.roomId}/bg_'
+            '${DateTime.now().millisecondsSinceEpoch}.jpg',
         bytes: bytes,
         contentType: 'image/jpeg',
       );
@@ -5148,7 +5151,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
       await _setBackground(url: url, scene: '');
       if (mounted) _toast('Fon dəyişdi.');
     } on MediaBucketMissing {
-      _toast('Supabase-də "rooms" qovluğu yoxdur.');
+      _toast('Şəkil anbarı hazır deyil.');
     } catch (_) {
       _toast('Şəkil yüklənmədi.');
     }
