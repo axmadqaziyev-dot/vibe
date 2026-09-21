@@ -14,7 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ui/vibe_design.dart';
 
 /// Siyahı dəyişəndə bu rəqəm artırılır — vərəq yenidən göstərilir.
-const int whatsNewVersion = 1;
+const int whatsNewVersion = 2;
 
 class NewsItem {
   const NewsItem({
@@ -33,6 +33,18 @@ class NewsItem {
 }
 
 const whatsNewItems = <NewsItem>[
+  NewsItem(
+    emoji: '⚡',
+    title: 'Storilər',
+    text: '24 saatlıq paylaşım. Halqa rənglidirsə baxmamısan.',
+    where: 'Anlar → yuxarıdakı zolaq → "Stori paylaş"',
+  ),
+  NewsItem(
+    emoji: '🔔',
+    title: 'Mesaj səsi',
+    text: 'Tətbiq açıq olanda yeni mesaj gələndə səs çalır.',
+    where: 'Öz-özünə işləyir',
+  ),
   NewsItem(
     emoji: '🎙️',
     title: 'Səsli anlar',
