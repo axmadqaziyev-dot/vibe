@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'server_time.dart';
 import 'call_log.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:just_audio/just_audio.dart';
@@ -148,7 +149,7 @@ class _IncomingCallsState extends State<IncomingCalls> {
 
           // Server timestamp gecikərsə zəngi itirmə.
           if (at is Timestamp &&
-              DateTime.now().difference(at.toDate()).inSeconds > 90) {
+              sinceServer(at.toDate()).inSeconds > 90) {
             continue;
           }
 

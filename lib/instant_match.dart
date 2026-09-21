@@ -5,6 +5,7 @@ import 'user_profile.dart';
 import 'ui/vibe_chrome.dart';
 import 'main.dart' show PersonPage, RealChatPage;
 import 'calls.dart';
+import 'server_time.dart';
 
 const _bg = Color(0xff070510);
 const _panel = Color(0xff151020);
@@ -169,7 +170,7 @@ class _InstantMatchPageState extends State<InstantMatchPage>
   bool _isOnline(Map<String, dynamic> data) {
     final lastSeen = data['lastSeen'];
     if (data['online'] != true || lastSeen is! Timestamp) return false;
-    final diff = DateTime.now().difference(lastSeen.toDate());
+    final diff = sinceServer(lastSeen.toDate());
     return diff.inSeconds >= -10 && diff.inSeconds <= 90;
   }
 

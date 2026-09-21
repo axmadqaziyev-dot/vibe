@@ -22,6 +22,7 @@ import 'rich_post_text.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'server_time.dart';
 
 class MomentCommentsSheet extends StatefulWidget {
   const MomentCommentsSheet({
@@ -597,7 +598,7 @@ class _CommentAvatar extends StatelessWidget {
 
 /// "3 dəq", "2 saat", "5 gün".
 String shortAgo(DateTime time) {
-  final diff = DateTime.now().difference(time);
+  final diff = sinceServer(time);
 
   if (diff.inMinutes < 1) return 'indi';
   if (diff.inMinutes < 60) return '${diff.inMinutes} dəq';

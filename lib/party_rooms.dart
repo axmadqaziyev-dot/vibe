@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 
 import 'coin_wallet.dart';
 import 'invite.dart';
+import 'server_time.dart';
 import 'room_background.dart';
 import 'room_contributors.dart';
 import 'room_profile_card.dart';
@@ -4008,7 +4009,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
       docs.where((doc) {
         final seen = doc.data()['lastSeen'];
         if (seen is! Timestamp) return true;
-        return DateTime.now().difference(seen.toDate()).inMinutes < 3;
+        return sinceServer(seen.toDate()).inMinutes < 3;
       }).toList();
 
   /// Otaqdakıların tam siyahısı.

@@ -16,6 +16,7 @@ import 'voice/waveform.dart';
 import 'share_sheet.dart';
 import 'whispers.dart';
 import 'moment_detail.dart';
+import 'server_time.dart';
 import 'post_links.dart';
 import 'rich_post_text.dart';
 import 'blocking.dart';
@@ -406,6 +407,10 @@ class _MomentsPageState extends State<MomentsPage> {
                   snap.data!.docs.map((d) => Story.from(d.id, d.data())),
                   me: widget.profile.uid,
                   seen: seenStories,
+                  // Stori 24 saat yaşayır. Telefonun saatı fərqlidirsə
+                  // stori vaxtından əvvəl itir və ya çoxdan bitmişi
+                  // qalır — ona görə serverin saatı verilir.
+                  now: serverNow(),
                 )
               : const <StoryGroup>[];
 
@@ -668,7 +673,7 @@ class _MomentCardState extends State<MomentCard> {
   String _ago() {
     final at = widget.data['createdAt'];
     if (at is! Timestamp) return '';
-    final diff = DateTime.now().difference(at.toDate());
+    final diff = sinceServer(at.toDate());
     if (diff.inMinutes < 1) return 'indicə';
     if (diff.inMinutes < 60) return '${diff.inMinutes} dəq əvvəl';
     if (diff.inHours < 24) return '${diff.inHours} saat əvvəl';

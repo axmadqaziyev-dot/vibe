@@ -47,6 +47,7 @@ import 'message_chime.dart';
 import 'whats_new.dart';
 import 'legal.dart';
 import 'push_notifications.dart';
+import 'server_time.dart';
 import 'push_send.dart';
 import 'moment_create.dart';
 import 'photo_pick.dart';
@@ -259,7 +260,10 @@ bool isReallyOnline(Map<String, dynamic> data) {
     return false;
   }
 
-  final difference = DateTime.now().difference(lastSeen.toDate());
+  // Serverin saatı ilə ölçülür. Telefonun saatı ilə ölçülsəydi,
+  // bir dəqiqəlik fərq kifayət edərdi ki, heç kim onlayn
+  // görünməsin — pəncərə cəmi 45 saniyədir.
+  final difference = sinceServer(lastSeen.toDate());
 
   return difference.inSeconds >= -5 && difference.inSeconds <= 45;
 }
@@ -272,7 +276,7 @@ String activityText(Map<String, dynamic> data) {
   }
 
   final time = lastSeen.toDate();
-  final difference = DateTime.now().difference(time);
+  final difference = sinceServer(time);
 
   if (isReallyOnline(data)) {
     return 'İndi aktivdir';
@@ -2792,6 +2796,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     setOnline();
+
+    // Serverin saatı ilə telefonun saatı arasındakı fərq bir dəfə
+    // ölçülür. Onsuz "onlayn", "yazır…" və "görüldü" nişanları saatı
+    // düz olmayan cihazlarda heç vaxt işləmirdi.
+    unawaited(syncServerClock(widget.profile.uid));
+
     ensureWelcomeBonus(widget.profile.uid);
     startPushNotifications(widget.profile.uid);
 

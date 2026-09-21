@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import '../server_time.dart';
 
 /// OTAQDA MUSİQİ.
 ///
@@ -66,7 +67,9 @@ class RoomMusic {
 
         // Hamı eyni yerdən davam etsin.
         if (startedAt is Timestamp) {
-          final elapsed = DateTime.now().difference(startedAt.toDate());
+          // Musiqi serverdə yazılan andan sayılır: telefonun saatı
+          // fərqlidirsə, mahnı səhv yerdən başlayırdı.
+          final elapsed = sinceServer(startedAt.toDate());
           if (elapsed.inSeconds > 1 && elapsed < const Duration(hours: 1)) {
             await _player.seek(elapsed);
           }

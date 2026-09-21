@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'moment_video.dart';
+import 'server_time.dart';
 import 'stories.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
@@ -286,7 +287,8 @@ class _StoryViewerState extends State<StoryViewer> {
                     ),
                   ),
                   Text(
-                    '${storyHours - story.hoursLeft()} saat əvvəl',
+                    '${storyHours - story.hoursLeft(now: serverNow())}'
+                    ' saat əvvəl',
                     style: const TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 ],

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ui/vibe_design.dart';
+import 'server_time.dart';
 
 // ============================================================
 // MODEL
@@ -68,7 +69,7 @@ class VibeStatus {
     final at = raw['at'];
     final time = at is Timestamp ? at.toDate() : null;
     if (time == null) return null;
-    if (DateTime.now().difference(time) > lifetime) return null;
+    if (sinceServer(time) > lifetime) return null;
 
     return VibeStatus(
       mood: mood,
@@ -80,7 +81,7 @@ class VibeStatus {
   String get title => note.isEmpty ? mood.label : note;
 
   String get ago {
-    final minutes = DateTime.now().difference(at).inMinutes;
+    final minutes = sinceServer(at).inMinutes;
     if (minutes < 1) return 'indi';
     if (minutes < 60) return '$minutes dəq əvvəl';
     return '${minutes ~/ 60} saat əvvəl';

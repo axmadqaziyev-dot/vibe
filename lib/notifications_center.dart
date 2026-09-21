@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'user_profile.dart';
+import 'server_time.dart';
 
 const _bg = Color(0xff070510);
 const _panel = Color(0xff151020);
@@ -213,7 +214,7 @@ class NotificationCenterPage extends StatelessWidget {
   }
 
   String _time(DateTime d) {
-    final diff = DateTime.now().difference(d);
+    final diff = sinceServer(d);
     if (diff.inMinutes < 1) return 'indi';
     if (diff.inHours < 1) return '${diff.inMinutes} dəq əvvəl';
     if (diff.inDays < 1) return '${diff.inHours} saat əvvəl';
