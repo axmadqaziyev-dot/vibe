@@ -23,6 +23,7 @@ import 'package:image_picker/image_picker.dart';
 import 'media_upload.dart';
 import 'voice/room_audio.dart';
 import 'voice/room_music.dart';
+import 'chat_lock.dart';
 import 'legal.dart';
 import 'blocking.dart';
 import 'main.dart' show PersonPage;
@@ -1090,6 +1091,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     final text = message.text.trim();
     if (text.isEmpty) return;
     if (!guardContent(context, text)) return;
+    if (!guardTopic(context, text)) return;
 
     message.clear();
     try {
@@ -3668,6 +3670,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     if (text == null) return;
     if (!mounted) return;
     if (text.isNotEmpty && !guardContent(context, text)) return;
+    if (text.isNotEmpty && !guardTopic(context, text)) return;
 
     try {
       await room.set({'announcement': text}, SetOptions(merge: true));

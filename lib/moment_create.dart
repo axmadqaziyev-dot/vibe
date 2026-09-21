@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'chat_lock.dart';
 import 'legal.dart';
 import 'media_store.dart';
 import 'dart:async';
@@ -147,6 +148,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
   Future<void> post() async {
     if (!canPost) return;
     if (!guardContent(context, caption.text)) return;
+    if (!guardTopic(context, caption.text)) return;
 
     setState(() => posting = true);
     try {

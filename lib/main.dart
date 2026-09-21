@@ -40,6 +40,8 @@ import 'auth_phone.dart';
 import 'coin_wallet.dart';
 import 'daily_reward.dart';
 import 'chat_themes.dart';
+import 'chat_filter.dart';
+import 'chat_lock.dart';
 import 'message_chime.dart';
 import 'whats_new.dart';
 import 'legal.dart';
@@ -4465,6 +4467,29 @@ class _RealChatPageState extends State<RealChatPage> {
   ChatTheme theme = chatThemes.first;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? themeSub;
 
+  // ----- MÖVZU SÜZGƏCİ -----
+  //
+  // Söhbət qadağan mövzuya keçəndə yazışma dayanır. Qərarı
+  // `chat_filter.dart` verir, kilidi `chat_lock.dart` yazır.
+
+  /// Qüvvədə olan kilid. `null`-dırsa söhbət açıqdır.
+  ChatLock? chatLock;
+
+  /// Söhbətin indiki qiyməti — xəbərdarlıq zolağı buna baxır.
+  ChatVerdict filterVerdict = ChatVerdict.clean;
+
+  /// Son mesajların mətni: yeni mesaj göndərilməzdən əvvəl ölçü
+  /// bunların üstünə qoyulur.
+  List<String> recentTexts = const [];
+
+  /// Söhbətin neçə dəfə bağlandığı — müddət buna görə uzanır.
+  int lockCount = 0;
+
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? filterSub;
+
+  /// İki kilid yazısının üst-üstə düşməməsi üçün.
+  bool locking = false;
+
   /// Söhbəti canlandıran mini oyunlar.
   static const truths = <String>[
     'Doğruluq 🤫 Ən son kimə "gülməli video" göndərmisən?',
@@ -4576,9 +4601,32 @@ class _RealChatPageState extends State<RealChatPage> {
         .snapshots()
         .listen((snap) {
       if (!mounted) return;
-      final next = chatThemeOf(snap.data()?['theme']);
-      if (next.id != theme.id) setState(() => theme = next);
+
+      final data = snap.data();
+      final next = chatThemeOf(data?['theme']);
+      final lock = readChatLock(data);
+
+      // Kilid sənəddədir: qarşı tərəf bağlanmaya səbəb olsa da,
+      // hər iki ekran eyni anda bağlanır.
+      if (next.id != theme.id ||
+          lock?.until != chatLock?.until ||
+          lockCount != lockCountOf(data)) {
+        setState(() {
+          theme = next;
+          chatLock = lock;
+          lockCount = lockCountOf(data);
+        });
+      }
     }, onError: (Object _) {});
+
+    filterSub = FirebaseFirestore.instance
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .orderBy('createdAt', descending: true)
+        .limit(filterWindow)
+        .snapshots()
+        .listen(_onRecentMessages, onError: (Object _) {});
 
     receiptSubscription = FirebaseFirestore.instance
         .collection('chats')
@@ -4610,6 +4658,7 @@ class _RealChatPageState extends State<RealChatPage> {
   @override
   void dispose() {
     themeSub?.cancel();
+    filterSub?.cancel();
     activityTimer?.cancel();
     typingTimer?.cancel();
     receiptSubscription?.cancel();
@@ -4665,6 +4714,56 @@ class _RealChatPageState extends State<RealChatPage> {
           'typingAt': {widget.currentProfile.uid: FieldValue.serverTimestamp()},
         }, SetOptions(merge: true));
       } catch (_) {}
+    }
+  }
+
+  /// Son mesajlar dəyişəndə söhbətin mövzusu yenidən ölçülür.
+  ///
+  /// Ölçmə **hər iki tərəfin** mesajlarına baxır: mövzunu tək adam
+  /// yox, söhbət özü müəyyən edir.
+  void _onRecentMessages(QuerySnapshot<Map<String, dynamic>> snap) {
+    final texts = <String>[];
+
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      // Stiker, şəkil və səs mətn kimi ölçülmür.
+      if ('${data['type'] ?? 'text'}' != 'text') continue;
+      texts.add('${data['text'] ?? ''}');
+    }
+
+    final verdict = evaluateChat(texts);
+
+    if (mounted) {
+      setState(() {
+        recentTexts = texts;
+        filterVerdict = verdict;
+      });
+    } else {
+      recentTexts = texts;
+      filterVerdict = verdict;
+    }
+
+    if (verdict.blocks && chatLock == null) {
+      unawaited(_lockChat(verdict.topic!));
+    }
+  }
+
+  /// Söhbəti bağlayır.
+  Future<void> _lockChat(FilterTopic topic) async {
+    if (locking) return;
+    locking = true;
+
+    try {
+      await applyChatLock(
+        FirebaseFirestore.instance.collection('chats').doc(chatId),
+        topic: topic,
+        previousLocks: lockCount,
+        members: [widget.currentProfile.uid, widget.targetUid],
+      );
+    } catch (_) {
+      // Yazıla bilmədisə növbəti mesajda yenidən cəhd olunur.
+    } finally {
+      locking = false;
     }
   }
 
@@ -4855,8 +4954,39 @@ class _RealChatPageState extends State<RealChatPage> {
   }) async {
     if (sending) return false;
 
+    // Söhbət bağlıdırsa heç nə getmir — mətn də, stiker də, şəkil də.
+    if (chatLock != null) {
+      notifySocial(context, 'Bu söhbət dayandırılıb.');
+      return false;
+    }
+
     // İcma qaydaları: uyğunsuz məzmun göndərilmir.
     if (type == 'text' && !guardContent(context, text)) return false;
+
+    // Mövzu süzgəci: bu mesaj həddi keçirsə, söhbət burada bağlanır
+    // və mesajın özü də getmir.
+    if (type == 'text') {
+      final verdict = evaluateChat(recentTexts, pending: text);
+
+      if (verdict.blocks) {
+        await _lockChat(verdict.topic!);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xff4a1020),
+              duration: const Duration(seconds: 5),
+              content: Text(
+                'Söhbət dayandırıldı: ${verdict.topic!.label}. '
+                '${verdict.topic!.explanation}',
+              ),
+            ),
+          );
+        }
+
+        return false;
+      }
+    }
 
     setState(() {
       sending = true;
@@ -6172,7 +6302,17 @@ class _RealChatPageState extends State<RealChatPage> {
                   targetUid: widget.targetUid,
                 ),
               ),
-              if (block.blocked)
+
+              // Hədd yaxınlaşır — bağlanmadan əvvəl xəbərdarlıq.
+              if (chatLock == null &&
+                  !block.blocked &&
+                  filterVerdict.level == FilterLevel.warn &&
+                  filterVerdict.topic != null)
+                ChatWarnStrip(topic: filterVerdict.topic!),
+
+              if (chatLock != null)
+                ChatLockBanner(lock: chatLock!)
+              else if (block.blocked)
                 const SizedBox.shrink()
               else if (voiceOpen)
                 VoiceComposer(

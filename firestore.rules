@@ -70,8 +70,16 @@ service cloud.firestore {
       allow read: if signedIn()
         && request.auth.uid in resource.data.members;
 
-      allow update, delete: if signedIn()
+      allow delete: if signedIn()
         && request.auth.uid in resource.data.members;
+
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.members
+        // Movzu suzgeci sohbeti baglayibsa, terefler kilidi
+        // qisaltmir. Yalniz saxlamaq ve ya uzatmaq olar —
+        // eks halda kilidi telefonda acmaq olardi.
+        && request.resource.data.get('lockedUntil', request.time)
+           >= resource.data.get('lockedUntil', request.time);
 
       match /messages/{messageId} {
         // Mövcud vəziyyət (oxumaq/silmək üçün).
@@ -92,7 +100,11 @@ service cloud.firestore {
           && request.auth.uid in chatAfter().members
           && request.resource.data.senderId == request.auth.uid
           // Kimsə bloklanıbsa, heç kim yaza bilmir.
-          && chatAfter().get('blockedBy', []).size() == 0;
+          && chatAfter().get('blockedBy', []).size() == 0
+          // Sohbet movzu suzgecine gore baglanibsa, mesaj getmir.
+          // Bu yoxlama serverdedir: yalniz ekranda gizletmek
+          // kifayet deyil, cunki muraciet birbasa da gonderile bilir.
+          && chatAfter().get('lockedUntil', request.time) <= request.time;
 
         // Reaksiya və mesaj vəziyyəti dəyişiklikləri üçün.
         allow update: if signedIn()
