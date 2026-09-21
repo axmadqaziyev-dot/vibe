@@ -152,6 +152,9 @@ class RoomAudio {
   // MİKROFON
   // ----------------------------------------------------------
 
+  /// Hazırkı kamera: 'user' ön, 'environment' arxa.
+  String _facing = 'user';
+
   Future<void> _openMicrophone() async {
     if (_microphone != null) return;
 
@@ -163,7 +166,7 @@ class RoomAudio {
       },
       'video': _video
           ? {
-              'facingMode': 'user',
+              'facingMode': _facing,
               // Mesh-də hər əlavə axın trafik deməkdir — ölçünü saxlayırıq.
               'width': {'ideal': 480},
               'height': {'ideal': 640},
@@ -193,12 +196,88 @@ class RoomAudio {
   }
 
   /// Ön/arxa kamera dəyişimi.
+  ///
+  /// `Helper.switchCamera` yalnız mobil platformalarda işləyir; brauzerdə
+  /// heç nə etmir. Ona görə vebdə yeni axın alıb treki əvəz edirik:
+  /// bağlantı qırılmır, qarşı tərəf kəsilmə görmür.
   Future<void> switchCamera() async {
-    final tracks = _microphone?.getVideoTracks() ?? const <MediaStreamTrack>[];
+    final stream = _microphone;
+    if (stream == null) return;
+
+    final tracks = stream.getVideoTracks();
     if (tracks.isEmpty) return;
+
+    final next = _facing == 'user' ? 'environment' : 'user';
+
+    // Mobildə paketin öz üsulu daha sürətlidir.
+    if (!kIsWeb) {
+      try {
+        await Helper.switchCamera(tracks.first);
+        _facing = next;
+        return;
+      } catch (_) {
+        // Alınmasa aşağıdakı ümumi yola düşürük.
+      }
+    }
+
+    MediaStream? fresh;
     try {
-      await Helper.switchCamera(tracks.first);
+      fresh = await navigator.mediaDevices.getUserMedia({
+        'audio': false,
+        'video': {
+          'facingMode': next,
+          'width': {'ideal': 480},
+          'height': {'ideal': 640},
+          'frameRate': {'ideal': 24},
+        },
+      });
+    } catch (_) {
+      // Cihazda ikinci kamera yoxdursa köhnəsi qalır.
+      return;
+    }
+
+    final newTrack = fresh.getVideoTracks().firstOrNull;
+    if (newTrack == null) {
+      try {
+        await fresh.dispose();
+      } catch (_) {}
+      return;
+    }
+
+    // Kamera söndürülmüş vəziyyətdə idisə yeni trek də söndürülü qalır.
+    newTrack.enabled = !_cameraOff;
+
+    // Bütün bağlantılarda köhnə treki yenisi ilə əvəz edirik.
+    for (final peer in _peers.values) {
+      final connection = peer.connection;
+      if (connection == null) continue;
+
+      try {
+        final senders = await connection.getSenders();
+        for (final sender in senders) {
+          if (sender.track?.kind == 'video') {
+            await sender.replaceTrack(newTrack);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Yerli görüntünü yeniləyirik.
+    final old = tracks.first;
+    try {
+      await stream.removeTrack(old);
+      await old.stop();
     } catch (_) {}
+
+    try {
+      await stream.addTrack(newTrack);
+    } catch (_) {}
+
+    // Brauzer bəzən eyni obyektə yenidən baxmır — mənbəni yenidən veririk.
+    localView?.srcObject = null;
+    localView?.srcObject = stream;
+
+    _facing = next;
   }
 
   /// Qarşı tərəfin görüntüsü (video otaqda).
