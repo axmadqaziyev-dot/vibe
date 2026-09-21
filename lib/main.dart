@@ -39,6 +39,7 @@ import 'auth_tiktok.dart';
 import 'auth_phone.dart';
 import 'coin_wallet.dart';
 import 'daily_reward.dart';
+import 'chat_themes.dart';
 import 'legal.dart';
 import 'push_notifications.dart';
 import 'push_send.dart';
@@ -4444,6 +4445,10 @@ class _RealChatPageState extends State<RealChatPage> {
   /// Cavab verilən mesaj: {id, name, text}
   Map<String, String>? replyTo;
 
+  /// Söhbətin mövzusu — sənəddə saxlanılır, hər iki tərəf eyni görür.
+  ChatTheme theme = chatThemes.first;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? themeSub;
+
   /// Söhbəti canlandıran mini oyunlar.
   static const truths = <String>[
     'Doğruluq 🤫 Ən son kimə "gülməli video" göndərmisən?',
@@ -4549,6 +4554,16 @@ class _RealChatPageState extends State<RealChatPage> {
 
     messageController.addListener(_onTypingChanged);
 
+    themeSub = FirebaseFirestore.instance
+        .collection('chats')
+        .doc(chatId)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      final next = chatThemeOf(snap.data()?['theme']);
+      if (next.id != theme.id) setState(() => theme = next);
+    }, onError: (Object _) {});
+
     receiptSubscription = FirebaseFirestore.instance
         .collection('chats')
         .doc(chatId)
@@ -4576,6 +4591,7 @@ class _RealChatPageState extends State<RealChatPage> {
 
   @override
   void dispose() {
+    themeSub?.cancel();
     activityTimer?.cancel();
     typingTimer?.cancel();
     receiptSubscription?.cancel();
@@ -5359,9 +5375,9 @@ class _RealChatPageState extends State<RealChatPage> {
         final peerVibe = VibeStatus.from(userSnapshot.data?.data());
 
         return Scaffold(
-          backgroundColor: const Color(0xff080611),
+          backgroundColor: theme.background.last,
           appBar: AppBar(
-            backgroundColor: const Color(0xff0d0917),
+            backgroundColor: theme.background.last,
             foregroundColor: Colors.white,
             surfaceTintColor: Colors.transparent,
             elevation: 0,
@@ -5526,9 +5542,20 @@ class _RealChatPageState extends State<RealChatPage> {
                 tooltip: 'Video zəng',
                 icon: const Icon(Icons.videocam_outlined),
               ),
+              IconButton(
+                onPressed: () => showChatThemeSheet(
+                  context,
+                  chatId: chatId,
+                  current: theme,
+                ),
+                tooltip: 'Söhbət mövzusu',
+                icon: const Icon(Icons.palette_outlined),
+              ),
             ],
           ),
-          body: StreamBuilder<BlockState>(
+          body: Container(
+            decoration: BoxDecoration(gradient: theme.backgroundGradient),
+            child: StreamBuilder<BlockState>(
             stream: watchBlockState(widget.currentProfile.uid, widget.targetUid),
             builder: (context, blockSnap) {
               final block = blockSnap.data ?? BlockState.none;
@@ -5765,9 +5792,7 @@ class _RealChatPageState extends State<RealChatPage> {
                                 vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                gradient: mine
-                                    ? const LinearGradient(colors: [Color(0xff7b3cff), Color(0xffff2bd6)])
-                                    : null,
+                                gradient: mine ? theme.mineGradient : null,
                                 color: mine ? null : const Color(0xff1b1426),
                                 border: mine ? null : Border.all(color: const Color(0xff352447)),
                                 borderRadius: BorderRadius.circular(18),
@@ -5959,9 +5984,7 @@ class _RealChatPageState extends State<RealChatPage> {
                               vertical: 11,
                             ),
                             decoration: BoxDecoration(
-                              gradient: mine
-                                  ? const LinearGradient(colors: [Color(0xff7b3cff), Color(0xffff2bd6)])
-                                  : null,
+                              gradient: mine ? theme.mineGradient : null,
                               color: mine ? null : const Color(0xff1b1426),
                               border: mine ? null : Border.all(color: const Color(0xff352447)),
                               borderRadius: BorderRadius.circular(18),
@@ -6235,6 +6258,7 @@ class _RealChatPageState extends State<RealChatPage> {
             ],
               );
             },
+          ),
           ),
         );
       },
