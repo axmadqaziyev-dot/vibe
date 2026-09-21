@@ -11,6 +11,7 @@ import 'vibe_ranking.dart';
 import 'game_center.dart';
 import 'gifts.dart';
 import 'games/domino_page.dart';
+import 'games/lucky_box_sheet.dart';
 import 'package:flutter/services.dart';
 
 import 'coin_wallet.dart';
@@ -3824,6 +3825,16 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                       const Color(0xffff8a3d), () {
                     Navigator.pop(sheet);
                     _startBattle(d);
+                  }),
+                  // Otaqdaxili oyun — otaqdan çıxmadan oynanılır.
+                  _tool(Icons.card_giftcard_rounded, 'Şanslı qutu',
+                      const Color(0xffffd458), () {
+                    Navigator.pop(sheet);
+                    showLuckyBox(
+                      context,
+                      profile: widget.profile,
+                      roomId: widget.roomId,
+                    );
                   }),
                   _tool(Icons.sports_esports_rounded, 'Oyunlar', _pink, () {
                     Navigator.pop(sheet);
