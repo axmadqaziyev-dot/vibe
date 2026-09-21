@@ -18,6 +18,7 @@ import 'invite.dart';
 import 'server_time.dart';
 import 'room_background.dart';
 import 'room_contributors.dart';
+import 'ui/vibe_badge.dart';
 import 'room_profile_card.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart'
     show RTCVideoRenderer, RTCVideoView, RTCVideoViewObjectFit;
@@ -2491,6 +2492,14 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                // Səviyyə və VIP nişanı.
+                //
+                // Status yalnız profildə qalsa mənasız olur — otaqda
+                // görünməsi xərcləməyə sövq edən şeydir.
+                if (!empty) ...[
+                  const SizedBox(height: 2),
+                  VibeBadgeFor(uid: uid, compact: true),
+                ],
                 if (!empty) ...[
                   const SizedBox(height: 3),
                   // Bu yerə göndərilmiş hədiyyələrin cəmi.
@@ -3587,7 +3596,10 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
       final uid = value is Map ? '${value['uid'] ?? ''}' : '';
       if (uid.isNotEmpty && index > highestTaken) highestTaken = index;
     });
-    final minimum = (highestTaken + 1).clamp(2, 20);
+    // SUGO-da otaqda 30 oturacaq var, bizdə 20 idi. Böyük otaq
+    // daha çox adam deməkdir; mesh səs isə yalnız danışanlar arasında
+    // qurulur, ona görə boş oturacaq yük yaratmır.
+    final minimum = (highestTaken + 1).clamp(2, maxRoomSeats);
 
     var next = current;
 
@@ -3614,8 +3626,10 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
               Slider(
                 value: next.toDouble(),
                 min: minimum.toDouble(),
-                max: 20,
-                divisions: (20 - minimum) == 0 ? 1 : 20 - minimum,
+                max: maxRoomSeats.toDouble(),
+                divisions: (maxRoomSeats - minimum) == 0
+                    ? 1
+                    : maxRoomSeats - minimum,
                 activeColor: _pink,
                 onChanged: (v) => setDialog(() => next = v.round()),
               ),
@@ -4279,6 +4293,9 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
   }
 
   /// Otaqdakı mikrofon yerlərinin sayı (host daxil).
+  /// Otaqda ən çox neçə mikrofon yeri ola bilər.
+  static const int maxRoomSeats = 30;
+
   int seatTotal(Map<String, dynamic> roomData) {
     final value = roomData['seatCount'];
     if (value is num && value >= 2) return value.toInt();
@@ -5908,7 +5925,11 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
   int seatCount = 8;
 
   /// Görüntülü otaqda mesh ağırdır — yer sayı məhduddur.
-  int get maxSeats => video ? 4 : 20;
+  /// Otaq qurarkən seçilə bilən ən çox yer.
+  ///
+  /// Görüntülü otaqda az saxlanılır: mesh-də hər əlavə kamera bütün
+  /// iştirakçılara ayrıca axın deməkdir və telefon qızır.
+  int get maxSeats => video ? 4 : _PartyRoomPageState.maxRoomSeats;
 
   @override
   void dispose() {

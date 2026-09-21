@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../gifts.dart';
 import 'vibe_design.dart';
 
 /// OTAQ EFFEKTLƏRİ — giriş animasiyası və hədiyyə partlayışı.
@@ -58,8 +59,14 @@ class _Effect {
 
   final bool isGift;
 
-  /// Bahalı hədiyyə ekranı bütöv tutur.
-  bool get isEpic => total >= 1000;
+  /// Hədiyyənin ağırlığı — animasiya buna görə seçilir.
+  ///
+  /// Əvvəl yalnız "1000-dən çoxdur / azdır" fərqi var idi. Nəticədə
+  /// 1000 sikkəlik hədiyyə ilə 5000 sikkəlik eyni görünürdü — bahalı
+  /// hədiyyə almağın mənası qalmırdı.
+  GiftTier get tier => tierForPrice(total);
+
+  bool get isEpic => tier.fullScreen;
 }
 
 class _RoomEffectOverlayState extends State<RoomEffectOverlay>
@@ -152,7 +159,7 @@ class _RoomEffectOverlayState extends State<RoomEffectOverlay>
     setState(() => _current = next);
 
     _controller.duration = Duration(
-      milliseconds: next.isEpic ? 4200 : 2600,
+      milliseconds: next.isGift ? next.tier.durationMs : 2600,
     );
     _controller.forward(from: 0);
   }
@@ -382,6 +389,9 @@ class _EpicGift extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tier = effect.tier;
+    final color = Color(tier.color);
+
     // Sönmə mərhələsi.
     final fade = t < .85 ? 1.0 : (1 - (t - .85) / .15).clamp(0.0, 1.0);
 
@@ -396,13 +406,54 @@ class _EpicGift extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Ekranı tündləşdirən pərdə.
-          ColoredBox(color: Colors.black.withValues(alpha: .62 * fade)),
+          // Ekranı tündləşdirən pərdə. Əfsanəvi hədiyyədə daha tünd —
+          // animasiya tam görünsün.
+          ColoredBox(
+            color: Colors.black.withValues(
+              alpha: (tier == GiftTier.legendary ? .78 : .62) * fade,
+            ),
+          ),
 
           // Şimşək və işıq.
           CustomPaint(
             painter: _LightningPainter(progress: strike, flash: reveal),
           ),
+
+          // Pillənin rəngində hissəciklər.
+          CustomPaint(
+            painter: _SparkPainter(
+              progress: reveal,
+              count: tier.particles,
+              color: color,
+            ),
+          ),
+
+          // Əfsanəvi hədiyyədə pillə adı yazılır.
+          if (tier == GiftTier.legendary)
+            Align(
+              alignment: const Alignment(0, -.42),
+              child: Opacity(
+                opacity: reveal,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: .18),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: color),
+                  ),
+                  child: Text(
+                    tier.label.toUpperCase(),
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 3,
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // Hədiyyə.
           Center(
@@ -596,4 +647,49 @@ class _LightningPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _LightningPainter old) =>
       old.progress != progress || old.flash != flash;
+}
+
+
+/// Hədiyyə açılanda dağılan hissəciklər.
+///
+/// Hər hissəcik mərkəzdən kənara uçur. Sayı hədiyyənin pilləsindən
+/// gəlir: adi hədiyyədə sıfırdır, əfsanəvidə ekran dolur.
+class _SparkPainter extends CustomPainter {
+  _SparkPainter({
+    required this.progress,
+    required this.count,
+    required this.color,
+  });
+
+  final double progress;
+  final int count;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (count <= 0 || progress <= 0) return;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final reach = size.shortestSide * .62;
+
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    for (var i = 0; i < count; i++) {
+      // Sabit "təsadüfi" bucaq: hər çəkilişdə eyni olsun, yoxsa
+      // hissəciklər titrəyərdi.
+      final angle = i * 2.399963;
+      final spread = .35 + ((i * 37) % 65) / 100;
+
+      final distance = reach * spread * progress;
+      final point = center +
+          Offset(math.cos(angle) * distance, math.sin(angle) * distance);
+
+      paint.color = color.withValues(alpha: (1 - progress).clamp(0.0, 1.0) * .9);
+      canvas.drawCircle(point, 3.2 * (1 - progress * .5), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SparkPainter old) =>
+      old.progress != progress || old.count != count;
 }

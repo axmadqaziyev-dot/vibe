@@ -127,3 +127,70 @@ String? activeSeasonName(DateTime now) {
   }
   return null;
 }
+
+// ============================================================
+// HƏDİYYƏ PİLLƏLƏRİ
+// ============================================================
+
+/// Hədiyyənin "ağırlığı".
+///
+/// Rəqib tətbiqlərdə 5000 sikkəlik hədiyyə göndərməyin səbəbi rəqəm
+/// deyil — ekranı bürüyən animasiyadır. Hamısı eyni görünsə, bahalı
+/// hədiyyə almağın mənası qalmır.
+enum GiftTier {
+  /// Adi — kiçik uçan işarə.
+  simple,
+
+  /// Nadir — rəngli lent.
+  rare,
+
+  /// Epik — ekranın yarısı.
+  epic,
+
+  /// Əfsanəvi — tam ekran, uzun animasiya.
+  legendary,
+}
+
+GiftTier tierForPrice(int price) {
+  if (price >= 5000) return GiftTier.legendary;
+  if (price >= 1000) return GiftTier.epic;
+  if (price >= 250) return GiftTier.rare;
+  return GiftTier.simple;
+}
+
+extension GiftTierLook on GiftTier {
+  String get label => switch (this) {
+        GiftTier.simple => 'Adi',
+        GiftTier.rare => 'Nadir',
+        GiftTier.epic => 'Epik',
+        GiftTier.legendary => 'Əfsanəvi',
+      };
+
+  /// Nişan və işıq rəngi.
+  int get color => switch (this) {
+        GiftTier.simple => 0xff6f6683,
+        GiftTier.rare => 0xff22a7ff,
+        GiftTier.epic => 0xffb06ab3,
+        GiftTier.legendary => 0xffffd458,
+      };
+
+  /// Animasiya nə qədər davam edir (millisaniyə).
+  int get durationMs => switch (this) {
+        GiftTier.simple => 1400,
+        GiftTier.rare => 2200,
+        GiftTier.epic => 3200,
+        GiftTier.legendary => 4500,
+      };
+
+  /// Neçə hissəcik uçur.
+  int get particles => switch (this) {
+        GiftTier.simple => 0,
+        GiftTier.rare => 14,
+        GiftTier.epic => 30,
+        GiftTier.legendary => 60,
+      };
+
+  /// Ekranı tam tutur?
+  bool get fullScreen =>
+      this == GiftTier.epic || this == GiftTier.legendary;
+}

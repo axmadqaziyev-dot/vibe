@@ -30,6 +30,7 @@ import 'moments.dart';
 import 'party_rooms.dart' show PartyRoomPage;
 import 'vibe_status.dart';
 import 'ui/vibe_design.dart';
+import 'ui/vibe_badge.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/welcome_art.dart';
 import 'ui/welcome_backdrop.dart';
@@ -6279,14 +6280,22 @@ class _RealChatPageState extends State<RealChatPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.targetName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.targetName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          VibeBadgeFor(uid: widget.targetUid, compact: true),
+                        ],
                       ),
                       Builder(
                         builder: (context) {
