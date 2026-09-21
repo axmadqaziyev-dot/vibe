@@ -13,6 +13,7 @@ import 'package:cross_file/cross_file.dart';
 import 'voice/audio_file.dart';
 import 'voice/waveform.dart';
 import 'photo_pick.dart';
+import 'rich_post_text.dart';
 import 'video_pick.dart';
 import 'media_upload.dart';
 import 'telemetry.dart';
@@ -276,10 +277,16 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
           'audioWave': audioWave,
         },
         if (ownerCountry.isNotEmpty) 'ownerCountry': ownerCountry,
+        // Hashtaglar ayrıca siyahıda saxlanılır: axtarış mətnin
+        // içində yox, bu siyahıda gedir — həm sürətli, həm də böyük
+        // hərf fərqindən asılı deyil.
+        'tags': hashtagsIn(caption.text),
+        'mentions': mentionsIn(caption.text),
         'createdAt': Timestamp.now(),
         'visibility': 'public',
         'likeCount': 0,
         'commentCount': 0,
+        'viewCount': 0,
       });
 
       // "Paylaşan" medalı üçün sayğac.

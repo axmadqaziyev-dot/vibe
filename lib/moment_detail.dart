@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'ui/vibe_chrome.dart';
+import 'post_links.dart';
+import 'rich_post_text.dart';
 import 'user_profile.dart';
 import 'moment_comments.dart';
 
@@ -128,12 +130,16 @@ class MomentDetailPage extends StatelessWidget {
               if ('${d['caption'] ?? ''}'.trim().isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                  child: Text(
+                  child: RichPostText(
                     '${d['caption']}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 15,
+                      height: 1.45,
                     ),
+                    onMention: (name) => openMention(context, profile, name),
+                    onHashtag: (tag) => openHashtag(context, profile, tag),
+                    onLink: (url) => openPostLink(context, url),
                   ),
                 ),
             ],

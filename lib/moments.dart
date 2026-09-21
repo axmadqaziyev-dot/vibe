@@ -16,6 +16,8 @@ import 'voice/waveform.dart';
 import 'share_sheet.dart';
 import 'whispers.dart';
 import 'moment_detail.dart';
+import 'post_links.dart';
+import 'rich_post_text.dart';
 import 'blocking.dart';
 import 'gift_sheet.dart';
 import 'media_upload.dart';
@@ -713,13 +715,14 @@ class _MomentCardState extends State<MomentCard> {
                   _nameRow(ownerUid, ownerName),
                   if (caption.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    Text(
+                    // @ad profilə, #söz hashtag lentinə, link brauzerə.
+                    RichPostText(
                       caption,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14.5,
-                        height: 1.45,
-                      ),
+                      onMention: (name) =>
+                          openMention(context, widget.profile, name),
+                      onHashtag: (tag) =>
+                          openHashtag(context, widget.profile, tag),
+                      onLink: (url) => openPostLink(context, url),
                     ),
                   ],
                   if (widget.data['quoted'] is Map) ...[
