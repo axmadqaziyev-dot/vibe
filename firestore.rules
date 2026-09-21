@@ -371,6 +371,61 @@ service cloud.firestore {
       }
     }
 
+    // QRUP SOHBETLERI
+    //
+    // Sened yalniz uzvlere aciqdir. Yazma icazesi (kim danisa biler,
+    // kim uzv cixara biler) tetbiqde `group_chat.dart`-da yoxlanilir;
+    // burada yalniz esas hedd qoyulur — kenar adam qrupu oxuya
+    // bilmesin ve ozunu icəri sala bilmesin.
+    match /groups/{groupId} {
+      function members() {
+        return resource.data.get('members', []);
+      }
+
+      allow read: if signedIn() && request.auth.uid in members();
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.auth.uid in request.resource.data.get('members', []);
+
+      // Uzvler senedi yenileye biler (ad, sekil, uzv siyahisi,
+      // oxunmamis saygac). Sahib deyisdirile bilmez — eks halda
+      // qrupu oğurlamaq olardi.
+      allow update: if signedIn()
+        && request.auth.uid in members()
+        && request.resource.data.get('ownerUid', '')
+           == resource.data.get('ownerUid', '');
+
+      // Yalniz sahib silir.
+      allow delete: if signedIn()
+        && resource.data.get('ownerUid', '') == request.auth.uid;
+
+      match /messages/{messageId} {
+        function group() {
+          return get(/databases/$(database)/documents/groups/$(groupId)).data;
+        }
+
+        allow read: if signedIn()
+          && request.auth.uid in group().get('members', []);
+
+        allow create: if signedIn()
+          && request.auth.uid in group().get('members', [])
+          && request.resource.data.senderId == request.auth.uid;
+
+        allow update: if signedIn()
+          && request.auth.uid in group().get('members', []);
+
+        allow delete: if signedIn()
+          && (resource.data.senderId == request.auth.uid
+              || group().get('ownerUid', '') == request.auth.uid);
+
+        match /media/{mediaId} {
+          allow read, write: if signedIn()
+            && request.auth.uid in group().get('members', []);
+        }
+      }
+    }
+
     // LEGACY POSTS
     match /posts/{postId} {
       allow read, write: if signedIn();

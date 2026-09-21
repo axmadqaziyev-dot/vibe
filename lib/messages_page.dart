@@ -12,6 +12,9 @@ import 'social_ui.dart' show SocialSurface, openChat, isUnread;
 import 'suggest_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'families_page.dart';
+import 'group_chat.dart';
+import 'group_create.dart';
+import 'group_page.dart';
 import 'push_notifications.dart' show askWebPush;
 import 'push_prompt.dart';
 import 'blocking.dart';
@@ -352,6 +355,17 @@ class _SocialMessagesState extends State<SocialMessages> {
                 onTap: () => widget.navigate(2),
               ),
               _shortcut(
+                icon: Icons.groups_2_rounded,
+                colors: const [Color(0xff7b3cff), Color(0xffff2bd6)],
+                title: 'Yeni qrup',
+                subtitle: 'Dostlarını bir yerə yığ',
+                onTap: () => startGroupCreation(
+                  context,
+                  profile: widget.profile,
+                  database: widget.database,
+                ),
+              ),
+              _shortcut(
                 icon: Icons.shield_rounded,
                 colors: const [Color(0xff22a7ff), Color(0xff1b6fd6)],
                 title: 'Ailələr',
@@ -374,6 +388,7 @@ class _SocialMessagesState extends State<SocialMessages> {
                 onTap: () => widget.navigate(1),
               ),
               const SizedBox(height: 10),
+              _groups(),
               const Divider(color: Color(0xff221a33), height: 24),
               if (visible.isEmpty)
                 Builder(builder: (context) {
@@ -886,6 +901,169 @@ class _SocialMessagesState extends State<SocialMessages> {
     }
     return '${at.day.toString().padLeft(2, '0')}.'
         '${at.month.toString().padLeft(2, '0')}';
+  }
+
+  /// Üzv olduğum qruplar.
+  ///
+  /// Ayrıca axındır: qruplar `groups` kolleksiyasındadır, adi
+  /// söhbətlər isə `chats`-də. Birləşdirmək üçün mövcud söhbət
+  /// kodunu dəyişmək lazım gələrdi — qrup pozulsa, yazışma da
+  /// pozulardı.
+  Widget _groups() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: db
+            .collection('groups')
+            .where('members', arrayContains: widget.profile.uid)
+            .limit(50)
+            .snapshots(),
+        builder: (context, snap) {
+          final docs = snap.data?.docs ?? const [];
+          if (docs.isEmpty) return const SizedBox.shrink();
+
+          // Sıralama cihazda: `array-contains` ilə birlikdə sıralamaq
+          // Firestore-da ayrıca indeks tələb edir.
+          final sorted = docs.toList()
+            ..sort((a, b) {
+              final x = a.data()['updatedAt'];
+              final y = b.data()['updatedAt'];
+              if (x is Timestamp && y is Timestamp) return y.compareTo(x);
+              return 0;
+            });
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(4, 4, 4, 8),
+                child: Text(
+                  'Qruplar',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              for (final doc in sorted) _groupRow(doc),
+              const SizedBox(height: 6),
+            ],
+          );
+        },
+      );
+
+  Widget _groupRow(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    final group = GroupInfo.from(doc.id, data);
+
+    final unread = int.tryParse(
+          '${(data['unread'] as Map?)?[widget.profile.uid] ?? 0}',
+        ) ??
+        0;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: PressableScale(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GroupPage(
+              profile: widget.profile,
+              groupId: doc.id,
+              database: widget.database,
+            ),
+          ),
+        ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+          decoration: BoxDecoration(
+            color: const Color(0xff141020),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: unread > 0
+                  ? const Color(0xff4a2a66)
+                  : const Color(0xff241b36),
+            ),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 46,
+                height: 46,
+                child: ClipOval(
+                  child: VibePhoto(url: group.photo, name: group.name),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            group.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: unread > 0
+                                  ? FontWeight.w900
+                                  : FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          groupAgo(data['updatedAt']),
+                          style: const TextStyle(color: vMuted, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${data['lastMessage'] ?? ''}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: unread > 0 ? Colors.white70 : vMuted,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ),
+                        if (unread > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: const BoxDecoration(
+                              color: vPink,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(minWidth: 20),
+                            child: Text(
+                              '${unread > 99 ? '99+' : unread}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _shortcut({
