@@ -16,6 +16,7 @@ import 'package:flutter/services.dart';
 import 'coin_wallet.dart';
 import 'invite.dart';
 import 'room_background.dart';
+import 'room_contributors.dart';
 import 'room_profile_card.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart'
     show RTCVideoRenderer, RTCVideoView, RTCVideoViewObjectFit;
@@ -1215,6 +1216,20 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
+        // Otağın töhfə sıralaması.
+        //
+        // Eyni əməliyyatda yazılır: hədiyyə keçib sıralama keçməsə,
+        // rəqəmlər bir-birini tutmazdı.
+        tx.set(
+          room.collection('contributors').doc(widget.profile.uid),
+          contributorUpdate(
+            name: widget.profile.name,
+            photo: '${data['photoUrl'] ?? ''}',
+            amount: total,
+          ),
+          SetOptions(merge: true),
+        );
+
         // Günlük və həftəlik lövhələr — həm göndərən, həm otaq üçün.
         recordGiftInTransaction(
           tx,
@@ -1961,16 +1976,16 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         // qaçırdı: otağa girən adam kiminlə oturduğunu görmürdü.
         _listenerStrip(d, canModerate),
         const SizedBox(width: 6),
+        // Kubok otağın öz sıralamasını açır.
+        //
+        // Əvvəl ümumi rankinq səhifəsinə aparırdı — otaqda oturan
+        // adamı isə məhz bu otağa kimin nə qədər dəstək verdiyi
+        // maraqlandırır. Ümumi rankinq alətlər vərəqində qalır.
         TopIconButton(
           icon: Icons.emoji_events_rounded,
           color: const Color(0xffffd86b),
-          tooltip: 'Ranking',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => VibeRankingPage(profile: widget.profile),
-            ),
-          ),
+          tooltip: 'Töhfə sıralaması',
+          onTap: () => showRoomContributors(context, widget.roomId),
         ),
         TopIconButton(
           icon: Icons.format_list_bulleted_rounded,
@@ -3803,6 +3818,11 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                         builder: (_) => VibeGameCenterPage(profile: widget.profile),
                       ),
                     );
+                  }),
+                  _tool(Icons.workspace_premium_rounded, 'Töhfə sıralaması',
+                      const Color(0xffffd458), () {
+                    Navigator.pop(sheet);
+                    showRoomContributors(context, widget.roomId);
                   }),
                   _tool(Icons.emoji_events_rounded, 'Ranking', const Color(0xffffd86b), () {
                     Navigator.pop(sheet);
