@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'moment_video.dart';
 import 'server_time.dart';
 import 'stories.dart';
+import 'story_overlay.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
@@ -180,6 +181,10 @@ class _StoryViewerState extends State<StoryViewer> {
               ),
             ),
 
+            // Yazı və stiker tündləşmədən SONRA çəkilir: əks halda
+            // pərdə onları da tündləşdirirdi.
+            _overlays(),
+
             SafeArea(
               child: Column(
                 children: [
@@ -204,8 +209,20 @@ class _StoryViewerState extends State<StoryViewer> {
     }
 
     final image = vibeImageProvider(story.imageUrl);
+
+    // Şəkilsiz stori: rəngli fon. Yazı və stiker onsuz da üstdədir.
     if (image == null) {
-      return const ColoredBox(color: Color(0xff120d20));
+      final background = backgroundById(story.background);
+
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [for (final value in background.colors) Color(value)],
+          ),
+        ),
+      );
     }
 
     return Image(
@@ -219,6 +236,50 @@ class _StoryViewerState extends State<StoryViewer> {
       ),
     );
   }
+
+  /// Storinin üstündəki yazı və stikerlər.
+  ///
+  /// Yer nisbi saxlanılır, ona görə hər ekran ölçüsündə eyni yerdə
+  /// çıxır.
+  Widget _overlays() => LayoutBuilder(
+        builder: (context, box) {
+          final items = StoryOverlay.listFrom(story.overlays);
+          if (items.isEmpty) return const SizedBox.shrink();
+
+          final size = box.biggest;
+
+          return Stack(
+            children: [
+              for (final item in items)
+                Positioned(
+                  left: item.dx * size.width,
+                  top: item.dy * size.height,
+                  child: FractionalTranslation(
+                    translation: const Offset(-.5, -.5),
+                    child: item.kind == OverlayKind.emoji
+                        ? Text(
+                            item.value,
+                            style: TextStyle(fontSize: 34 * item.scale),
+                          )
+                        : Text(
+                            item.value,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(item.colorValue),
+                              fontSize: 22 * item.scale,
+                              fontWeight: FontWeight.w900,
+                              height: 1.25,
+                              shadows: const [
+                                Shadow(color: Colors.black54, blurRadius: 10),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+            ],
+          );
+        },
+      );
 
   /// Yuxarıdakı gedişat zolaqları — hər stori üçün bir.
   Widget _bars() => Padding(

@@ -10,6 +10,7 @@ import 'user_profile.dart';
 import 'moment_create.dart';
 import 'stories.dart';
 import 'stories_view.dart';
+import 'story_editor.dart';
 import 'moment_ranking.dart';
 import 'voice/moment_voice.dart';
 import 'voice/waveform.dart';
@@ -461,10 +462,7 @@ class _MomentsPageState extends State<MomentsPage> {
   Future<void> _createStory() => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => CreateMomentPage(
-            profile: widget.profile,
-            asStory: true,
-          ),
+          builder: (_) => StoryEditorPage(profile: widget.profile),
         ),
       );
 
@@ -1238,6 +1236,25 @@ class _MomentCardState extends State<MomentCard> {
                   : Icons.bookmark_border_rounded,
               label: saved ? 'Yaddaşdan çıxar' : 'Yadda saxla',
               onTap: () => _toggleSave(saved, ownerName),
+            ),
+
+            // Anı öz storinə atmaq.
+            //
+            // Instagram-ın ən çox işlənən paylaşma yolu budur: post
+            // lentdə qalır, stori isə izləyicini dərhal ora çəkir.
+            _menuItem(
+              sheet,
+              icon: Icons.add_to_photos_rounded,
+              label: 'Storinə at',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => StoryEditorPage(
+                    profile: widget.profile,
+                    sharedMoment: widget.data,
+                  ),
+                ),
+              ),
             ),
 
             // Cihaza endirmək.

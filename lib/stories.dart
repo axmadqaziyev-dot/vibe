@@ -23,6 +23,8 @@ class Story {
     this.videoUrl = '',
     this.caption = '',
     this.viewCount = 0,
+    this.background = '',
+    this.overlays = const [],
   });
 
   final String id;
@@ -35,6 +37,13 @@ class Story {
   final String videoUrl;
   final String caption;
   final int viewCount;
+
+  /// Şəkilsiz stori üçün fon adı.
+  final String background;
+
+  /// Üstündəki yazı və stikerlər — xam şəkildə saxlanılır ki, bu
+  /// fayl Flutter-dən asılı olmasın.
+  final List<Object?> overlays;
 
   bool get isVideo => videoUrl.trim().isNotEmpty;
 
@@ -73,6 +82,8 @@ class Story {
       videoUrl: '${data['videoUrl'] ?? ''}',
       caption: '${data['caption'] ?? ''}',
       viewCount: int.tryParse('${data['viewCount'] ?? 0}') ?? 0,
+      background: '${data['bg'] ?? ''}',
+      overlays: (data['overlays'] as List?) ?? const [],
     );
   }
 }
