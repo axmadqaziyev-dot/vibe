@@ -14,10 +14,14 @@ class TonightCard extends StatelessWidget {
     required this.uid,
     this.database,
     this.onChanged,
+    this.compact = false,
   });
 
   final String uid;
   final FirebaseFirestore? database;
+
+  /// Dar rejim — yan-yana iki kart kimi göstəriləndə.
+  final bool compact;
 
   /// Seçim dəyişəndə siyahı yenidən sıralansın deyə.
   final ValueChanged<Tonight?>? onChanged;
@@ -105,6 +109,60 @@ class TonightCard extends StatelessWidget {
       stream: db.collection('users').doc(uid).snapshots(),
       builder: (context, snap) {
         final current = tonightOf(snap.data?.data()?['tonight']);
+
+        if (compact) {
+          return GestureDetector(
+            onTap: () => _choose(context, current),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: current == null
+                      ? [const Color(0xff241a44), const Color(0xff17122a)]
+                      : [
+                          vPurple.withValues(alpha: .45),
+                          vPink.withValues(alpha: .3),
+                        ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: current == null
+                      ? vLine
+                      : vPink.withValues(alpha: .55),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    current?.emoji ?? '🌙',
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    current == null ? 'Bu axşam' : current.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    current == null ? 'Nə istəyirsən?' : 'Dəyişdir',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: vMuted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
         return GestureDetector(
           onTap: () => _choose(context, current),

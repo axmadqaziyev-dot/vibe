@@ -194,10 +194,18 @@ class VibePillStream extends StatelessWidget {
 /// Öz statusun — toxunanda seçim pəncərəsi açılır.
 /// Həm ana səhifədə, həm də profil səhifəsində istifadə olunur.
 class MyVibeCard extends StatelessWidget {
-  const MyVibeCard({super.key, required this.uid, this.database});
+  const MyVibeCard({
+    super.key,
+    required this.uid,
+    this.database,
+    this.compact = false,
+  });
 
   final String uid;
   final FirebaseFirestore? database;
+
+  /// Dar rejim — yan-yana iki kart kimi göstəriləndə.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) =>
@@ -209,6 +217,46 @@ class MyVibeCard extends StatelessWidget {
         builder: (context, snapshot) {
           final status = VibeStatus.from(snapshot.data?.data());
           final accent = status?.mood.color ?? vPurple;
+
+          if (compact) {
+            return GlassCard(
+              glow: accent,
+              border: accent.withValues(alpha: .45),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              child: GestureDetector(
+                onTap: () => showVibePicker(context, uid, status),
+                behavior: HitTestBehavior.opaque,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      status?.mood.emoji ?? '✨',
+                      style: const TextStyle(fontSize: 22),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      status == null ? 'Əhvalın' : status.mood.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      status == null ? 'Seç və paylaş' : status.ago,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: vMuted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
 
           return GlassCard(
             glow: accent,

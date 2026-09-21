@@ -1104,6 +1104,26 @@ class ChatAvatar extends StatelessWidget {
               ),
             ),
           ),
+          // Onlayn nişanı: halqa özü kifayət etmirdi, çünki əhval
+          // nişanı gələndə diqqəti çəkir və halqa gözdən qaçır.
+          if (online)
+            Positioned(
+              right: 0,
+              top: 1,
+              child: Container(
+                width: size * .26,
+                height: size * .26,
+                decoration: BoxDecoration(
+                  color: const Color(0xff2de28a),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: vBg, width: 2),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x662de28a), blurRadius: 6),
+                  ],
+                ),
+              ),
+            ),
+
           if (status != null)
             Positioned(
               right: -2,

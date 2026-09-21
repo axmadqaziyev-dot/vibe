@@ -2966,6 +2966,86 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     } catch (_) {}
   }
 
+
+  /// Səsin hansı həlqədə kəsildiyini göstərir.
+  ///
+  /// "Səs gəlmir" şikayətini təxminlə həll etmək olmur: problem ya
+  /// mikrofonda, ya bağlantıda, ya da trekdə olur. Bu panel hansı
+  /// olduğunu birbaşa deyir.
+  void _showAudioDiagnostics() {
+    final data = audio?.diagnostics() ?? const {'Vəziyyət': 'Səs qoşulmayıb'};
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xff151020),
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Səs diaqnostikası',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final entry in data.entries)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 110,
+                        child: Text(
+                          entry.key,
+                          style: const TextStyle(color: _muted, fontSize: 12.5),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          entry.value,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 10),
+              GradientButton(
+                label: 'Kopyala',
+                icon: Icons.copy_rounded,
+                gradient: vBrand,
+                height: 46,
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(
+                    text: data.entries
+                        .map((e) => '${e.key}: ${e.value}')
+                        .join('\n'),
+                  ));
+                  Navigator.pop(sheet);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Kopyalandı.')),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Başlıqdakı PK zolağı — geri sayım və qalib göstəricisi.
   Widget _pkBanner(Map<String, dynamic> d) {
     final endsAt = _pkEndsAt(d);
@@ -3520,6 +3600,11 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                       Navigator.pop(sheet);
                       _changeSeatCount(d);
                     }),
+                  _tool(Icons.monitor_heart_rounded, 'Səs diaqnostikası',
+                      const Color(0xff48e08a), () {
+                    Navigator.pop(sheet);
+                    _showAudioDiagnostics();
+                  }),
                   _tool(Icons.copy_rounded, 'ID kopyala', const Color(0xff9d94ae), () {
                     Navigator.pop(sheet);
                     Clipboard.setData(ClipboardData(text: widget.roomId));
@@ -4289,22 +4374,31 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (hasPicture)
+                  // Görüntü olmasa da element ağacda qalmalıdır: vebdə
+                  // qarşı tərəfin SƏSİ məhz bu elementdən çıxır. Əvvəl
+                  // kamerası bağlı olanın səsi ümumiyyətlə eşidilmirdi.
+                  if (view != null)
                     RTCVideoView(
                       view,
                       objectFit:
                           RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                       mirror: mine,
-                    )
-                  else if (uid.isNotEmpty)
-                    Center(
-                      child: SizedBox(
-                        width: 58,
-                        height: 58,
-                        child: ClipOval(child: _UserPhoto(uid: uid, name: name)),
+                    ),
+
+                  if (!hasPicture && uid.isNotEmpty)
+                    Container(
+                      color: const Color(0xff120d20),
+                      child: Center(
+                        child: SizedBox(
+                          width: 58,
+                          height: 58,
+                          child:
+                              ClipOval(child: _UserPhoto(uid: uid, name: name)),
+                        ),
                       ),
-                    )
-                  else
+                    ),
+
+                  if (uid.isEmpty)
                     const Center(
                       child: Icon(Icons.videocam_rounded,
                           color: _muted, size: 28),

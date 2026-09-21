@@ -36,7 +36,9 @@ class SocialHome extends StatefulWidget {
 
 class _SocialHomeState extends State<SocialHome> {
   static const topLabels = ['Kəşf et', 'Yaxınlıq', 'Online', 'Popular'];
-  static const pillLabels = ['Hamısı', 'Qızlar', 'Oğlanlar', 'Online'];
+  // "Online" yuxarıdakı sekmələrdə var idi, burada təkrarlanırdı —
+  // eyni süzgəcin iki yeri istifadəçini çaşdırır.
+  static const pillLabels = ['Hamısı', 'Qızlar', 'Oğlanlar'];
 
   String query = '';
   int topTab = 0;
@@ -229,7 +231,6 @@ class _SocialHomeState extends State<SocialHome> {
                 final gender = genderCode(d);
                 if (pill == 1 && gender != 1) return false;
                 if (pill == 2 && gender != 2) return false;
-                if (pill == 3 && !isReallyOnline(d)) return false;
 
                 if (countryFilter.isNotEmpty &&
                     '${d['countryCode'] ?? ''}' != countryFilter) {
@@ -293,12 +294,28 @@ class _SocialHomeState extends State<SocialHome> {
                   children: [
                     _hero(),
                     const SizedBox(height: 16),
-                    MyVibeCard(uid: widget.profile.uid, database: widget.database),
-                    const SizedBox(height: 12),
-                    TonightCard(
-                      uid: widget.profile.uid,
-                      database: widget.database,
-                      onChanged: (value) => setState(() => myTonight = value),
+                    // Əhval və niyyət eyni işi görür — ekranda iki böyük
+                    // kart kimi durmaları lazımsız yer tuturdu.
+                    Row(
+                      children: [
+                        Expanded(
+                          child: MyVibeCard(
+                            uid: widget.profile.uid,
+                            database: widget.database,
+                            compact: true,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TonightCard(
+                            uid: widget.profile.uid,
+                            database: widget.database,
+                            compact: true,
+                            onChanged: (value) =>
+                                setState(() => myTonight = value),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     PillTabs(

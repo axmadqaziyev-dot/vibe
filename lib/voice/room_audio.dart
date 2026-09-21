@@ -52,6 +52,14 @@ class RoomAudio {
   /// Video otaqda mesh daha ağırdır — limit kiçikdir.
   static const int maxVideoPeers = 4;
 
+  /// Diaqnostika üçün: hansı namizəd tipləri toplanıb.
+  ///
+  /// `relay` yoxdursa TURN işləmir və sərt şəbəkədə səs qurulmayacaq.
+  final Set<String> iceTypes = <String>{};
+
+  /// Son xəta mətni — panel onu göstərir.
+  String? lastError;
+
   /// Vəziyyət dəyişəndə UI-ni yeniləmək üçün.
   final ValueNotifier<RoomAudioState> state =
       ValueNotifier<RoomAudioState>(const RoomAudioState());
@@ -79,6 +87,7 @@ class RoomAudio {
         connecting: false,
       );
       debugPrint('room audio mic: $error');
+      lastError = '$error';
       _publishing = false;
     }
 
@@ -280,6 +289,44 @@ class RoomAudio {
     _facing = next;
   }
 
+  /// Səs zəncirinin hansı həlqəsinin işlədiyini göstərir.
+  ///
+  /// Səs gəlmirsə problem üç yerdən birindədir: mikrofon açılmayıb,
+  /// bağlantı qurulmayıb, ya da trek gəlməyib. Bu siyahı hansı olduğunu
+  /// dərhal deyir — təxmin etməyə ehtiyac qalmır.
+  Map<String, String> diagnostics() {
+    final mic = _microphone;
+    final audioTracks = mic?.getAudioTracks() ?? const <MediaStreamTrack>[];
+    final videoTracks = mic?.getVideoTracks() ?? const <MediaStreamTrack>[];
+
+    final connected = _peers.values.where((p) => p.connected).length;
+    final withTrack = _peers.values.where((p) => p.gotTrack).length;
+
+    return {
+      'Rejim': _publishing ? 'Mikrofonda' : 'Dinləyici',
+      'Otaq': _video ? 'Görüntülü' : 'Səsli',
+      'Mikrofon': mic == null
+          ? 'Açılmayıb'
+          : audioTracks.isEmpty
+              ? 'Trek yoxdur'
+              : audioTracks.first.enabled
+                  ? 'Açıq'
+                  : 'Susdurulub',
+      if (_video) 'Kamera': videoTracks.isEmpty ? 'Yoxdur' : 'Açıq',
+      'Qoşulan': '$connected / ${_peers.length}',
+      'Səs gələn': '$withTrack / ${_peers.length}',
+      'Şəbəkə': iceTypes.isEmpty
+          ? 'Namizəd yoxdur'
+          : iceTypes.join(', '),
+      'TURN': iceTypes.contains('relay') ? 'İşləyir' : 'Relay namizədi yoxdur',
+      if (lastError != null) 'Xəta': lastError!,
+      for (final peer in _peers.values)
+        peer.uid.substring(0, peer.uid.length.clamp(0, 6)):
+            '${peer.status} · '
+            '${peer.gotTrack ? peer.trackKinds.join("+") : "trek yoxdur"}',
+    };
+  }
+
   /// Qarşı tərəfin görüntüsü (video otaqda).
   RTCVideoRenderer? viewFor(String peerUid) => _peers[peerUid]?.renderer;
 
@@ -406,6 +453,8 @@ class RoomAudio {
 
       connection.onTrack = (event) {
         if (event.streams.isEmpty) return;
+        peer.gotTrack = true;
+        peer.trackKinds.add(event.track.kind ?? '?');
         peer.renderer?.srcObject = event.streams.first;
         // Video otaqda görüntü gələn kimi şəbəkə yenilənməlidir.
         if (!_closed) {
@@ -422,6 +471,11 @@ class RoomAudio {
             connecting: _peers.values.any((p) => !p.connected),
           );
         }
+        peer.status = status.toString().replaceFirst(
+              'RTCPeerConnectionState.RTCPeerConnectionState',
+              '',
+            );
+
         if (status == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
           _drop(other);
         }
@@ -434,6 +488,14 @@ class RoomAudio {
 
       connection.onIceCandidate = (candidate) async {
         if (candidate.candidate == null) return;
+
+        // "candidate:... typ host|srflx|relay ..." formatından tipi alırıq.
+        final parts = candidate.candidate!.split(' ');
+        final typeIndex = parts.indexOf('typ');
+        if (typeIndex >= 0 && typeIndex + 1 < parts.length) {
+          iceTypes.add(parts[typeIndex + 1]);
+        }
+
         try {
           await myCandidates.add({
             'candidate': candidate.candidate,
@@ -524,6 +586,11 @@ class _Peer {
   final String uid;
   RTCPeerConnection? connection;
   RTCVideoRenderer? renderer;
+
+  /// Diaqnostika: qarşı tərəfdən trek gəlibmi və bağlantı hansı haldadır.
+  bool gotTrack = false;
+  final Set<String> trackKinds = <String>{};
+  String status = '—';
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? docSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? candidateSub;
   bool connected = false;
