@@ -49,6 +49,7 @@ import 'whats_new.dart';
 import 'legal.dart';
 import 'push_notifications.dart';
 import 'server_time.dart';
+import 'image_save.dart';
 import 'push_send.dart';
 import 'moment_create.dart';
 import 'photo_pick.dart';
@@ -5239,6 +5240,78 @@ class _RealChatPageState extends State<RealChatPage> {
 
   /// "+" düyməsi: stiker, oyun və digər əlavələr.
   /// Şəkli tam ekranda açır — böyük nüsxə ayrıca sənəddən gəlir.
+  /// Bir dəfəlik şəkli açır və dərhal silir.
+  ///
+  /// Silmə bağlananda yox, **açılanda** baş verir: tətbiq yarımçıq
+  /// bağlansa da şəkil qalmamalıdır.
+  Future<void> _openOnce(
+    DocumentReference<Map<String, dynamic>> messageRef,
+  ) async {
+    final media = messageRef.collection('media').doc('full');
+
+    String full = '';
+    try {
+      full = '${(await media.get()).data()?['data'] ?? ''}';
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    if (full.isEmpty) {
+      notifySocial(context, 'Şəkil artıq yoxdur.');
+      return;
+    }
+
+    // Əvvəlcə işarələyirik, sonra göstəririk.
+    try {
+      await messageRef.set({
+        'openedAt': Timestamp.now(),
+        'openedBy': widget.currentProfile.uid,
+      }, SetOptions(merge: true));
+      await media.delete();
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (dialog) => Stack(
+        children: [
+          Center(
+            child: InteractiveViewer(
+              maxScale: 4,
+              child: Image(
+                image: vibeImageProvider(full)!,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 44,
+            left: 16,
+            right: 16,
+            child: Row(
+              children: [
+                const Icon(Icons.looks_one_rounded, color: vPink, size: 18),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Bir dəfəlik — bağlayanda itir',
+                    style: TextStyle(color: Colors.white70, fontSize: 12.5),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(dialog),
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openPhoto(
     DocumentReference<Map<String, dynamic>> messageRef,
     String thumb,
@@ -5266,6 +5339,33 @@ class _RealChatPageState extends State<RealChatPage> {
               },
             ),
           ),
+          // Yadda saxla.
+          //
+          // Flutter veb şəkli kətana çəkir, ona görə brauzerin öz
+          // "Şəkli saxla" menyusu çıxmır — düymə olmadan şəkli
+          // götürmək mümkün deyildi.
+          Positioned(
+            top: 40,
+            left: 12,
+            child: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              future: messageRef.collection('media').doc('full').get(),
+              builder: (_, snap) {
+                final full = '${snap.data?.data()?['data'] ?? ''}';
+                final source = full.isNotEmpty ? full : thumb;
+                if (source.isEmpty) return const SizedBox.shrink();
+
+                return TextButton.icon(
+                  onPressed: () => _saveMedia(source, 'vibe-sekil.jpg'),
+                  icon: const Icon(Icons.download_rounded,
+                      color: Colors.white, size: 19),
+                  label: const Text(
+                    'Yadda saxla',
+                    style: TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                );
+              },
+            ),
+          ),
           Positioned(
             top: 40,
             right: 12,
@@ -5279,12 +5379,31 @@ class _RealChatPageState extends State<RealChatPage> {
     );
   }
 
+  /// Şəkli və ya videonu cihaza endirir.
+  Future<void> _saveMedia(String source, String name) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final saved = await saveImage(source, name: name);
+
+    messenger.showSnackBar(SnackBar(
+      content: Text(saved == null
+          ? 'Yadda saxlanmadı.'
+          : 'Yükləndi. iPhone-da açılan şəklə uzun bas → '
+              '"Şəkillərə əlavə et".'),
+      duration: const Duration(seconds: 4),
+    ));
+  }
+
   /// Söhbətə şəkil göndərir.
   ///
   /// Şəkil sıxılıb Firestore-da data URI kimi saxlanılır (pullu Storage
   /// tələb etmir) — kiçik nüsxə mesajda, böyüyü ayrıca sənəddə.
-  Future<void> _sendPhoto(ImageSource source) async {
+  /// Növbəti şəkil bir dəfəlik göndərilsin?
+  bool photoOnce = false;
+
+  Future<void> _sendPhoto(ImageSource source, {bool once = false}) async {
     if (sending) return;
+
+    photoOnce = once;
 
     // Kamera bir şəkil verir.
     if (source == ImageSource.camera) {
@@ -5337,7 +5456,7 @@ class _RealChatPageState extends State<RealChatPage> {
           widget.targetUid: widget.targetName,
         },
         'unread': {widget.targetUid: FieldValue.increment(1)},
-        'lastMessage': '📷 Şəkil',
+        'lastMessage': photoOnce ? '📷 Bir dəfəlik şəkil' : '📷 Şəkil',
         'lastSenderId': widget.currentProfile.uid,
         // "Ən çox yazışılan" süzgəci bu sayğaca görə sıralayır.
         'messageCount': FieldValue.increment(1),
@@ -5348,7 +5467,11 @@ class _RealChatPageState extends State<RealChatPage> {
         'senderId': widget.currentProfile.uid,
         'text': '',
         'type': 'photo',
-        'photo': picked.thumb,
+        // Bir dəfəlik şəkildə kiçik nüsxə də yazılmır: mesaj
+        // siyahısında görünən önizləmə "bir dəfə" sözünü mənasız
+        // edərdi.
+        if (!photoOnce) 'photo': picked.thumb,
+        if (photoOnce) 'viewOnce': true,
         'createdAt': Timestamp.now(),
         'clientCreatedAt': DateTime.now().millisecondsSinceEpoch,
       });
@@ -5498,6 +5621,21 @@ class _RealChatPageState extends State<RealChatPage> {
                   onTap: () {
                     Navigator.pop(sheet);
                     _sendPhoto(ImageSource.camera);
+                  },
+                ),
+                // Bir dəfəlik şəkil.
+                //
+                // Açılandan sonra silinir — qarşı tərəf yenidən baxa
+                // bilmir, siyahıda da önizləmə qalmır.
+                ListTile(
+                  leading: const Icon(Icons.looks_one_rounded, color: vPink),
+                  title: const Text('Bir dəfəlik şəkil',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('Bir dəfə baxılır, sonra itir',
+                      style: TextStyle(color: vMuted, fontSize: 12)),
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    _sendPhoto(ImageSource.gallery, once: true);
                   },
                 ),
                 ListTile(
@@ -6179,6 +6317,67 @@ class _RealChatPageState extends State<RealChatPage> {
                                             ),
                                   ),
                                 ],
+                              ),
+                            ),
+                          ));
+                        }
+
+                        // --- bir dəfəlik şəkil ---
+                        //
+                        // Açılandan sonra şəkil silinir: sənəd qalır,
+                        // məzmun qalmır. Beləliklə "bir dəfə" sözü
+                        // həqiqətən bir dəfə deməkdir.
+                        if (type == 'photo' && data['viewOnce'] == true) {
+                          final opened = data['openedAt'] != null;
+
+                          return decorate(Align(
+                            alignment: mine
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: GestureDetector(
+                              onTap: opened || mine
+                                  ? null
+                                  : () => _openOnce(messageRef),
+                              onLongPress: () => _openMessageActions(
+                                  messageRef, mine, data),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding:
+                                    const EdgeInsets.fromLTRB(14, 11, 16, 11),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xff1b1426),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: opened
+                                        ? const Color(0xff352447)
+                                        : const Color(0xff5c2a6b),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      opened
+                                          ? Icons.visibility_off_rounded
+                                          : Icons.looks_one_rounded,
+                                      size: 18,
+                                      color: opened ? vMuted : vPink,
+                                    ),
+                                    const SizedBox(width: 9),
+                                    Text(
+                                      opened
+                                          ? 'Açıldı'
+                                          : mine
+                                              ? 'Bir dəfəlik şəkil'
+                                              : 'Bir dəfəlik şəkil · Bax',
+                                      style: TextStyle(
+                                        color: opened ? vMuted : Colors.white,
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ));

@@ -17,6 +17,7 @@ import 'share_sheet.dart';
 import 'whispers.dart';
 import 'moment_detail.dart';
 import 'server_time.dart';
+import 'image_save.dart';
 import 'post_links.dart';
 import 'rich_post_text.dart';
 import 'blocking.dart';
@@ -1239,6 +1240,19 @@ class _MomentCardState extends State<MomentCard> {
               onTap: () => _toggleSave(saved, ownerName),
             ),
 
+            // Cihaza endirmək.
+            //
+            // Flutter veb şəkli kətana çəkir — brauzerin öz "Şəkli
+            // saxla" menyusu çıxmır. Düymə olmadan şəkli və videonu
+            // götürmək mümkün deyildi.
+            if (_downloadSource() != null)
+              _menuItem(
+                sheet,
+                icon: Icons.download_rounded,
+                label: _isVideo() ? 'Videonu endir' : 'Şəkli endir',
+                onTap: _download,
+              ),
+
             if (mine) ...[
               _menuItem(
                 sheet,
@@ -1438,6 +1452,38 @@ class _MomentCardState extends State<MomentCard> {
   /// Birbaşa ana aparan bağlantı hələ yoxdur — tətbiqdə dərin keçid
   /// qurulmayıb. Ona görə tətbiqin ünvanı və anın mətni kopyalanır,
   /// mövcud olmayan səhifəyə aparan saxta ünvan yazmırıq.
+  /// Endirilə bilən məzmunun ünvanı.
+  String? _downloadSource() {
+    final video = '${widget.data['videoUrl'] ?? ''}'.trim();
+    if (video.isNotEmpty) return video;
+
+    final images = (widget.data['images'] as List?) ?? const [];
+    if (images.isNotEmpty) return '${images.first}';
+
+    final single = '${widget.data['imageUrl'] ?? ''}'.trim();
+    return single.isEmpty ? null : single;
+  }
+
+  bool _isVideo() => '${widget.data['videoUrl'] ?? ''}'.trim().isNotEmpty;
+
+  Future<void> _download() async {
+    final source = _downloadSource();
+    if (source == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final saved = await saveImage(
+      source,
+      name: _isVideo() ? 'vibe-video.mp4' : 'vibe-sekil.jpg',
+    );
+
+    messenger.showSnackBar(SnackBar(
+      content: Text(saved == null
+          ? 'Endirilmədi.'
+          : 'Açıldı. iPhone-da uzun bas → "Şəkillərə əlavə et".'),
+      duration: const Duration(seconds: 4),
+    ));
+  }
+
   Future<void> _copyLink(String ownerName) async {
     final messenger = ScaffoldMessenger.of(context);
     final caption = '${widget.data['caption'] ?? ''}'.trim();
