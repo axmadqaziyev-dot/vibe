@@ -60,4 +60,29 @@ if (!index.includes(preload)) {
   );
 }
 
+// Yayimdan xeber vermek ucun kicik bir fayl.
+//
+// Tetbiq onu vaxtasiri oxuyur: icindeki damga ise dusen versiyadan
+// ferqlidirse, demeli yeni yayim var. Onsuz istifadeci yeniliyi
+// yalniz tetbiqi tam bagladiqdan sonra gorurdu — iOS-da bu, gunlerle
+// cekile bilir.
+writeFileSync(
+  join(dir, 'version.json'),
+  JSON.stringify({ build: hash, at: Date.now() }),
+);
+
+// Ise dusen versiyanin damgasi sehifenin ozunde saxlanilir ki,
+// muqayise ucun elave sorgu lazim olmasin.
+const marked = readFileSync(indexPath, 'utf8');
+if (!marked.includes('window.vibeBuild')) {
+  writeFileSync(
+    indexPath,
+    marked.replace(
+      '</head>',
+      `  <script>window.vibeBuild = "${hash}";</script>
+</head>`,
+    ),
+  );
+}
+
 console.log(`${hashed} (${Math.round(body.length / 1024)} KB), ${patched} fayl yenilendi`);

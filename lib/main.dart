@@ -60,6 +60,8 @@ import 'push_send.dart';
 import 'moment_create.dart';
 import 'photo_pick.dart';
 import 'app/i18n.dart';
+import 'app_update.dart';
+import 'reload_page.dart';
 import 'telemetry.dart';
 import 'home_discover.dart';
 import 'install_app.dart';
@@ -246,7 +248,17 @@ class VibeApp extends StatelessWidget {
             ),
           ),
           builder: (context, child) {
-            return child ?? const SizedBox.shrink();
+            // Yeni yayım zolağı bütün ekranların üstündədir:
+            // istifadəçi hansı səhifədə olursa olsun görür.
+            return Stack(
+              children: [
+                child ?? const SizedBox.shrink(),
+                const Align(
+                  alignment: Alignment.bottomCenter,
+                  child: _UpdateBar(),
+                ),
+              ],
+            );
           },
           home: const AuthGate(),
         );
@@ -2815,6 +2827,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // düz olmayan cihazlarda heç vaxt işləmirdi.
     unawaited(syncServerClock(widget.profile.uid));
 
+    // Yeni yayım çıxanda xəbər verilsin.
+    startUpdateWatch();
+
     ensureWelcomeBonus(widget.profile.uid);
     startPushNotifications(widget.profile.uid);
 
@@ -2907,6 +2922,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     foreground = state == AppLifecycleState.resumed;
+
+    // Tətbiqə qayıdanda yeni yayım olub-olmadığını yoxlayırıq: adam
+    // ən çox məhz bu anda yeniləməyə hazırdır.
+    if (foreground) unawaited(checkForUpdate());
 
     if (state == AppLifecycleState.resumed) {
       setOnline();
@@ -7609,4 +7628,80 @@ class _LocationBubbleState extends State<_LocationBubble> {
       ),
     );
   }
+}
+
+/// Yeni yayım çıxanda görünən zolaq.
+///
+/// Öz-özünə təzələmirik: adam mesaj yazarkən ekranın sıfırlanması
+/// pisdir. Qərar onun olur — zolaq sadəcə xəbər verir.
+class _UpdateBar extends StatelessWidget {
+  const _UpdateBar();
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+        valueListenable: updateReady,
+        builder: (context, ready, _) {
+          if (!ready) return const SizedBox.shrink();
+
+          return SafeArea(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+                padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
+                decoration: BoxDecoration(
+                  gradient: vHot,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: vPink.withValues(alpha: .4),
+                      blurRadius: 18,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded,
+                        color: Colors.white, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        t('Yeni versiya hazırdır'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    PressableScale(
+                      onTap: reloadPage,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          t('Yenilə'),
+                          style: const TextStyle(
+                            color: Color(0xff7b3cff),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
 }

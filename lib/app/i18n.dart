@@ -589,4 +589,7 @@ const _translations = <String, Map<AppLang, String>>{
   'Ən az 6 simvol': {AppLang.az: 'Ən az 6 simvol', AppLang.tr: 'En az 6 karakter', AppLang.en: 'At least 6 characters'},
   'Əsassız': {AppLang.az: 'Əsassız', AppLang.tr: 'Asılsız', AppLang.en: 'Unfounded'},
 
+  'Yeni versiya hazırdır': {AppLang.az: 'Yeni versiya hazırdır', AppLang.tr: 'Yeni sürüm hazır', AppLang.en: 'New version ready'},
+  'Yenilə': {AppLang.az: 'Yenilə', AppLang.tr: 'Güncelle', AppLang.en: 'Update'},
+
 };
