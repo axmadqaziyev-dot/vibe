@@ -4453,7 +4453,6 @@ class _RealChatPageState extends State<RealChatPage> {
 
   Timer? activityTimer;
   Timer? typingTimer;
-  StreamSubscription? receiptSubscription;
 
   bool sending = false;
   bool typingSent = false;
@@ -4486,6 +4485,9 @@ class _RealChatPageState extends State<RealChatPage> {
   int lockCount = 0;
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? filterSub;
+
+  /// Hansı vaxta qədər "oxundu" yazmışıq — təkrar yazının qarşısını alır.
+  DateTime? markedReadUpTo;
 
   /// İki kilid yazısının üst-üstə düşməməsi üçün.
   bool locking = false;
@@ -4628,26 +4630,6 @@ class _RealChatPageState extends State<RealChatPage> {
         .snapshots()
         .listen(_onRecentMessages, onError: (Object _) {});
 
-    receiptSubscription = FirebaseFirestore.instance
-        .collection('chats')
-        .doc(chatId)
-        .snapshots()
-        .listen((doc) {
-          if (mounted &&
-              (ModalRoute.of(context)?.isCurrent ?? false) &&
-              doc.exists &&
-              isUnread(doc.data()!, widget.currentProfile.uid)) {
-            doc.reference
-                .update({
-                  'readAt.${widget.currentProfile.uid}':
-                      FieldValue.serverTimestamp(),
-                  // Söhbət açıldı — oxunmamış sayğacı sıfırlanır.
-                  'unread.${widget.currentProfile.uid}': 0,
-                })
-                .catchError((Object _) {});
-          }
-        }, onError: (Object _) {});
-
     activityTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) {
         setState(() {});
@@ -4661,7 +4643,6 @@ class _RealChatPageState extends State<RealChatPage> {
     filterSub?.cancel();
     activityTimer?.cancel();
     typingTimer?.cancel();
-    receiptSubscription?.cancel();
     messageController.removeListener(_onTypingChanged);
     if (typingSent) {
       _setTyping(false);
@@ -4724,12 +4705,27 @@ class _RealChatPageState extends State<RealChatPage> {
   void _onRecentMessages(QuerySnapshot<Map<String, dynamic>> snap) {
     final texts = <String>[];
 
+    // Qarşı tərəfdən gələn ƏN TƏZƏ mesajın vaxtı.
+    //
+    // Sorğu `createdAt` üzrə azalan sıradadır, ona görə ilk tapılan
+    // ən təzəsidir.
+    Timestamp? newestIncoming;
+
     for (final doc in snap.docs) {
       final data = doc.data();
+
+      if (newestIncoming == null &&
+          data['senderId'] == widget.targetUid &&
+          data['createdAt'] is Timestamp) {
+        newestIncoming = data['createdAt'] as Timestamp;
+      }
+
       // Stiker, şəkil və səs mətn kimi ölçülmür.
       if ('${data['type'] ?? 'text'}' != 'text') continue;
       texts.add('${data['text'] ?? ''}');
     }
+
+    if (newestIncoming != null) _markRead(newestIncoming);
 
     final verdict = evaluateChat(texts);
 
@@ -4745,6 +4741,43 @@ class _RealChatPageState extends State<RealChatPage> {
 
     if (verdict.blocks && chatLock == null) {
       unawaited(_lockChat(verdict.topic!));
+    }
+  }
+
+  /// "Görüldü" işarəsini yazır.
+  ///
+  /// Burada bir incəlik var. Əvvəl bu sahəyə
+  /// `FieldValue.serverTimestamp()` yazılırdı, mesajın `createdAt`
+  /// sahəsi isə göndərənin **telefon saatı** ilə doldurulur. İki
+  /// müxtəlif saatı müqayisə etmək olmaz: göndərənin saatı bir neçə
+  /// dəqiqə irəlidirsə, `readAt` həmişə `createdAt`-dan kiçik çıxır və
+  /// mesaj heç vaxt "görüldü" olmur. İki quşun görünməməsinin səbəbi
+  /// bu idi.
+  ///
+  /// İndi oxunma nişanı kimi qarşı tərəfin öz mesajının `createdAt`
+  /// dəyəri yazılır. Hər iki tərəf eyni saatdan gəlir, müqayisə
+  /// doğrudur.
+  Future<void> _markRead(Timestamp upTo) async {
+    // Səhifə arxada qalıbsa oxunmuş sayılmır.
+    if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+
+    // Eyni dəyəri təkrar yazmırıq — yoxsa dinləyici ilə yazı
+    // bir-birini sonsuz oyadardı.
+    if (markedReadUpTo != null && !upTo.toDate().isAfter(markedReadUpTo!)) {
+      return;
+    }
+    markedReadUpTo = upTo.toDate();
+
+    try {
+      await FirebaseFirestore.instance.collection('chats').doc(chatId).set({
+        'members': [widget.currentProfile.uid, widget.targetUid],
+        'readAt': {widget.currentProfile.uid: upTo},
+        // Söhbət açıqdır — oxunmamış sayğacı sıfırlanır.
+        'unread': {widget.currentProfile.uid: 0},
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // Yazıla bilmədisə növbəti mesajda yenidən cəhd olunur.
+      markedReadUpTo = null;
     }
   }
 
@@ -6259,7 +6292,7 @@ class _RealChatPageState extends State<RealChatPage> {
                                           children: [
                                             Icon(
                                               seen ? Icons.done_all_rounded : Icons.done_rounded,
-                                              size: 14,
+                                              size: 15,
                                               color: seen
                                                   ? const Color(0xff7ee7ff)
                                                   : Colors.white54,
@@ -6268,7 +6301,8 @@ class _RealChatPageState extends State<RealChatPage> {
                                             Text(
                                               seen ? 'Görüldü' : 'Göndərildi',
                                               style: TextStyle(
-                                                fontSize: 9,
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w600,
                                                 color: seen
                                                     ? const Color(0xff7ee7ff)
                                                     : Colors.white54,

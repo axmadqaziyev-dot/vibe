@@ -237,6 +237,8 @@ class _IncomingCallsState extends State<IncomingCalls> {
                       caller: false,
                       video: isVideo,
                       name: callerName,
+                      // Qəbul düyməsinə artıq basılıb.
+                      autoStart: true,
                     ),
                   ),
                 );
@@ -667,12 +669,20 @@ class CallPage extends StatefulWidget {
     required this.caller,
     required this.video,
     required this.name,
+    this.autoStart = false,
   });
 
   final DocumentReference<Map<String, dynamic>> ref;
   final bool caller;
   final bool video;
   final String name;
+
+  /// Zəng artıq qəbul edilib — yaşıl düyməni bir daha gözləmə.
+  ///
+  /// Əvvəl gələn zəngdə istifadəçi yaşıl düyməyə iki dəfə basırdı:
+  /// biri "zəng gəlir" ekranında, biri də bu səhifədə. İkinci basış
+  /// heç nə demirdi — sadəcə mikrofon icazəsini gecikdirirdi.
+  final bool autoStart;
 
   @override
   State<CallPage> createState() => _CallPageState();
@@ -713,6 +723,14 @@ class _CallPageState extends State<CallPage> {
   @override
   void initState() {
     super.initState();
+
+    // Qəbul edilmiş zəng dərhal başlayır: icazə pəncərəsi bir dəfə
+    // çıxır və zəng qurulur.
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) begin();
+      });
+    }
 
     signaling = widget.ref.snapshots().listen(
       (doc) async {
@@ -813,11 +831,27 @@ class _CallPageState extends State<CallPage> {
       await local.initialize();
       await remote.initialize();
 
+      // Səs emalı açıq olmalıdır.
+      //
+      // Əvvəl burada sadəcə `'audio': true` yazılmışdı — brauzer əks-səda
+      // ləğvini və küy azaltmanı öz istəyi ilə seçirdi. Telefon
+      // dinamikdə danışanda qarşı tərəf öz səsini geri eşidirdi.
+      //
+      // Görüntü üçün ölçü tələb olunur: göstəriş olmayanda brauzer
+      // çox vaxt 320x240 verir, ekran isə ondan qat-qat böyükdür —
+      // görüntü buna görə "zəif" görünürdü.
       media = await navigator.mediaDevices.getUserMedia({
-        'audio': true,
+        'audio': {
+          'echoCancellation': true,
+          'noiseSuppression': true,
+          'autoGainControl': true,
+        },
         'video': widget.video
             ? {
                 'facingMode': 'user',
+                'width': {'ideal': 1280},
+                'height': {'ideal': 720},
+                'frameRate': {'ideal': 30},
               }
             : false,
       });

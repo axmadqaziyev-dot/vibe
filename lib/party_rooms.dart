@@ -723,6 +723,15 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     });
   }
 
+  /// Səs vəziyyəti dəyişəndə ekranı təzələyir.
+  ///
+  /// Əvvəl bu, adsız funksiya idi və `dispose`-da silinmirdi. Otaqdan
+  /// çıxanda `RoomAudio.leave()` dinləyicini bağlayırdı — dinləyici
+  /// isə hələ qoşulu qalırdı.
+  void _onAudioState() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     ticker?.cancel();
@@ -731,8 +740,22 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     hiddenSub?.cancel();
     music?.dispose();
     music = null;
-    audio?.leave();
+
+    // Çıxış şəbəkə və WebRTC işidir: uzun çəkə və səhv verə bilər.
+    // Ekranın bağlanması ondan asılı olmamalıdır — əks halda bir
+    // istisna bütün ekranı qara qoyurdu.
+    final leaving = audio;
     audio = null;
+
+    if (leaving != null) {
+      leaving.state.removeListener(_onAudioState);
+      unawaited(() async {
+        try {
+          await leaving.leave();
+        } catch (_) {}
+      }());
+    }
+
     _leavePresence();
     super.dispose();
   }
@@ -754,9 +777,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
       uid: widget.profile.uid,
     );
     audio = instance;
-    instance.state.addListener(() {
-      if (mounted) setState(() {});
-    });
+    instance.state.addListener(_onAudioState);
     // İlk açılışda izləyici kimi qoşulur; oturacağa çıxanda kamera açılır.
     await instance.join(publishing: false, video: videoRoom);
   }
@@ -1947,7 +1968,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                 subtitle: 'Otaqda qal, tətbiqin başqa yerinə bax',
                 onTap: () {
                   Navigator.pop(sheet);
-                  Navigator.pop(context);
+                  _closeRoom();
                 },
               ),
               const SizedBox(height: 12),
@@ -1958,8 +1979,10 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                 subtitle: 'Otaqdan tam çıx, mikrofonu bağla',
                 onTap: () async {
                   Navigator.pop(sheet);
-                  await _leaveSeatIfAny();
-                  if (mounted) Navigator.pop(context);
+                  try {
+                    await _leaveSeatIfAny();
+                  } catch (_) {}
+                  _closeRoom();
                 },
               ),
               const SizedBox(height: 10),
@@ -2026,6 +2049,19 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
   }
 
   /// Çıxarkən mikrofon yerini boşaldır.
+  /// Otaq səhifəsini bağlayır.
+  ///
+  /// `Navigator.pop` yığında başqa səhifə olmayanda yığını boşaldır və
+  /// ekran tam qara qalır. Otağa bildirişdən və ya zəngdən birbaşa
+  /// girmək mümkündür — belə halda otaq ilk səhifə olur. `canPop`
+  /// yoxlaması məhz bunun üçündür.
+  void _closeRoom() {
+    if (!mounted) return;
+
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) navigator.pop();
+  }
+
   Future<void> _leaveSeatIfAny() async {
     try {
       final snap = await room.get();
