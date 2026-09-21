@@ -47,7 +47,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('VIBE-də yeniliklər'), findsOneWidget);
-    expect(find.text('Səsli anlar'), findsOneWidget);
     expect(find.text('Başla'), findsOneWidget);
+
+    // Birinci maddə dərhal görünür.
+    expect(find.text(whatsNewItems.first.title), findsOneWidget);
+
+    // Siyahı uzundur — qalanı sürüşdürəndə gəlir. Əvvəl burada
+    // ortadakı maddə birbaşa axtarılırdı və siyahıya yeni maddə
+    // əlavə edəndə sınaq səbəbsiz yerə qırılırdı.
+    await tester.scrollUntilVisible(
+      find.text(whatsNewItems.last.title),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text(whatsNewItems.last.title), findsOneWidget);
   });
 }

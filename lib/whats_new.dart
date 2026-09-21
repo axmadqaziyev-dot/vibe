@@ -14,7 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ui/vibe_design.dart';
 
 /// Siyahı dəyişəndə bu rəqəm artırılır — vərəq yenidən göstərilir.
-const int whatsNewVersion = 2;
+const int whatsNewVersion = 3;
 
 class NewsItem {
   const NewsItem({
@@ -33,6 +33,42 @@ class NewsItem {
 }
 
 const whatsNewItems = <NewsItem>[
+  NewsItem(
+    emoji: '#️⃣',
+    title: 'Hashtag və ad',
+    text: 'Mətndə #söz yazsan lent açılır, @ad yazsan profil açılır.',
+    where: 'Anlarda mətnin içində — toxun',
+  ),
+  NewsItem(
+    emoji: '💬',
+    title: 'Şərhə cavab',
+    text: 'Hər şərhə ayrıca cavab yaz, bəyən. Cavablar alt-alta düzülür.',
+    where: 'Anın şərhlərində → "Cavab ver"',
+  ),
+  NewsItem(
+    emoji: '🖼️',
+    title: 'Otağın fonu',
+    text: 'Otağını seçilən et — hazır mənzərə və ya öz şəklin.',
+    where: 'Otaqda menyu → "Otağın fonu"',
+  ),
+  NewsItem(
+    emoji: '👑',
+    title: 'Töhfə sıralaması',
+    text: 'Otağa ən çox dəstək verənlər podiumda görünür.',
+    where: 'Otaqda yuxarıdakı kubok',
+  ),
+  NewsItem(
+    emoji: '✓',
+    title: 'Görüldü',
+    text: 'Mesajın oxunanda iki quş və "Görüldü" yazısı çıxır.',
+    where: 'Söhbətdə öz mesajının altında',
+  ),
+  NewsItem(
+    emoji: '📷',
+    title: 'Bir dəfəyə çox şəkil',
+    text: 'Qalereyaya bir dəfə gir, hamısını seç.',
+    where: 'An paylaşanda və söhbətdə',
+  ),
   NewsItem(
     emoji: '⚡',
     title: 'Storilər',

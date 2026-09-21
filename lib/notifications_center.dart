@@ -188,6 +188,8 @@ class NotificationCenterPage extends StatelessWidget {
         return Icons.card_giftcard_rounded;
       case 'room':
         return Icons.mic_rounded;
+      case 'comment':
+        return Icons.mode_comment_rounded;
       default:
         return Icons.notifications_active_rounded;
     }
@@ -203,6 +205,8 @@ class NotificationCenterPage extends StatelessWidget {
         return const Color(0xffffd86b);
       case 'room':
         return const Color(0xff35e18b);
+      case 'comment':
+        return const Color(0xffff8a3d);
       default:
         return _purple;
     }

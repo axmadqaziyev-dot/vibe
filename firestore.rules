@@ -167,8 +167,18 @@ service cloud.firestore {
         allow read: if signedIn();
         allow create: if signedIn()
           && request.resource.data.uid == request.auth.uid;
+
+        // Sahib her seyi deyise biler.
+        //
+        // Basqalari YALNIZ beyenme sahelerini yaza biler. Bu olmadan
+        // serhi beyenmek mumkun deyildi: qayda yalniz muellife yazmaga
+        // icaze verirdi, urek duymesi isse sessizce ucurdu.
         allow update: if signedIn()
-          && resource.data.uid == request.auth.uid;
+          && (
+            resource.data.uid == request.auth.uid
+            || request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['likeCount', 'likedBy'])
+          );
         allow delete: if signedIn()
           && (resource.data.uid == request.auth.uid || isAdmin());
 

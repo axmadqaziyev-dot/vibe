@@ -11,9 +11,13 @@ library;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'dart:async';
+
+import 'chat_lock.dart';
 import 'comment_thread.dart';
 import 'legal.dart';
 import 'post_links.dart';
+import 'push_send.dart';
 import 'rich_post_text.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
@@ -63,7 +67,10 @@ class _MomentCommentsSheetState extends State<MomentCommentsSheet> {
     final text = controller.text.trim();
     if (text.isEmpty || sending) return;
 
+    // Söyüş süzgəci və mövzu süzgəci. Şərh açıq məzmundur —
+    // paylaşımın özü ilə eyni qaydaya tabedir.
     if (!guardContent(context, text)) return;
+    if (!guardTopic(context, text)) return;
 
     final target = replyTo;
     setState(() => sending = true);
@@ -86,6 +93,8 @@ class _MomentCommentsSheetState extends State<MomentCommentsSheet> {
         SetOptions(merge: true),
       );
 
+      unawaited(_notify(text, target));
+
       controller.clear();
       if (mounted) {
         setState(() {
@@ -104,6 +113,56 @@ class _MomentCommentsSheetState extends State<MomentCommentsSheet> {
     } finally {
       if (mounted) setState(() => sending = false);
     }
+  }
+
+  /// Şərhdən xəbər verir.
+  ///
+  /// İki nəfərə: paylaşımın sahibinə və (cavabdırsa) cavab verilən
+  /// adama. Özünə bildiriş getmir — adam öz yazdığını onsuz da bilir.
+  /// Eyni adam hər iki rolda olsa, bir dəfə xəbər alır.
+  Future<void> _notify(String text, ThreadComment? target) async {
+    final me = widget.profile.uid;
+    final sent = <String>{me};
+
+    Future<void> send(String uid, String title) async {
+      if (uid.isEmpty || sent.contains(uid)) return;
+      sent.add(uid);
+
+      try {
+        await db
+            .collection('users')
+            .doc(uid)
+            .collection('notifications')
+            .add({
+          'type': 'comment',
+          'title': title,
+          'body': text.length > 80 ? '${text.substring(0, 80)}…' : text,
+          'fromUid': me,
+          'momentId': widget.momentId,
+          'read': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {}
+
+      unawaited(sendPushToUser(
+        toUid: uid,
+        title: title,
+        body: text,
+        fromName: widget.profile.name,
+      ));
+    }
+
+    if (target != null) {
+      await send(target.uid, '${widget.profile.name} sənə cavab verdi');
+    }
+
+    try {
+      final moment =
+          await db.collection('moments').doc(widget.momentId).get();
+      final owner = '${moment.data()?['ownerUid'] ?? ''}';
+
+      await send(owner, '${widget.profile.name} anına şərh yazdı');
+    } catch (_) {}
   }
 
   /// Şərhi bəyənir və ya bəyənməni götürür.
