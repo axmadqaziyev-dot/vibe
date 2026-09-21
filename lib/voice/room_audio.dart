@@ -34,6 +34,9 @@ class RoomAudio {
   Map<String, dynamic> get _iceConfig => vibeIceConfig;
 
   final Map<String, _Peer> _peers = {};
+
+  /// Hazırda yenidən qurulan bağlantılar — təkrar cəhdin qarşısını alır.
+  final Set<String> _retrying = <String>{};
   MediaStream? _microphone;
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _membersSub;
@@ -323,6 +326,8 @@ class RoomAudio {
       for (final peer in _peers.values)
         peer.uid.substring(0, peer.uid.length.clamp(0, 6)):
             '${peer.status} · '
+            '${peer.remoteSet ? "təsvir var" : "TƏSVİR YOX"} · '
+            '${peer.pending.isEmpty ? "" : "${peer.pending.length} namizəd növbədə · "}'
             '${peer.gotTrack ? peer.trackKinds.join("+") : "trek yoxdur"}',
     };
   }
@@ -476,8 +481,16 @@ class RoomAudio {
               '',
             );
 
-        if (status == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
-          _drop(other);
+        // Uğursuz bağlantı özü bərpa olunmur.
+        //
+        // Əvvəl sadəcə silinirdi. Yenidən qurulması `_watchMembers`
+        // dinləyicisinə qalırdı, o isə yalnız iştirakçı siyahısı
+        // dəyişəndə işləyir — heç kim girib-çıxmasa bağlantı əbədi
+        // qırıq qalırdı.
+        if (status == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+            status ==
+                RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+          _retry(other);
         }
       };
 
@@ -501,6 +514,7 @@ class RoomAudio {
             'candidate': candidate.candidate,
             'sdpMid': candidate.sdpMid,
             'sdpMLineIndex': candidate.sdpMLineIndex,
+            'session': peer.session,
           });
         } catch (_) {
           // Namizəd yazılmasa bağlantı digər namizədlərlə qurulur.
@@ -512,7 +526,17 @@ class RoomAudio {
           if (change.type != DocumentChangeType.added) continue;
           final data = change.doc.data();
           if (data == null) continue;
-          peer.connection?.addCandidate(RTCIceCandidate(
+
+          // Köhnə sessiyanın namizədləri yeni təsvirə uymur —
+          // tətbiq olunsa bağlantını pozur.
+          final session = '${data['session'] ?? ''}';
+          if (peer.session.isNotEmpty &&
+              session.isNotEmpty &&
+              session != peer.session) {
+            continue;
+          }
+
+          peer.offerCandidate(RTCIceCandidate(
             '${data['candidate']}',
             data['sdpMid'] as String?,
             (data['sdpMLineIndex'] as num?)?.toInt(),
@@ -521,43 +545,134 @@ class RoomAudio {
       });
 
       if (caller) {
+        // Hər qoşulma üçün yeni sessiya. Köhnə namizədlər silinir,
+        // yoxsa qarşı tərəf onları yeni təsvirə tətbiq etməyə çalışır.
+        peer.session =
+            '${DateTime.now().microsecondsSinceEpoch}_${uid.hashCode}';
+
+        await _clearCandidates(doc);
+
         final offer = await connection.createOffer();
         await connection.setLocalDescription(offer);
+
         await doc.set({
           'offer': {'sdp': offer.sdp, 'type': offer.type},
+          'session': peer.session,
           'callerUid': uid,
           'createdAt': FieldValue.serverTimestamp(),
         });
 
         peer.docSub = doc.snapshots().listen((snapshot) async {
-          final answer = snapshot.data()?['answer'];
+          final data = snapshot.data();
+          final answer = data?['answer'];
           if (answer == null || peer.remoteSet) return;
+
+          // Yalnız öz sessiyamızın cavabı qəbul olunur.
+          if ('${answer['session'] ?? ''}' != peer.session) return;
+
           peer.remoteSet = true;
-          await peer.connection?.setRemoteDescription(
-            RTCSessionDescription('${answer['sdp']}', '${answer['type']}'),
-          );
+          try {
+            await peer.connection?.setRemoteDescription(
+              RTCSessionDescription('${answer['sdp']}', '${answer['type']}'),
+            );
+            await peer.flushCandidates();
+          } catch (error) {
+            lastError = '$error';
+            peer.remoteSet = false;
+          }
         });
       } else {
         peer.docSub = doc.snapshots().listen((snapshot) async {
-          final offer = snapshot.data()?['offer'];
-          if (offer == null || peer.remoteSet) return;
-          peer.remoteSet = true;
+          final data = snapshot.data();
+          final offer = data?['offer'];
+          if (offer == null) return;
 
-          await peer.connection?.setRemoteDescription(
-            RTCSessionDescription('${offer['sdp']}', '${offer['type']}'),
-          );
-          final answer = await peer.connection?.createAnswer();
-          if (answer == null) return;
-          await peer.connection?.setLocalDescription(answer);
-          await doc.set({
-            'answer': {'sdp': answer.sdp, 'type': answer.type},
-          }, SetOptions(merge: true));
+          final session = '${data?['session'] ?? ''}';
+          if (session.isEmpty) return;
+
+          // Eyni sessiyaya bir dəfə cavab veririk. Yeni sessiya
+          // gələndə isə yenidən cavab verilməlidir — əks halda
+          // otağa ikinci dəfə girən adam əbədi gözləyirdi.
+          if (peer.session == session) return;
+          peer.session = session;
+
+          try {
+            await peer.connection?.setRemoteDescription(
+              RTCSessionDescription('${offer['sdp']}', '${offer['type']}'),
+            );
+            peer.remoteSet = true;
+            await peer.flushCandidates();
+
+            final answer = await peer.connection?.createAnswer();
+            if (answer == null) return;
+            await peer.connection?.setLocalDescription(answer);
+
+            await doc.set({
+              'answer': {
+                'sdp': answer.sdp,
+                'type': answer.type,
+                'session': session,
+              },
+            }, SetOptions(merge: true));
+          } catch (error) {
+            lastError = '$error';
+            peer.session = '';
+            peer.remoteSet = false;
+          }
         });
       }
     } catch (error) {
       debugPrint('room audio connect: $error');
       await _drop(other);
     }
+  }
+
+  /// Cütün köhnə namizədlərini silir.
+  ///
+  /// Sənədin adı sabitdir, ona görə keçən sessiyanın namizədləri
+  /// orada qalır. Yeni təsvirlə uyuşmayan namizəd bağlantını qurmağa
+  /// qoymur.
+  Future<void> _clearCandidates(
+    DocumentReference<Map<String, dynamic>> doc,
+  ) async {
+    for (final side in ['a', 'b']) {
+      try {
+        final old = await doc.collection(side).limit(200).get();
+        for (final entry in old.docs) {
+          await entry.reference.delete();
+        }
+      } catch (_) {
+        // Silinməsə də sessiya süzgəci onları kənarda saxlayır.
+      }
+    }
+  }
+
+  /// Qırılmış bağlantını yenidən qurur.
+  ///
+  /// Dərhal deyil: qarşı tərəf də eyni anda yenidən qurmağa çalışır
+  /// və iki tərəf bir-birini kəsə bilər. Kiçik gecikmə həm buna mane
+  /// olur, həm də şəbəkə özünə gələndə boş cəhdlərin qarşısını alır.
+  void _retry(String other) {
+    if (_closed || _retrying.contains(other)) return;
+    _retrying.add(other);
+
+    unawaited(() async {
+      await _drop(other);
+      await Future<void>.delayed(const Duration(seconds: 2));
+
+      _retrying.remove(other);
+      if (_closed) return;
+
+      // Qarşı tərəf hələ otaqdadırsa yenidən qoşuluruq.
+      try {
+        final snap = await _members.doc(other).get();
+        final data = snap.data();
+        if (data == null || data['rtcReady'] != true) return;
+        if (!_publishing && data['audio'] != true) return;
+
+        await _connect(other);
+      } catch (_) {}
+    }());
   }
 
   Future<void> _drop(String other) async {
@@ -595,6 +710,44 @@ class _Peer {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? candidateSub;
   bool connected = false;
   bool remoteSet = false;
+
+  /// Bu bağlantının sessiya nömrəsi.
+  ///
+  /// Siqnal sənədinin adı iki uid-dən qurulur və otaqdan çıxıb
+  /// yenidən girəndə eyni qalır. Sessiya nömrəsi olmasa, qarşı tərəf
+  /// köhnə təklifi görüb ona cavab verir — yeni bağlantı isə əbədi
+  /// gözləyir. Otağa ikinci dəfə girəndə səsin gəlməməsinin səbəbi
+  /// məhz bu idi.
+  String session = '';
+
+  /// Uzaq təsvir qoyulana qədər gələn namizədlər.
+  ///
+  /// `addCandidate` uzaq təsvir qoyulmamış çağırılsa xəta verir və
+  /// namizəd itir. Bağlantı çox vaxt məhz bu səbəbdən qurulmurdu.
+  final List<RTCIceCandidate> pending = <RTCIceCandidate>[];
+
+  /// Namizədi ya dərhal tətbiq edir, ya da növbəyə qoyur.
+  Future<void> offerCandidate(RTCIceCandidate candidate) async {
+    if (!remoteSet) {
+      pending.add(candidate);
+      return;
+    }
+    try {
+      await connection?.addCandidate(candidate);
+    } catch (_) {}
+  }
+
+  /// Uzaq təsvir qoyulandan sonra növbəni boşaldır.
+  Future<void> flushCandidates() async {
+    final queued = List<RTCIceCandidate>.from(pending);
+    pending.clear();
+
+    for (final candidate in queued) {
+      try {
+        await connection?.addCandidate(candidate);
+      } catch (_) {}
+    }
+  }
 
   Future<void> dispose() async {
     await docSub?.cancel();
