@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 
 import 'coin_wallet.dart';
 import 'invite.dart';
+import 'room_background.dart';
 import 'room_profile_card.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart'
     show RTCVideoRenderer, RTCVideoView, RTCVideoViewObjectFit;
@@ -1811,8 +1812,9 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
 
         return Scaffold(
           backgroundColor: _bg,
-          body: AuroraBackground(
-            child: SafeArea(
+          body: _withBackdrop(
+            d,
+            SafeArea(
               child: Center(
                 child: ConstrainedBox(
                   // Geniş ekranda oturacaqlar dağılmasın deyə
@@ -1822,12 +1824,11 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                 children: [
                   Column(
                     children: [
-                      _topBar(),
+                      _topBar(d, canModerate),
                       _roomHeader(d),
                       const SizedBox(height: 10),
                       _tagRow(d),
                       const SizedBox(height: 10),
-                      _pkBanner(d),
                       _announcement(d),
                       const SizedBox(height: 4),
                       _hostBlock(d, seats),
@@ -1844,10 +1845,13 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                       const SizedBox(height: 6),
                       _musicBar(d),
                       _seatInvite(d),
-                      _listeners(d, canModerate),
                       const SizedBox(height: 4),
                       if (hidden) _hiddenBar(),
                       Expanded(child: _chat(d)),
+                      // PK zolağı söhbətin altındadır: yarış gedəndə
+                      // ekranın yuxarısı oturacaqlara qalır, hesab isə
+                      // barmağın çatdığı yerdə olur.
+                      _pkBanner(d),
                       _bottomBar(d),
                     ],
                   ),
@@ -1909,11 +1913,30 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     );
   }
 
+  /// Otağın fonunu tətbiq edir.
+  ///
+  /// Fon seçilməyibsə köhnə şəfəq fonu qalır — mövcud otaqların
+  /// görünüşü dəyişmir.
+  Widget _withBackdrop(Map<String, dynamic> d, Widget child) {
+    if (!RoomBackdrop.isSet(d)) return AuroraBackground(child: child);
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        RoomBackdrop(
+          sceneId: d['bgScene'],
+          imageUrl: '${d['bgUrl'] ?? ''}',
+        ),
+        child,
+      ],
+    );
+  }
+
   // ----------------------------------------------------------
   // BAŞLIQ
   // ----------------------------------------------------------
 
-  Widget _topBar() => Padding(
+  Widget _topBar(Map<String, dynamic> d, bool canModerate) => Padding(
     padding: const EdgeInsets.fromLTRB(14, 6, 8, 2),
     child: Row(
       children: [
@@ -1930,6 +1953,14 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         const SizedBox(width: 8),
         _audioStatus(),
         const Spacer(),
+
+        // Kim otaqdadır — başlıqda.
+        //
+        // Əvvəl dinləyici zolağı ekranın ortasında, oturacaqlarla
+        // söhbətin arasında idi. Orada həm yer yeyirdi, həm də gözdən
+        // qaçırdı: otağa girən adam kiminlə oturduğunu görmürdü.
+        _listenerStrip(d, canModerate),
+        const SizedBox(width: 6),
         TopIconButton(
           icon: Icons.emoji_events_rounded,
           color: const Color(0xffffd86b),
@@ -3798,6 +3829,12 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                       Navigator.pop(sheet);
                       _changeSeatCount(d);
                     }),
+                  if (isHost)
+                    _tool(Icons.wallpaper_rounded, 'Otağın fonu',
+                        const Color(0xffb06ab3), () {
+                      Navigator.pop(sheet);
+                      _openBackgroundPicker(d);
+                    }),
                   _tool(Icons.add_ic_call_rounded, 'Zəngə çağır',
                       const Color(0xff2de28a), () {
                     Navigator.pop(sheet);
@@ -3862,7 +3899,231 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         ),
       );
 
+  /// Başlıqdakı yığcam dinləyici nişanı.
+  ///
+  /// Üç avatar üst-üstə düşür, yanında ümumi say yazılır. Toxunanda
+  /// tam siyahı açılır.
+  Widget _listenerStrip(Map<String, dynamic> roomData, bool canModerate) =>
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: room
+            .collection('members')
+            .orderBy('joinedAt', descending: true)
+            .limit(30)
+            .snapshots(),
+        builder: (context, snapshot) {
+          final live = _liveMembers(snapshot.data?.docs ?? const []);
+          if (live.isEmpty) return const SizedBox.shrink();
+
+          final visible =
+              live.where((doc) => doc.data()['hidden'] != true).toList();
+          final shown = visible.take(3).toList();
+
+          return PressableScale(
+            onTap: () => _openListenersSheet(roomData, canModerate),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(4, 3, 9, 3),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: .38),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: .10)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (shown.isNotEmpty)
+                    SizedBox(
+                      // Üst-üstə düşən avatarlar: hər biri 8 px sağa.
+                      width: 22.0 + (shown.length - 1) * 14,
+                      height: 24,
+                      child: Stack(
+                        children: [
+                          for (var i = 0; i < shown.length; i++)
+                            Positioned(
+                              left: i * 14,
+                              child: Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xff130f20),
+                                    width: 1.4,
+                                  ),
+                                ),
+                                child: ClipOval(
+                                  child: _UserPhoto(
+                                    uid: shown[i].id,
+                                    name: '${shown[i].data()['name'] ?? ''}',
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${live.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
+  /// Siqnalı təzə olan iştirakçılar.
+  ///
+  /// Brauzer sekməsi bağlananda "çıxdım" siqnalı həmişə çatmır. Ona
+  /// görə 3 dəqiqədən köhnə siqnal sayılmır — əks halda otaq boş
+  /// olanda belə dolu görünürdü.
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _liveMembers(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) =>
+      docs.where((doc) {
+        final seen = doc.data()['lastSeen'];
+        if (seen is! Timestamp) return true;
+        return DateTime.now().difference(seen.toDate()).inMinutes < 3;
+      }).toList();
+
+  /// Otaqdakıların tam siyahısı.
+  void _openListenersSheet(Map<String, dynamic> roomData, bool canModerate) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xff120d1d),
+      showDragHandle: true,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .7,
+      ),
+      builder: (sheet) => SafeArea(
+        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: room
+              .collection('members')
+              .orderBy('joinedAt', descending: true)
+              .limit(100)
+              .snapshots(),
+          builder: (context, snapshot) {
+            final live = _liveMembers(snapshot.data?.docs ?? const []);
+            final visible =
+                live.where((doc) => doc.data()['hidden'] != true).toList();
+            final hiddenCount = live.length - visible.length;
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Otaqdakılar',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Text(
+                        '${live.length}',
+                        style: const TextStyle(
+                          color: _pink,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (hiddenCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.headphones_rounded,
+                            size: 14, color: _blue),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${hiddenCount} nəfər gizli qulaq asır',
+                          style: const TextStyle(color: _blue, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 6),
+                Flexible(
+                  child: visible.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.fromLTRB(20, 10, 20, 24),
+                          child: Text(
+                            'Görünən dinləyici yoxdur.',
+                            style: TextStyle(color: _muted, fontSize: 13),
+                          ),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
+                          itemCount: visible.length,
+                          itemBuilder: (context, i) {
+                            final uid = visible[i].id;
+                            final name = '${visible[i].data()['name'] ?? ''}';
+
+                            return ListTile(
+                              onTap: () {
+                                Navigator.pop(sheet);
+                                _openListenerMenu(
+                                  uid: uid,
+                                  name: name,
+                                  roomData: roomData,
+                                  canModerate: canModerate,
+                                );
+                              },
+                              leading: SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: ClipOval(
+                                  child: _UserPhoto(uid: uid, name: name),
+                                ),
+                              ),
+                              title: Text(
+                                name.isEmpty ? 'İstifadəçi' : name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              trailing: uid == widget.profile.uid
+                                  ? const Text(
+                                      'sən',
+                                      style: TextStyle(
+                                          color: _muted, fontSize: 12),
+                                    )
+                                  : const Icon(Icons.chevron_right_rounded,
+                                      color: _muted),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   /// Otaqdakı dinləyicilər — avatar zolağı + ümumi say.
+  // ignore: unused_element
   Widget _listeners(Map<String, dynamic> roomData, bool canModerate) =>
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
     stream: room
@@ -4696,6 +4957,201 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         ],
       ),
     );
+  }
+
+  /// Otağın fonunu seçir.
+  ///
+  /// Hazır mənzərələr qradiyentdir — yüklənmir, dərhal görünür.
+  /// İstəyən öz şəklini də qoya bilər.
+  void _openBackgroundPicker(Map<String, dynamic> d) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xff120d1d),
+      showDragHandle: true,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .72,
+      ),
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Otağın fonu',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Otağı seçilən et — hamı eyni fonu görür.',
+                style: TextStyle(color: _muted, fontSize: 12.5),
+              ),
+              const SizedBox(height: 14),
+              Flexible(
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  itemCount: roomScenes.length,
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: .78,
+                  ),
+                  itemBuilder: (context, i) {
+                    final scene = roomScenes[i];
+                    final selected = '${d['bgScene'] ?? ''}' == scene.id &&
+                        '${d['bgUrl'] ?? ''}'.isEmpty;
+
+                    return PressableScale(
+                      onTap: () {
+                        Navigator.pop(sheet);
+                        _setBackground(scene: scene.id);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Expanded(
+                            child: Container(
+                              width: double.infinity,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                gradient: scene.gradient,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: selected ? _pink : Colors.white12,
+                                  width: selected ? 2 : 1,
+                                ),
+                              ),
+                              child: Text(
+                                scene.emoji,
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            scene.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: selected ? _pink : Colors.white,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: GradientButton(
+                      label: 'Şəkil seç',
+                      icon: Icons.add_photo_alternate_rounded,
+                      gradient: vHot,
+                      height: 46,
+                      onPressed: () {
+                        Navigator.pop(sheet);
+                        _pickBackgroundPhoto();
+                      },
+                    ),
+                  ),
+                  if (RoomBackdrop.isSet(d)) ...[
+                    const SizedBox(width: 10),
+                    PressableScale(
+                      onTap: () {
+                        Navigator.pop(sheet);
+                        _setBackground(scene: '', url: '');
+                      },
+                      child: Container(
+                        height: 46,
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: .06),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: const Text(
+                          'Sil',
+                          style: TextStyle(
+                            color: Color(0xffff8a9b),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setBackground({String? scene, String? url}) async {
+    try {
+      await room.set({
+        if (scene != null) 'bgScene': scene,
+        if (url != null) 'bgUrl': url,
+        // Hazır mənzərə seçiləndə köhnə şəkil qalmamalıdır.
+        if (scene != null && scene.isNotEmpty && url == null) 'bgUrl': '',
+      }, SetOptions(merge: true));
+    } catch (_) {
+      _toast('Fon dəyişmədi.');
+    }
+  }
+
+  Future<void> _pickBackgroundPhoto() async {
+    // Seçim anında kiçildirik: fon ekranın arxasındadır, orijinal
+    // ölçü mənasızdır və yükləmə uzanır.
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1400,
+      imageQuality: 80,
+    );
+    if (picked == null || !mounted) return;
+
+    _toast('Fon yüklənir…');
+
+    try {
+      final bytes = await picked.readAsBytes();
+
+      // Fon ekranın arxasındadır — böyük fayl mənasızdır, otağı
+      // yavaşladır. 5 MB-dan böyüyü qəbul etmirik.
+      if (bytes.lengthInBytes > 5 * 1024 * 1024) {
+        _toast('Şəkil çox böyükdür. 5 MB-a qədər olsun.');
+        return;
+      }
+
+      final url = await MediaUpload.upload(
+        bucket: 'rooms',
+        path: '${widget.roomId}/bg_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        bytes: bytes,
+        contentType: 'image/jpeg',
+      );
+
+      await _setBackground(url: url, scene: '');
+      if (mounted) _toast('Fon dəyişdi.');
+    } on MediaBucketMissing {
+      _toast('Supabase-də "rooms" qovluğu yoxdur.');
+    } catch (_) {
+      _toast('Şəkil yüklənmədi.');
+    }
   }
 
   /// Otağa musiqi qoyur (yalnız host və moderatorlar).
