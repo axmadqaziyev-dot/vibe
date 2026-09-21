@@ -1,14 +1,19 @@
-/// Basıb saxla — səsli mesaj.
+/// Səsli mesaj — bir toxunuşla.
 ///
-/// Əvvəl mikrofon düyməsi ayrıca panel açırdı: bas, panel gəlsin,
-/// yaz, dayandır, sonra göndər. Dörd toxunuş. WhatsApp-da isə bir
-/// hərəkətdir — barmağını basıb saxlayırsan, danışırsan, buraxırsan
-/// və mesaj gedir. Sola sürüşdürsən ləğv olunur, yuxarı sürüşdürsən
-/// kilidlənir və barmağını götürə bilirsən.
+/// Əvvəl iki yanlış yol sınandı:
 ///
-/// Yazının özü bu pəncərənin içindədir, üst ekrana heç nə ötürülmür:
-/// yazma vəziyyəti `Overlay` ilə göstərilir, ona görə mesaj sırasının
-/// quruluşuna toxunmaq lazım gəlmir.
+/// 1. Ayrıca panel: bas, panel gəlsin, yaz, dayandır, göndər —
+///    dörd toxunuş.
+/// 2. Basıb saxlamaq: barmağını ekranda saxlamalısan, uzun danışanda
+///    əl yorulur, sürüşdürmə qaydalarını isə heç kim bilmir.
+///
+/// Instagram-ın yolu sadədir və seçilən budur: mikrofona **basırsan**,
+/// yazı başlayır; ekranda yalnız üç şey qalır — **sil**, **dayandır**,
+/// **göndər**. Barmağını saxlamaq lazım deyil, nə edəcəyin isə
+/// baxan kimi bəllidir.
+///
+/// Yazma paneli `Overlay` ilə göstərilir: mesaj sırasının quruluşuna
+/// toxunmaq lazım gəlmir.
 library;
 
 import 'dart:async';
@@ -22,33 +27,33 @@ import 'audio_file.dart';
 import 'voice_message_service.dart';
 import 'voice_player.dart';
 
-/// Sola bu qədər sürüşdürsən ləğv olunur.
-const double cancelDistance = 90;
-
-/// Yuxarı bu qədər sürüşdürsən kilidlənir.
-const double lockDistance = 70;
-
 /// Bundan qısa yazı göndərilmir.
 const int minVoiceMs = 600;
-
-/// Sürüşdürmə hansı nəticəyə aparır.
-enum HoldGesture { recording, willCancel, willLock }
-
-/// Barmağın yerinə görə nəticəni hesablayır.
-///
-/// Ayrıca funksiyadır ki, jest məntiqi ekranı açmadan sınana bilsin.
-HoldGesture gestureFor(Offset move) {
-  // Yuxarı sürüşmə üstünlük təşkil edir: kilidləmək istəyən adam
-  // barmağını azca sola da apara bilər.
-  if (-move.dy >= lockDistance) return HoldGesture.willLock;
-  if (-move.dx >= cancelDistance) return HoldGesture.willCancel;
-  return HoldGesture.recording;
-}
 
 /// Saniyəni "0:07" şəklinə salır.
 String holdTimer(int milliseconds) {
   final seconds = milliseconds ~/ 1000;
   return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+}
+
+/// Yazının hansı mərhələdə olduğu.
+enum VoiceStage {
+  /// Yazılmır.
+  idle,
+
+  /// Danışır.
+  recording,
+
+  /// Dayandırılıb, göndərilməyi gözləyir.
+  ready,
+}
+
+/// Göndər düyməsi hansı halda işləkdir.
+///
+/// Ayrıca funksiyadır ki, ekranı açmadan sınana bilsin.
+bool canSendVoice(VoiceStage stage, int elapsedMs) {
+  if (stage == VoiceStage.idle) return false;
+  return elapsedMs >= minVoiceMs;
 }
 
 class VoiceHoldButton extends StatefulWidget {
@@ -76,11 +81,12 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton>
   OverlayEntry? overlay;
   String? recordingFile;
 
-  /// Ekranın yenilənməsi üçün — `setState` overlay-i təzələmir.
-  final notifier = ValueNotifier<_HoldView>(const _HoldView());
+  /// Dayandırıldıqdan sonra hazır olan yazı.
+  VoiceDraft? draft;
 
-  bool recording = false;
-  bool locked = false;
+  final notifier = ValueNotifier<_BarView>(const _BarView());
+
+  VoiceStage stage = VoiceStage.idle;
   bool busy = false;
 
   @override
@@ -102,9 +108,16 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Tətbiq arxa plana keçdi — yarımçıq yazını saxlamırıq.
-    if (state != AppLifecycleState.resumed && recording) {
-      unawaited(_cancel());
+    if (state != AppLifecycleState.resumed && stage != VoiceStage.idle) {
+      unawaited(_discard());
     }
+  }
+
+  void _refresh() {
+    notifier.value = _BarView(
+      stage: stage,
+      elapsed: clock.elapsedMilliseconds,
+    );
   }
 
   // ----------------------------------------------------------
@@ -112,17 +125,19 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton>
   // ----------------------------------------------------------
 
   Future<void> _start() async {
-    if (recording || busy || !widget.enabled) return;
+    if (stage != VoiceStage.idle || busy || !widget.enabled) return;
     busy = true;
 
     try {
       await VoicePlayer.pauseActive();
 
-      if (!await recorder.hasPermission()) {
-        _toast('Mikrofona icazə verilmədi.');
-        return;
-      }
-
+      // `hasPermission()` QƏSDƏN çağırılmır.
+      //
+      // O, əvvəlcə brauzerin icazə sorğusuna baxır; iOS Safari bu
+      // sorğunu mikrofon üçün dəstəkləmir, ona görə paket birbaşa
+      // `getUserMedia` çağırır — yəni icazə pəncərəsi açılır. Sonra
+      // `start()` bir də açır. Nəticədə hər səs yazısında pəncərə iki
+      // dəfə çıxırdı.
       recordingFile = await newRecordingPath();
 
       await recorder.start(
@@ -143,97 +158,123 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton>
         ..reset()
         ..start();
 
-      recording = true;
-      locked = false;
-
+      stage = VoiceStage.recording;
       HapticFeedback.mediumImpact();
+
       _showOverlay();
+      _refresh();
 
       ticker = Timer.periodic(const Duration(milliseconds: 100), (_) {
         if (!mounted) return;
+        _refresh();
 
-        notifier.value = notifier.value.copyWith(
-          elapsed: clock.elapsedMilliseconds,
-        );
-
-        // Hədd doldu — özü göndərilir.
+        // Hədd doldu — özü dayanır, göndərmək istifadəçinin işidir.
         if (clock.elapsedMilliseconds >= maxVoiceSeconds * 1000) {
-          unawaited(_finish());
+          unawaited(_stop());
         }
       });
-    } catch (_) {
-      _toast('Səs yazılmadı. Mikrofonu yoxla.');
+    } catch (error) {
+      // İcazə verilməyibsə brauzer "NotAllowedError" atır.
+      final denied = '$error'.contains('NotAllowed') ||
+          '$error'.contains('Permission');
+
+      _toast(denied
+          ? 'Mikrofona icazə verilmədi.'
+          : 'Səs yazılmadı. Mikrofonu yoxla.');
     } finally {
       busy = false;
     }
   }
 
-  /// Yazını bitirir və göndərir.
-  Future<void> _finish() async {
-    if (!recording) return;
-    recording = false;
+  /// Dayandırır, amma göndərmir.
+  Future<void> _stop() async {
+    if (stage != VoiceStage.recording) return;
 
     ticker?.cancel();
     clock.stop();
-    _removeOverlay();
-
-    final tooShort = clock.elapsedMilliseconds < minVoiceMs;
-    String? path;
 
     try {
-      path = await recorder.stop();
-
-      if (tooShort) {
-        _toast('Basıb saxla və danış.');
+      final path = await recorder.stop();
+      if (path == null) {
+        await _discard();
         return;
       }
-
-      if (path == null) return;
 
       final file = XFile(path);
-      if (await file.length() > maxVoiceBytes) {
-        _toast('Səs çox böyükdür.');
+      final bytes = await file.readAsBytes();
+
+      try {
+        await releaseAudio(path);
+      } catch (_) {}
+
+      if (bytes.length <= 44 || clock.elapsedMilliseconds < minVoiceMs) {
+        _toast('Səs çox qısadır.');
+        await _discard();
         return;
       }
 
-      final bytes = await file.readAsBytes();
-      if (bytes.length <= 44) return;
+      if (bytes.lengthInBytes > maxVoiceBytes) {
+        _toast('Səs çox böyükdür.');
+        await _discard();
+        return;
+      }
 
-      HapticFeedback.lightImpact();
-
-      await widget.send(VoiceDraft(
+      draft = VoiceDraft(
         id: widget.newId(),
         bytes: bytes,
         durationMs: clock.elapsedMilliseconds
             .clamp(minVoiceMs, maxVoiceSeconds * 1000),
-      ));
+      );
+
+      stage = VoiceStage.ready;
+      HapticFeedback.selectionClick();
+      _refresh();
     } catch (_) {
-      _toast('Səs göndərilmədi.');
-    } finally {
-      if (path != null) {
-        try {
-          await releaseAudio(path);
-        } catch (_) {}
-      }
-      locked = false;
+      await _discard();
     }
   }
 
-  /// Yazını atır.
-  Future<void> _cancel() async {
-    if (!recording) return;
-    recording = false;
-    locked = false;
+  /// Göndərir. Hələ yazılırsa əvvəlcə dayandırır.
+  Future<void> _send() async {
+    if (busy) return;
 
-    ticker?.cancel();
-    clock.stop();
+    if (stage == VoiceStage.recording) await _stop();
+    if (stage != VoiceStage.ready || draft == null) return;
+
+    busy = true;
+    final ready = draft!;
+
+    stage = VoiceStage.idle;
+    draft = null;
     _removeOverlay();
 
-    HapticFeedback.heavyImpact();
-
     try {
-      await recorder.cancel();
-    } catch (_) {}
+      HapticFeedback.lightImpact();
+      await widget.send(ready);
+    } catch (_) {
+      _toast('Səs göndərilmədi.');
+    } finally {
+      busy = false;
+    }
+  }
+
+  /// Atır.
+  Future<void> _discard() async {
+    ticker?.cancel();
+    clock.stop();
+
+    final wasRecording = stage == VoiceStage.recording;
+
+    stage = VoiceStage.idle;
+    draft = null;
+    _removeOverlay();
+
+    if (wasRecording) {
+      HapticFeedback.heavyImpact();
+      try {
+        await recorder.cancel();
+      } catch (_) {}
+    }
   }
 
   void _toast(String text) {
@@ -244,48 +285,11 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton>
   }
 
   // ----------------------------------------------------------
-  // JESTLƏR
-  // ----------------------------------------------------------
-
-  void _onMove(Offset move) {
-    if (!recording || locked) return;
-
-    final gesture = gestureFor(move);
-
-    if (gesture != notifier.value.gesture) {
-      HapticFeedback.selectionClick();
-    }
-
-    notifier.value = notifier.value.copyWith(gesture: gesture, move: move);
-
-    // Kilid barmağı buraxmadan işə düşür — WhatsApp-da da belədir.
-    if (gesture == HoldGesture.willLock) {
-      locked = true;
-      notifier.value = notifier.value.copyWith(locked: true);
-    }
-  }
-
-  void _onRelease() {
-    if (!recording) return;
-
-    // Kilidlidirsə barmağın buraxılması heç nə etmir — yazı davam edir.
-    if (locked) return;
-
-    if (notifier.value.gesture == HoldGesture.willCancel) {
-      unawaited(_cancel());
-    } else {
-      unawaited(_finish());
-    }
-  }
-
-  // ----------------------------------------------------------
   // EKRAN
   // ----------------------------------------------------------
 
   void _showOverlay() {
     _removeOverlay();
-
-    notifier.value = const _HoldView();
 
     overlay = OverlayEntry(
       builder: (context) => Positioned(
@@ -294,12 +298,13 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton>
         bottom: 0,
         child: Material(
           color: Colors.transparent,
-          child: ValueListenableBuilder<_HoldView>(
+          child: ValueListenableBuilder<_BarView>(
             valueListenable: notifier,
-            builder: (context, view, _) => _HoldPanel(
+            builder: (context, view, _) => _RecordBar(
               view: view,
-              onCancel: () => unawaited(_cancel()),
-              onSend: () => unawaited(_finish()),
+              onStop: () => unawaited(_stop()),
+              onDiscard: () => unawaited(_discard()),
+              onSend: () => unawaited(_send()),
             ),
           ),
         ),
@@ -315,177 +320,138 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton>
   }
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onLongPressStart: (_) => unawaited(_start()),
-      onLongPressMoveUpdate: (details) => _onMove(details.offsetFromOrigin),
-      onLongPressEnd: (_) => _onRelease(),
-      onLongPressCancel: _onRelease,
-      // Qısa toxunuş: adam nə etməli olduğunu bilmir.
-      onTap: () => _toast('Mikrofonu basıb saxla və danış.'),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Icon(
+  Widget build(BuildContext context) => IconButton(
+        tooltip: 'Səsli mesaj',
+        onPressed: widget.enabled ? () => unawaited(_start()) : null,
+        icon: Icon(
           Icons.mic_none_rounded,
           color: widget.enabled
               ? const Color(0xff9d7dff)
               : const Color(0xff4a4160),
-          size: 24,
         ),
-      ),
-    );
-  }
-}
-
-/// Overlay-in göstərdiyi vəziyyət.
-class _HoldView {
-  const _HoldView({
-    this.elapsed = 0,
-    this.gesture = HoldGesture.recording,
-    this.move = Offset.zero,
-    this.locked = false,
-  });
-
-  final int elapsed;
-  final HoldGesture gesture;
-  final Offset move;
-  final bool locked;
-
-  _HoldView copyWith({
-    int? elapsed,
-    HoldGesture? gesture,
-    Offset? move,
-    bool? locked,
-  }) =>
-      _HoldView(
-        elapsed: elapsed ?? this.elapsed,
-        gesture: gesture ?? this.gesture,
-        move: move ?? this.move,
-        locked: locked ?? this.locked,
       );
 }
 
-class _HoldPanel extends StatelessWidget {
-  const _HoldPanel({
+class _BarView {
+  const _BarView({this.stage = VoiceStage.idle, this.elapsed = 0});
+
+  final VoiceStage stage;
+  final int elapsed;
+}
+
+/// Yazma paneli.
+///
+/// Üç düymə: sil, dayandır/davam, göndər. Artıq heç nə yoxdur —
+/// panelin bütün məqsədi seçimi sadə saxlamaqdır.
+class _RecordBar extends StatelessWidget {
+  const _RecordBar({
     required this.view,
-    required this.onCancel,
+    required this.onStop,
+    required this.onDiscard,
     required this.onSend,
   });
 
-  final _HoldView view;
-  final VoidCallback onCancel;
+  final _BarView view;
+  final VoidCallback onStop;
+  final VoidCallback onDiscard;
   final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
-    final cancelling = view.gesture == HoldGesture.willCancel;
+    final recording = view.stage == VoiceStage.recording;
+    final ready = canSendVoice(view.stage, view.elapsed);
 
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        decoration: BoxDecoration(
-          color: const Color(0xff140f1f),
-          border: const Border(top: BorderSide(color: Color(0xff2a1a3b))),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: .4),
-              blurRadius: 18,
-              offset: const Offset(0, -4),
-            ),
-          ],
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: const BoxDecoration(
+          color: Color(0xff0d0917),
+          border: Border(top: BorderSide(color: Color(0xff2a1a3b))),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!view.locked)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text(
-                  cancelling
-                      ? 'Buraxsan silinəcək'
-                      : 'Yuxarı sürüşdür — əlini burax  ↑',
-                  style: TextStyle(
-                    color: cancelling
-                        ? const Color(0xffff8a9b)
-                        : const Color(0xff9d94ae),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                  ),
+            // Bənövşəyi zolaq: solda dayandır, sağda saniyə.
+            Container(
+              height: 46,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xff7b3cff), Color(0xffff2bd6)],
                 ),
+                borderRadius: BorderRadius.circular(24),
               ),
-            Row(
-              children: [
-                _RecordDot(cancelling: cancelling),
-                const SizedBox(width: 10),
-                Text(
-                  holdTimer(view.elapsed),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: view.locked
-                      ? const Text(
-                          'Kilidləndi — danış, sonra göndər',
-                          style: TextStyle(
-                            color: Color(0xff9d94ae),
-                            fontSize: 12,
-                          ),
-                        )
-                      : Row(
-                          children: [
-                            Icon(
-                              Icons.keyboard_double_arrow_left_rounded,
-                              size: 17,
-                              color: cancelling
-                                  ? const Color(0xffff8a9b)
-                                  : const Color(0xff6f6683),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Sürüşdür — ləğv et',
-                              style: TextStyle(
-                                color: cancelling
-                                    ? const Color(0xffff8a9b)
-                                    : const Color(0xff6f6683),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-                if (view.locked) ...[
-                  TextButton(
-                    onPressed: onCancel,
-                    child: const Text(
-                      'Ləğv et',
-                      style: TextStyle(color: Color(0xffff8a9b)),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: recording ? onStop : null,
+                    child: Icon(
+                      recording
+                          ? Icons.stop_rounded
+                          : Icons.graphic_eq_rounded,
+                      color: Colors.white,
+                      size: 21,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  GestureDetector(
-                    onTap: onSend,
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xff7b3cff), Color(0xffff2bd6)],
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.send_rounded,
-                          size: 18, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(child: _Wave(active: recording)),
+                  const SizedBox(width: 12),
+                  Text(
+                    holdTimer(view.elapsed),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: [FontFeature.tabularFigures()],
                     ),
                   ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            Row(
+              children: [
+                IconButton(
+                  tooltip: 'Sil',
+                  onPressed: onDiscard,
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      color: Color(0xffb9b1cb)),
+                ),
+                Expanded(
+                  child: Text(
+                    recording ? 'Danış…' : 'Hazırdır — göndər',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xff9d94ae),
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: ready ? onSend : null,
+                  child: Container(
+                    width: 46,
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: ready
+                          ? const LinearGradient(
+                              colors: [Color(0xff7b3cff), Color(0xffff2bd6)],
+                            )
+                          : null,
+                      color: ready ? null : const Color(0xff241b36),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.send_rounded,
+                      size: 20,
+                      color: ready ? Colors.white : const Color(0xff6f6683),
+                    ),
+                  ),
+                ),
               ],
             ),
           ],
@@ -495,22 +461,21 @@ class _HoldPanel extends StatelessWidget {
   }
 }
 
-/// Yanıb-sönən qırmızı nöqtə.
-class _RecordDot extends StatefulWidget {
-  const _RecordDot({required this.cancelling});
+/// Zolağın içindəki hərəkətli dalğa.
+class _Wave extends StatefulWidget {
+  const _Wave({required this.active});
 
-  final bool cancelling;
+  final bool active;
 
   @override
-  State<_RecordDot> createState() => _RecordDotState();
+  State<_Wave> createState() => _WaveState();
 }
 
-class _RecordDotState extends State<_RecordDot>
-    with SingleTickerProviderStateMixin {
+class _WaveState extends State<_Wave> with SingleTickerProviderStateMixin {
   late final AnimationController controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat(reverse: true);
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
 
   @override
   void dispose() {
@@ -519,17 +484,54 @@ class _RecordDotState extends State<_RecordDot>
   }
 
   @override
-  Widget build(BuildContext context) => FadeTransition(
-        opacity: controller.drive(Tween(begin: .35, end: 1)),
-        child: Container(
-          width: 11,
-          height: 11,
-          decoration: BoxDecoration(
-            color: widget.cancelling
-                ? const Color(0xff6f6683)
-                : const Color(0xffff4d5e),
-            shape: BoxShape.circle,
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) => CustomPaint(
+          size: const Size(double.infinity, 20),
+          painter: _WavePainter(
+            phase: widget.active ? controller.value : 0,
+            active: widget.active,
           ),
         ),
       );
+}
+
+class _WavePainter extends CustomPainter {
+  _WavePainter({required this.phase, required this.active});
+
+  final double phase;
+  final bool active;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: active ? .85 : .4)
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round;
+
+    const gap = 6.0;
+    final count = (size.width / gap).floor();
+
+    for (var i = 0; i < count; i++) {
+      // Sabit "təsadüfi" hündürlük: hər çəkilişdə eyni olsun, yoxsa
+      // dalğa titrəyərdi.
+      final seed = ((i * 53) % 17) / 17;
+      final wave = active
+          ? (0.35 + 0.65 * (1 - (((i / count) + phase) % 1 - .5).abs() * 2))
+          : .45;
+
+      final height = (4 + seed * 12) * wave;
+      final x = i * gap + gap / 2;
+
+      canvas.drawLine(
+        Offset(x, size.height / 2 - height / 2),
+        Offset(x, size.height / 2 + height / 2),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_WavePainter old) =>
+      old.phase != phase || old.active != active;
 }

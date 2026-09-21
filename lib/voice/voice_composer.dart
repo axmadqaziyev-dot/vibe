@@ -60,12 +60,8 @@ class _VoiceComposerState extends State<VoiceComposer>
     try {
       await VoicePlayer.pauseActive();
 
-      if (!await recorder.hasPermission()) {
-        throw StateError(
-          'Mikrofona icazə verilməyib. Brauzer və ya telefon parametrlərindən icazə ver.',
-        );
-      }
-
+      // `hasPermission()` çağırılmır — səbəbi `voice_hold.dart`-da
+      // izah olunub: iOS-da o da ayrıca icazə pəncərəsi açır.
       if (!mounted) return;
 
       recordingFile = await newRecordingPath();
