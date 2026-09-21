@@ -44,6 +44,7 @@ import 'daily_reward.dart';
 import 'chat_themes.dart';
 import 'chat_filter.dart';
 import 'chat_lock.dart';
+import 'chat_notify.dart';
 import 'message_chime.dart';
 import 'whats_new.dart';
 import 'legal.dart';
@@ -5108,21 +5109,15 @@ class _RealChatPageState extends State<RealChatPage> {
         setState(() => replyTo = null);
       }
 
-      try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.targetUid)
-            .collection('notifications')
-            .add({
-          'type': 'message',
-          'title': widget.currentProfile.name,
-          'body': lastMessage,
-          'fromUid': widget.currentProfile.uid,
-          'chatId': chatId,
-          'read': false,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      } catch (_) {}
+      // Bildiriş yalnız tanımadığı adam yazanda gedir — səbəbi
+      // `chat_notify.dart`-da izah olunub.
+      unawaited(notifyNewMessage(
+        toUid: widget.targetUid,
+        fromUid: widget.currentProfile.uid,
+        fromName: widget.currentProfile.name,
+        body: lastMessage,
+        chatId: chatId,
+      ));
 
       // Cihaz bildirişi (Supabase Edge Function deploy edilibsə).
       unawaited(sendPushToUser(

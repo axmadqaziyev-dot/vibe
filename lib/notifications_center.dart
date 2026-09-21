@@ -28,6 +28,48 @@ class NotificationCenterPage extends StatelessWidget {
     await batch.commit();
   }
 
+  /// Siyahını tam təmizləyir.
+  ///
+  /// Oxunmuş bildiriş siyahıda qalırdı və yığılırdı — bir neçə gündən
+  /// sonra adam heç nə tapa bilmirdi.
+  Future<void> _clearAll(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: _panel,
+        title: const Text(
+          'Bildirişləri sil',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
+        content: const Text(
+          'Hamısı silinəcək. Mesajların özü qalır.',
+          style: TextStyle(color: _muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text('Ləğv et', style: TextStyle(color: _muted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('Sil', style: TextStyle(color: Color(0xffff657b))),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      final snap = await ref.limit(300).get();
+      final batch = FirebaseFirestore.instance.batch();
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -42,6 +84,11 @@ class NotificationCenterPage extends StatelessWidget {
           TextButton(
             onPressed: _markAllRead,
             child: const Text('Hamısını oxu'),
+          ),
+          IconButton(
+            tooltip: 'Hamısını sil',
+            onPressed: () => _clearAll(context),
+            icon: const Icon(Icons.delete_sweep_rounded, color: _muted),
           ),
         ],
       ),
