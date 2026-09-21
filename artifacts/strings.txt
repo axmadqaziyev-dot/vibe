@@ -1,0 +1,275 @@
+8	Alınmadı.
+4	Şəhər
+3	Anladım
+3	Haqqımda
+3	Alınmadı. Bağlantını yoxla.
+3	Kopyalandı.
+3	Şikayət göndərildi.
+3	ID kopyalandı.
+2	Paylaşımı sil
+2	Rədd et
+2	Sikkən çatmır.
+2	E-poçt kopyalandı.
+2	E-poçt
+2	Şifrə
+2	İlk şərhi sən yaz 💜
+2	Şərh yaz...
+2	Şikayət göndərilmədi.
+2	Yeni söhbət
+2	Daha çox
+2	Otaq ID kopyalandı.
+2	Ad ilə axtar
+2	Alınmadı. Yenidən sına.
+2	Göndərilmədi. Bağlantını yoxla.
+1	Bəli, sil
+1	Hesabı sil
+1	Başa düşdüm
+1	Hesab silinmədi. Yenidən sına.
+1	Dayandır
+1	Əməliyyat alınmadı.
+1	Paylaşım silindi.
+1	Məzmuna bax
+1	Hesabı dayandır
+1	Əsassız
+1	Baxıldı
+1	Bərpa et
+1	Kod altı simvol olmalıdır.
+1	Belə agentlik tapılmadı.
+1	Qoşulmaq alınmadı.
+1	Məsələn: VIBE Stars
+1	Agentlik yaradılmadı.
+1	Kod kopyalandı.
+1	Yeni şifrə
+1	Ən az 6 simvol
+1	SMS ilə davam et
+1	Blok götürüldü.
+1	Blokdan çıxar
+1	Cavab göndərildi.
+1	Cavab göndərilmədi.
+1	Otaq yaradılmadı. Yenidən sına.
+1	Dostu əlavə et
+1	Hələ hərəkət yoxdur.
+1	Tapılmadı
+1	Mükafat alınmadı. Yenidən sına.
+1	Ailə yarat
+1	Ailənin adı
+1	Təsvir
+1	Ailə
+1	Xəzinəyə töhfə
+1	Ailədən çıx
+1	Ailəyə qoşul
+1	Hələ üzv yoxdur.
+1	Məbləğ
+1	Məbləğ sıfırdan böyük olmalıdır.
+1	Ailə doludur.
+1	Ailəyə qoşuldun.
+1	Artıq bir ailədəsən.
+1	Ailədən çıxdın.
+1	Özünə hədiyyə göndərə bilməzsən.
+1	Hədiyyə göndərilmədi. Yenidən sına.
+1	Qrup yaradılmadı.
+1	Lent açılmadı.
+1	Dəvət mətni kopyalandı — dostuna göndər.
+1	Ad, şəhər, maraq, ID və ya əhval axtar
+1	İndi kəşf et  →
+1	Hər əhval
+1	Filtri təmizlə
+1	Dostunu dəvət et
+1	VIBE-ı ana ekrana əlavə et
+1	1. Aşağıdakı «Paylaş» düyməsinə toxun
+1	2. «Ana ekrana əlavə et» seç
+1	3. «Əlavə et» düyməsini bas
+1	VIBE ikonu telefonunda görünəcək və tam ekranda açılacaq.
+1	Səsli
+1	Qızlar
+1	Oğlanlar
+1	Hər yerdən
+1	Şəhərim
+1	Yenidən
+1	Keç
+1	Dəvət mətni kopyalandı 💜
+1	Link kopyalandı
+1	Dostlarını dəvət et
+1	Dəstəyə yaz
+1	Çıxış et
+1	Apple ilə davam et
+1	Google ilə davam et
+1	Nömrə ilə
+1	E-poçt ilə
+1	Digər
+1	Dəstək
+1	Dəstək e-poçtu kopyalandı.
+1	Nömrə
+1	VIBE
+1	E-poçta link göndər
+1	Gmail və digər e-poçt ünvanları üçün
+1	Nömrəyə SMS kod göndər
+1	Hesabına nömrə bağlıdırsa
+1	Məni yadda saxla
+1	və ya
+1	Hesabın yoxdur?
+1	Ana səhifə
+1	Kəşf et
+1	Canlı
+1	Şifrəni bərpa et
+1	ad@nümunə.com
+1	Bu e-poçtla hesab var
+1	Başqa e-poçt
+1	Yaş
+1	VIBE original sound
+1	İzlənilən
+1	Sənin üçün
+1	İzləmə əməliyyatı alınmadı.
+1	Bloklama alınmadı.
+1	Blok götürülmədi.
+1	Şikayət göndərildi. Təşəkkür edirik.
+1	Otaqlara keç
+1	Şəkil göndər
+1	Qalereyadan seç
+1	Kamera ilə indi çək
+1	İndiki yerin — bir dəfəlik
+1	Hərəkət etdikcə yenilənir
+1	Bir dəfə baxılır, sonra itir
+1	Stiker göndər
+1	Böyük emoji stikerlər
+1	Dostunla növbə ilə — real oyun
+1	Doğruluq
+1	Təsadüfi sual göndər
+1	Cəsarət
+1	Kiçik bir tapşırıq at
+1	Sən hansını seçərsən?
+1	Oyuna keç
+1	Cavabı ləğv et
+1	Ad və ya mesaj axtar
+1	Hazırda yeni tövsiyə yoxdur.
+1	İnsanlar siyahısından seç
+1	Telefon bildirişlərini aç
+1	Tanış ol
+1	Sənə uyğun adamlara salam de
+1	Hamısını oxunmuş et
+1	Bir neçə söhbəti seçib sil
+1	Hamısı oxunmuş sayıldı.
+1	Silinmədi.
+1	İnternet bağlantını yoxla.
+1	Pıçıltı — anonim səs
+1	Sitat gətir
+1	Öz sözünü əlavə et
+1	Olduğu kimi paylaş
+1	Söz əlavə etmədən
+1	Yenidən paylaşıldı.
+1	Nə demək istəyirsən?
+1	Paylaşıldı.
+1	Maraqlandırmır
+1	Səssizə al
+1	Yaddaşdan çıxarıldı.
+1	Yadda saxlanıldı.
+1	Bu an bir daha göstərilməyəcək.
+1	Silinmədi. Bağlantını yoxla.
+1	Bloklanmadı.
+1	Bağlantını yoxla və yenidən aç.
+1	Yaddaşdan çıxar
+1	Şərh göndərilmədi.
+1	Bəyənmə yazılmadı.
+1	Bu an haqqında yaz…
+1	Səsi sil
+1	Ölkə
+1	Doğum ili
+1	Otağa gir
+1	Siyahıda görünürsən, danışa bilərsən
+1	Heç kim səni görmür, sonra üzə çıxa bilərsən
+1	Mesaj göndərilmədi. Yenidən sına.
+1	Hədiyyə göndərilmədi.
+1	Hədiyyə göndərmək üçün mikrofonda kimsə olmalıdır.
+1	Döyüş üçün mikrofonda ən azı iki nəfər olmalıdır.
+1	Döyüş başlamadı.
+1	PK başlamadı.
+1	Çağıracaq adam yoxdur.
+1	Çağırış getmədi.
+1	Tətbiq et
+1	Dəyişiklik saxlanmadı.
+1	Xoş gəlmisiniz! Qaydalar, mövzu, salamlama…
+1	Təqdimat saxlanmadı.
+1	Dəvət kopyalandı.
+1	Mikrofon istəkləri
+1	Otaq ID-sini kopyala
+1	Otaqdan çıx
+1	Kameranı çevir
+1	Şəkil seç
+1	Musiqini kıs
+1	Musiqini dayandır
+1	Geri qayıt
+1	Profilə bax
+1	Yazdıqlarını bir daha görməzsən
+1	Bu otağa bir daha girə bilməz
+1	Mic istə
+1	Domino (2 nəfər)
+1	Room oyunları
+1	Ürək göndər
+1	Qəbul et
+1	Otağın adı
+1	Mövzu
+1	Otaq şifrəsi
+1	Şifrəli otaq
+1	Profil açılmadı.
+1	Link açılmadı.
+1	Profil şəkli yeniləndi ✨
+1	Şəkil saxlanmadı. Yenidən sına.
+1	Örtük şəkli yeniləndi.
+1	Örtük şəkli saxlanmadı.
+1	Örtük şəklini dəyiş
+1	Profili paylaş
+1	Doğum günü yeniləndi.
+1	Yadda saxlanmadı. Yenidən sına.
+1	Masaya dəvət
+1	Söhbət
+1	Tapılmadı.
+1	VIP
+1	Gündəlik +25
+1	Profil şəkli et
+1	Şəkli sil
+1	Şəkilə basıb profil şəkli edə bilərsən
+1	Hələ şəkil əlavə edilməyib
+1	Şikayətləri yoxla və idarə et
+1	Doğum günü
+1	Hesabdan çıxılsın?
+1	Yenidən daxil olmaq üçün şifrən lazım olacaq.
+1	Hesabdan çıxış
+1	Paylaşım silinsin?
+1	Şərh
+1	Söhbətə qoşul
+1	Nə yazırsan?
+1	Əlavə et
+1	Şəkil seç və ya bir yazı əlavə et.
+1	Stori paylaşılmadı.
+1	Ad günü
+1	Təbrik
+1	Yeni paylaşım
+1	Otağa dəvət
+1	Təşəkkür
+1	Status yadda saxlanmadı. Yenidən sına.
+1	İstəsən bir cümlə yaz: "Film tövsiyəsi axtarıram"
+1	Video yüklə
+1	Saxlanılanlar
+1	Hashtag kəşfi
+1	Videonu düzəlt
+1	Video seçimləri
+1	Başlıq
+1	Görünürlük
+1	Video, istifadəçi, hashtag axtar...
+1	Paylaşım mətni kopyalandı.
+1	Video yayımlandı 💜
+1	Başlıq, hashtag...
+1	Video paylaş
+1	Yüklənmədi.
+1	Oyun yüklənmədi.
+1	Oyun tapılmadı.
+1	Daşın qalmadı.
+1	Yenidən oyna
+1	Bazardan çək
+1	Ötür
+1	Boş
+1	Yarısı
+1	Səsi ləğv et
+1	Yazmanı bitir
+1	Səsi göndər
+1	Yenidən yaz

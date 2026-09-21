@@ -237,7 +237,7 @@ class _ShareSheetState extends State<_ShareSheet> {
       if (!mounted) return;
       setState(() => sending = false);
       messenger.showSnackBar(
-        const SnackBar(content: Text('Göndərilmədi. Bağlantını yoxla.')),
+        SnackBar(content: Text(t('Göndərilmədi. Bağlantını yoxla.'))),
       );
     }
   }
@@ -282,7 +282,7 @@ class _ShareSheetState extends State<_ShareSheet> {
           style: const TextStyle(color: Colors.white, fontSize: 14),
           cursorColor: vPink,
           decoration: InputDecoration(
-            hintText: 'Ad ilə axtar',
+            hintText: t('Ad ilə axtar'),
             hintStyle: const TextStyle(color: vMuted, fontSize: 13),
             prefixIcon: const Icon(Icons.search_rounded, color: vMuted, size: 20),
             isDense: true,
@@ -327,9 +327,9 @@ class _ShareSheetState extends State<_ShareSheet> {
           }
 
           if (shown.isEmpty) {
-            return const Padding(
+            return Padding(
               padding: EdgeInsets.all(24),
-              child: Text('Tapılmadı.', style: TextStyle(color: vMuted)),
+              child: Text(t('Tapılmadı.'), style: TextStyle(color: vMuted)),
             );
           }
 
@@ -439,7 +439,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                           if (!context.mounted) return;
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Kopyalandı.')),
+                            SnackBar(content: Text(t('Kopyalandı.'))),
                           );
                         },
                       ),

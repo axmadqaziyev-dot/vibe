@@ -99,7 +99,7 @@ Future<void> showInviteSheet(
                 await Clipboard.setData(ClipboardData(text: text));
                 if (sheet.mounted) Navigator.pop(sheet);
                 messenger.showSnackBar(
-                  const SnackBar(content: Text('Dəvət mətni kopyalandı 💜')),
+                  SnackBar(content: Text(t('Dəvət mətni kopyalandı 💜'))),
                 );
               },
             ),
@@ -113,7 +113,7 @@ Future<void> showInviteSheet(
                   );
                   if (sheet.mounted) Navigator.pop(sheet);
                   messenger.showSnackBar(
-                    const SnackBar(content: Text('Link kopyalandı')),
+                    SnackBar(content: Text(t('Link kopyalandı'))),
                   );
                 },
                 child: const Text(
@@ -184,7 +184,7 @@ class InviteCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           GradientButton(
-            label: 'Dostlarını dəvət et',
+            label: t('Dostlarını dəvət et'),
             icon: Icons.ios_share_rounded,
             expand: false,
             gradient: vBrand,

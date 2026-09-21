@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 
 import 'ui/vibe_design.dart';
 import 'ui/vibe_chrome.dart';
+import 'app/i18n.dart';
 
 class VibeAdminPanel extends StatefulWidget {
   const VibeAdminPanel({super.key});
@@ -57,7 +58,7 @@ class _VibeAdminPanelState extends State<VibeAdminPanel> {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: vRose),
             onPressed: () => Navigator.pop(dialog, true),
-            child: const Text('Dayandır'),
+            child: Text(t('Dayandır')),
           ),
         ],
       ),
@@ -80,7 +81,7 @@ class _VibeAdminPanelState extends State<VibeAdminPanel> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Əməliyyat alınmadı.')),
+          SnackBar(content: Text(t('Əməliyyat alınmadı.'))),
         );
       }
     }
@@ -182,13 +183,13 @@ class _VibeAdminPanelState extends State<VibeAdminPanel> {
                               ),
                             ),
                             trailing: IconButton(
-                              tooltip: 'Paylaşımı sil',
+                              tooltip: t('Paylaşımı sil'),
                               onPressed: () async {
                                 await docs[i].reference.delete();
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Paylaşım silindi.'),
+                                  SnackBar(
+                                    content: Text(t('Paylaşım silindi.')),
                                   ),
                                 );
                               },
@@ -356,7 +357,7 @@ class _VibeAdminPanelState extends State<VibeAdminPanel> {
                           ? null
                           : () => _openContent(targetId, targetName),
                       icon: const Icon(Icons.photo_library_outlined, size: 18),
-                      label: const Text('Məzmuna bax'),
+                      label: Text(t('Məzmuna bax')),
                     ),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(backgroundColor: vRose),
@@ -371,18 +372,18 @@ class _VibeAdminPanelState extends State<VibeAdminPanel> {
                               );
                             },
                       icon: const Icon(Icons.gavel_rounded, size: 18),
-                      label: const Text('Hesabı dayandır'),
+                      label: Text(t('Hesabı dayandır')),
                     ),
                     if (status == 'new') ...[
                       OutlinedButton.icon(
                         onPressed: () => _setStatus(doc.reference, 'dismissed'),
                         icon: const Icon(Icons.close_rounded, size: 18),
-                        label: const Text('Əsassız'),
+                        label: Text(t('Əsassız')),
                       ),
                       FilledButton.icon(
                         onPressed: () => _setStatus(doc.reference, 'reviewed'),
                         icon: const Icon(Icons.check_rounded, size: 18),
-                        label: const Text('Baxıldı'),
+                        label: Text(t('Baxıldı')),
                       ),
                     ],
                   ],
@@ -449,7 +450,7 @@ class _VibeAdminPanelState extends State<VibeAdminPanel> {
               ),
               trailing: TextButton(
                 onPressed: () => _unsuspend(docs[i].id, name),
-                child: const Text('Bərpa et', style: TextStyle(color: vMint)),
+                child: Text(t('Bərpa et'), style: TextStyle(color: vMint)),
               ),
             ),
           );

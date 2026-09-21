@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 class VideoShareButton extends StatelessWidget {
   const VideoShareButton({
@@ -38,8 +39,8 @@ class VideoShareButton extends StatelessWidget {
             );
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Paylaşım mətni kopyalandı.'),
+                SnackBar(
+                  content: Text(t('Paylaşım mətni kopyalandı.')),
                 ),
               );
             }

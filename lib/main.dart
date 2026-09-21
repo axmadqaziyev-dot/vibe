@@ -466,13 +466,13 @@ class SuspendedPage extends StatelessWidget {
             ),
             const SizedBox(height: 28),
             GradientButton(
-              label: 'Dəstəyə yaz',
+              label: t('Dəstəyə yaz'),
               icon: Icons.mail_outline_rounded,
               expand: false,
               onPressed: () {
                 Clipboard.setData(const ClipboardData(text: supportEmail));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('E-poçt kopyalandı.')),
+                  SnackBar(content: Text(t('E-poçt kopyalandı.'))),
                 );
               },
             ),
@@ -585,7 +585,7 @@ class MissingProfilePage extends StatelessWidget {
                 const SizedBox(height: 6),
                 TextButton(
                   onPressed: () => FirebaseAuth.instance.signOut(),
-                  child: const Text('Çıxış et',
+                  child: Text(t('Çıxış et'),
                       style: TextStyle(color: vMuted)),
                 ),
               ],
@@ -615,7 +615,12 @@ class _WelcomePageState extends State<WelcomePage> {
   /// Giriş əməliyyatı gedir — düymələr bağlanır.
   bool authBusy = false;
 
-  static const Map<String, Map<String, String>> t = {
+  /// Xoş gəlmisiniz ekranının öz mətnləri.
+  ///
+  /// Ad qəsdən `t` deyil: qlobal `t()` tərcümə funksiyası ilə eyni
+  /// olsaydı, onu bu sinifin içində kölgələyərdi və heç bir sətir
+  /// tərcümə olunmazdı.
+  static const Map<String, Map<String, String>> welcomeText = {
     'AZ': {
       'home': 'Ana səhifə', 'discover': 'Kəşf et', 'live': 'Canlı',
       'messages': 'Mesajlar', 'login': 'Daxil ol',
@@ -662,7 +667,7 @@ class _WelcomePageState extends State<WelcomePage> {
     },
   };
 
-  String x(String key) => t[lang]![key]!;
+  String x(String key) => welcomeText[lang]![key]!;
 
   void openSection(int index) {
     setState(() => guestTab = index);
@@ -1094,14 +1099,14 @@ class _WelcomePageState extends State<WelcomePage> {
                 // Apple yuxarıda, Google altda — mağaza tətbiqlərindəki sıra.
                 if (appleSignInAvailable) ...[
                   WelcomeAuthButton(
-                    label: 'Apple ilə davam et',
+                    label: t('Apple ilə davam et'),
                     icon: const Icon(Icons.apple, size: 26, color: Colors.black),
                     onPressed: authBusy ? null : _welcomeApple,
                   ),
                   const SizedBox(height: 12),
                 ],
                 WelcomeAuthButton(
-                  label: 'Google ilə davam et',
+                  label: t('Google ilə davam et'),
                   icon: _googleMark(),
                   onPressed: authBusy ? null : _welcomeGoogle,
                 ),
@@ -1112,7 +1117,7 @@ class _WelcomePageState extends State<WelcomePage> {
                     WelcomeMiniButton(
                       icon: Icons.phone_iphone_rounded,
                       color: const Color(0xffd9ccff),
-                      tooltip: 'Nömrə ilə',
+                      tooltip: t('Nömrə ilə'),
                       onPressed:
                           authBusy ? null : () => openPage(const PhoneAuthPage()),
                     ),
@@ -1120,7 +1125,7 @@ class _WelcomePageState extends State<WelcomePage> {
                     WelcomeMiniButton(
                       icon: Icons.mail_outline_rounded,
                       color: const Color(0xff9fe4ff),
-                      tooltip: 'E-poçt ilə',
+                      tooltip: t('E-poçt ilə'),
                       onPressed:
                           authBusy ? null : () => openPage(const LoginPage()),
                     ),
@@ -1128,7 +1133,7 @@ class _WelcomePageState extends State<WelcomePage> {
                     WelcomeMiniButton(
                       icon: Icons.more_horiz_rounded,
                       color: const Color(0xffffd9a0),
-                      tooltip: 'Digər',
+                      tooltip: t('Digər'),
                       onPressed: authBusy ? null : _openMoreWays,
                     ),
                   ],
@@ -1210,11 +1215,11 @@ class _WelcomePageState extends State<WelcomePage> {
   Widget _supportButton() => WelcomeMiniButton(
         icon: Icons.headset_mic_rounded,
         color: const Color(0xffd9ccff),
-        tooltip: 'Dəstək',
+        tooltip: t('Dəstək'),
         onPressed: () {
           Clipboard.setData(const ClipboardData(text: supportEmail));
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Dəstək e-poçtu kopyalandı.')),
+            SnackBar(content: Text(t('Dəstək e-poçtu kopyalandı.'))),
           );
         },
       );
@@ -1268,7 +1273,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   ),
                   const SizedBox(width: 26),
                   _wayButton(
-                    label: 'Nömrə',
+                    label: t('Nömrə'),
                     background: const Color(0xff8b5cff),
                     child: const Icon(Icons.phone_iphone_rounded,
                         color: Colors.white, size: 27),
@@ -1279,7 +1284,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   ),
                   const SizedBox(width: 26),
                   _wayButton(
-                    label: 'E-poçt',
+                    label: t('E-poçt'),
                     background: const Color(0xff22a7ff),
                     child: const Icon(Icons.mail_rounded,
                         color: Colors.white, size: 26),
@@ -1692,17 +1697,17 @@ class _LoginPageState extends State<LoginPage> {
             ),
             ListTile(
               leading: const Icon(Icons.mail_outline_rounded, color: vBlue),
-              title: const Text('E-poçta link göndər',
+              title: Text(t('E-poçta link göndər'),
                   style: TextStyle(color: vInk)),
-              subtitle: const Text('Gmail və digər e-poçt ünvanları üçün',
+              subtitle: Text(t('Gmail və digər e-poçt ünvanları üçün'),
                   style: TextStyle(color: vMuted, fontSize: 12)),
               onTap: () => Navigator.pop(sheet, 'email'),
             ),
             ListTile(
               leading: const Icon(Icons.sms_rounded, color: vMint),
-              title: const Text('Nömrəyə SMS kod göndər',
+              title: Text(t('Nömrəyə SMS kod göndər'),
                   style: TextStyle(color: vInk)),
-              subtitle: const Text('Hesabına nömrə bağlıdırsa',
+              subtitle: Text(t('Hesabına nömrə bağlıdırsa'),
                   style: TextStyle(color: vMuted, fontSize: 12)),
               onTap: () => Navigator.pop(sheet, 'phone'),
             ),
@@ -1956,7 +1961,7 @@ class _LoginPageState extends State<LoginPage> {
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      const Text('Məni yadda saxla', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                      Text(t('Məni yadda saxla'), style: TextStyle(color: Colors.white, fontSize: 13)),
                                       const Spacer(),
                                       TextButton(
                                         onPressed: loading ? null : _resetPassword,
@@ -1990,9 +1995,9 @@ class _LoginPageState extends State<LoginPage> {
                                   Row(
                                     children: [
                                       Expanded(child: Divider(color: Colors.white.withValues(alpha: .16))),
-                                      const Padding(
+                                      Padding(
                                         padding: EdgeInsets.symmetric(horizontal: 14),
-                                        child: Text('və ya', style: TextStyle(color: Color(0xffb7aecb), fontSize: 12)),
+                                        child: Text(t('və ya'), style: TextStyle(color: Color(0xffb7aecb), fontSize: 12)),
                                       ),
                                       Expanded(child: Divider(color: Colors.white.withValues(alpha: .16))),
                                     ],
@@ -2024,7 +2029,7 @@ class _LoginPageState extends State<LoginPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text('Hesabın yoxdur?', style: TextStyle(color: Color(0xffc7bfd8))),
+                                Text(t('Hesabın yoxdur?'), style: TextStyle(color: Color(0xffc7bfd8))),
                                 TextButton(
                                   onPressed: () {
                                     Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterPage()));
@@ -2075,7 +2080,7 @@ class _LoginPageState extends State<LoginPage> {
             const SizedBox(width: 42),
             const Text('Kəşf et', style: TextStyle(color: Colors.white70)),
             const SizedBox(width: 42),
-            const Text('Canlı', style: TextStyle(color: Colors.white70)),
+            Text(t('Canlı'), style: TextStyle(color: Colors.white70)),
             const SizedBox(width: 42),
             const Text('Mesajlar', style: TextStyle(color: Colors.white70)),
           ],
@@ -2236,7 +2241,7 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
     return AlertDialog(
       backgroundColor: vPanel,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Şifrəni bərpa et', style: TextStyle(color: vInk)),
+      title: Text(t('Şifrəni bərpa et'), style: TextStyle(color: vInk)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2256,7 +2261,7 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
               if (error != null) setState(() => error = null);
             },
             decoration: InputDecoration(
-              hintText: 'ad@nümunə.com',
+              hintText: t('ad@nümunə.com'),
               hintStyle: const TextStyle(color: vMuted),
               errorText: error,
               filled: true,
@@ -2412,7 +2417,7 @@ class _RegisterPageState extends State<RegisterPage> {
       builder: (dialog) => AlertDialog(
         backgroundColor: vPanel,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Bu e-poçtla hesab var',
+        title: Text(t('Bu e-poçtla hesab var'),
             style: TextStyle(color: vInk, fontSize: 18)),
         content: Text(
           '$email artıq qeydiyyatdan keçib. Daxil ola, '
@@ -2422,7 +2427,7 @@ class _RegisterPageState extends State<RegisterPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialog),
-            child: const Text('Başqa e-poçt', style: TextStyle(color: vMuted)),
+            child: Text(t('Başqa e-poçt'), style: TextStyle(color: vMuted)),
           ),
           TextButton(
             onPressed: () {
@@ -2496,7 +2501,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         width: 104,
                         child: _field(
                           controller: ageController,
-                          label: 'Yaş',
+                          label: t('Yaş'),
                           icon: Icons.cake_rounded,
                           keyboardType: TextInputType.number,
                         ),
@@ -2505,7 +2510,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       Expanded(
                         child: _field(
                           controller: cityController,
-                          label: 'Şəhər',
+                          label: t('Şəhər'),
                           icon: Icons.place_rounded,
                           textCapitalization: TextCapitalization.words,
                         ),
@@ -2515,7 +2520,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   const SizedBox(height: 11),
                   _field(
                     controller: aboutController,
-                    label: 'Haqqımda',
+                    label: t('Haqqımda'),
                     hint: 'Nəyi sevirsən, nədən danışmağı xoşlayırsan?',
                     icon: Icons.chat_bubble_rounded,
                     maxLines: 3,
@@ -2532,14 +2537,14 @@ class _RegisterPageState extends State<RegisterPage> {
                 children: [
                   _field(
                     controller: emailController,
-                    label: 'E-poçt',
+                    label: t('E-poçt'),
                     icon: Icons.alternate_email_rounded,
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 11),
                   _field(
                     controller: passwordController,
-                    label: 'Şifrə',
+                    label: t('Şifrə'),
                     hint: 'Ən azı 6 simvol',
                     icon: Icons.key_rounded,
                     obscureText: hidePassword,
@@ -3180,7 +3185,7 @@ class _VibeVideoFeedState extends State<VibeVideoFeed> {
                 const SizedBox(height: 12),
                 Expanded(
                   child: comments.isEmpty
-                      ? const Center(child: Text('İlk şərhi sən yaz 💜', style: TextStyle(color: Color(0xffa89fbd))))
+                      ? Center(child: Text(t('İlk şərhi sən yaz 💜'), style: TextStyle(color: Color(0xffa89fbd))))
                       : ListView.separated(
                           itemCount: comments.length,
                           separatorBuilder: (_, __) => const Divider(color: Color(0xff2d2540)),
@@ -3193,7 +3198,7 @@ class _VibeVideoFeedState extends State<VibeVideoFeed> {
                 ),
                 Row(
                   children: [
-                    Expanded(child: TextField(controller: controller, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Şərh yaz...'))),
+                    Expanded(child: TextField(controller: controller, style: TextStyle(color: Colors.white), decoration: InputDecoration(hintText: t('Şərh yaz...')))),
                     const SizedBox(width: 8),
                     IconButton.filled(
                       onPressed: () async {
@@ -3324,12 +3329,12 @@ class _VibeVideoFeedState extends State<VibeVideoFeed> {
               child: Row(
                 children: [
                   const Spacer(),
-                  const Text('İzlənilən', style: TextStyle(color: Color(0xff9f96b4), fontWeight: FontWeight.w700)),
+                  Text(t('İzlənilən'), style: TextStyle(color: Color(0xff9f96b4), fontWeight: FontWeight.w700)),
                   const SizedBox(width: 22),
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Sənin üçün', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+                      Text(t('Sənin üçün'), style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
                       const SizedBox(height: 5),
                       Container(width: 34, height: 2, decoration: BoxDecoration(borderRadius: BorderRadius.circular(2), gradient: const LinearGradient(colors: [Color(0xff8b5cff), Color(0xffff2bd6)]))),
                     ],
@@ -3474,7 +3479,7 @@ class _PersonPageState extends State<PersonPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('İzləmə əməliyyatı alınmadı.')),
+          SnackBar(content: Text(t('İzləmə əməliyyatı alınmadı.'))),
         );
       }
     }
@@ -3497,7 +3502,7 @@ class _PersonPageState extends State<PersonPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bloklama alınmadı.')),
+          SnackBar(content: Text(t('Bloklama alınmadı.'))),
         );
       }
     }
@@ -3514,7 +3519,7 @@ class _PersonPageState extends State<PersonPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Blok götürülmədi.')),
+          SnackBar(content: Text(t('Blok götürülmədi.'))),
         );
       }
     }
@@ -3533,13 +3538,13 @@ class _PersonPageState extends State<PersonPage> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Şikayət göndərildi. Təşəkkür edirik.')),
+          SnackBar(content: Text(t('Şikayət göndərildi. Təşəkkür edirik.'))),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Şikayət göndərilmədi.')),
+          SnackBar(content: Text(t('Şikayət göndərilmədi.'))),
         );
       }
     }
@@ -4434,7 +4439,7 @@ class _PersonPageState extends State<PersonPage> {
             ),
             const SizedBox(height: 16),
             GradientButton(
-              label: 'Otaqlara keç',
+              label: t('Otaqlara keç'),
               icon: Icons.mic_rounded,
               onPressed: () => Navigator.pop(sheet),
             ),
@@ -5992,8 +5997,8 @@ class _RealChatPageState extends State<RealChatPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.photo_library_rounded, color: Color(0xff48e08a)),
-                  title: const Text('Şəkil göndər', style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('Qalereyadan seç', style: TextStyle(color: vMuted, fontSize: 12)),
+                  title: Text(t('Şəkil göndər'), style: TextStyle(color: Colors.white)),
+                  subtitle: Text(t('Qalereyadan seç'), style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(sheet);
                     _sendPhoto(ImageSource.gallery);
@@ -6002,7 +6007,7 @@ class _RealChatPageState extends State<RealChatPage> {
                 ListTile(
                   leading: const Icon(Icons.photo_camera_rounded, color: Color(0xff22a7ff)),
                   title: Text(t('Şəkil çək'), style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('Kamera ilə indi çək', style: TextStyle(color: vMuted, fontSize: 12)),
+                  subtitle: Text(t('Kamera ilə indi çək'), style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(sheet);
                     _sendPhoto(ImageSource.camera);
@@ -6017,7 +6022,7 @@ class _RealChatPageState extends State<RealChatPage> {
                       color: Color(0xff2de28a)),
                   title: Text(t('Konum göndər'),
                       style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('İndiki yerin — bir dəfəlik',
+                  subtitle: Text(t('İndiki yerin — bir dəfəlik'),
                       style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(sheet);
@@ -6029,7 +6034,7 @@ class _RealChatPageState extends State<RealChatPage> {
                       color: Color(0xff22a7ff)),
                   title: Text(t('Canlı konum'),
                       style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('Hərəkət etdikcə yenilənir',
+                  subtitle: Text(t('Hərəkət etdikcə yenilənir'),
                       style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(sheet);
@@ -6040,7 +6045,7 @@ class _RealChatPageState extends State<RealChatPage> {
                   leading: const Icon(Icons.looks_one_rounded, color: vPink),
                   title: Text(t('Bir dəfəlik şəkil'),
                       style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('Bir dəfə baxılır, sonra itir',
+                  subtitle: Text(t('Bir dəfə baxılır, sonra itir'),
                       style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(sheet);
@@ -6049,8 +6054,8 @@ class _RealChatPageState extends State<RealChatPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.auto_awesome_rounded, color: Color(0xffff5bd6)),
-                  title: const Text('Stiker göndər', style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('Böyük emoji stikerlər', style: TextStyle(color: vMuted, fontSize: 12)),
+                  title: Text(t('Stiker göndər'), style: TextStyle(color: Colors.white)),
+                  subtitle: Text(t('Böyük emoji stikerlər'), style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(sheet);
                     openStickerPicker();
@@ -6060,7 +6065,7 @@ class _RealChatPageState extends State<RealChatPage> {
                   leading: const Icon(Icons.casino_rounded, color: Color(0xff48e08a)),
                   title: const Text('Domino oyna',
                       style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('Dostunla növbə ilə — real oyun',
+                  subtitle: Text(t('Dostunla növbə ilə — real oyun'),
                       style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(sheet);
@@ -6069,19 +6074,19 @@ class _RealChatPageState extends State<RealChatPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.psychology_alt_rounded, color: Color(0xff8fd4ff)),
-                  title: const Text('Doğruluq', style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('Təsadüfi sual göndər', style: TextStyle(color: vMuted, fontSize: 12)),
+                  title: Text(t('Doğruluq'), style: TextStyle(color: Colors.white)),
+                  subtitle: Text(t('Təsadüfi sual göndər'), style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () => _sendFun(truths),
                 ),
                 ListTile(
                   leading: const Icon(Icons.local_fire_department_rounded, color: Color(0xffff8a3d)),
-                  title: const Text('Cəsarət', style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('Kiçik bir tapşırıq at', style: TextStyle(color: vMuted, fontSize: 12)),
+                  title: Text(t('Cəsarət'), style: TextStyle(color: Colors.white)),
+                  subtitle: Text(t('Kiçik bir tapşırıq at'), style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () => _sendFun(dares),
                 ),
                 ListTile(
                   leading: const Icon(Icons.casino_rounded, color: Color(0xff48e08a)),
-                  title: const Text('Sən hansını seçərsən?', style: TextStyle(color: Colors.white)),
+                  title: Text(t('Sən hansını seçərsən?'), style: TextStyle(color: Colors.white)),
                   subtitle: const Text('İki variantdan biri', style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () => _sendFun(wouldYouRather),
                 ),
@@ -6759,7 +6764,7 @@ class _RealChatPageState extends State<RealChatPage> {
                                   ),
                                   const SizedBox(height: 12),
                                   GradientButton(
-                                    label: 'Oyuna keç',
+                                    label: t('Oyuna keç'),
                                     height: 40,
                                     fontSize: 13.5,
                                     gradient: vBrand,
@@ -7343,7 +7348,7 @@ class _RealChatPageState extends State<RealChatPage> {
                                 ),
                               ),
                               IconButton(
-                                tooltip: 'Cavabı ləğv et',
+                                tooltip: t('Cavabı ləğv et'),
                                 onPressed: () => setState(() => replyTo = null),
                                 icon: const Icon(Icons.close_rounded,
                                     color: Color(0xff9d94ae), size: 19),

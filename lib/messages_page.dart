@@ -191,12 +191,12 @@ class _SocialMessagesState extends State<SocialMessages> {
         ),
         TopIconButton(
           icon: Icons.add_circle_outline_rounded,
-          tooltip: 'Yeni söhbət',
+          tooltip: t('Yeni söhbət'),
           onTap: () => setState(() => tab = 1),
         ),
         TopIconButton(
           icon: Icons.menu_rounded,
-          tooltip: 'Daha çox',
+          tooltip: t('Daha çox'),
           onTap: _openTools,
         ),
       ],
@@ -247,7 +247,7 @@ class _SocialMessagesState extends State<SocialMessages> {
       style: const TextStyle(color: Colors.white),
       cursorColor: vPink,
       decoration: InputDecoration(
-        hintText: 'Ad və ya mesaj axtar',
+        hintText: t('Ad və ya mesaj axtar'),
         hintStyle: const TextStyle(color: vMuted, fontSize: 13),
         prefixIcon: const Icon(Icons.search_rounded, color: vPurple),
         isDense: true,
@@ -474,7 +474,7 @@ class _SocialMessagesState extends State<SocialMessages> {
 
     if (people.isEmpty) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Hazırda yeni tövsiyə yoxdur.')),
+        SnackBar(content: Text(t('Hazırda yeni tövsiyə yoxdur.'))),
       );
       return;
     }
@@ -504,9 +504,9 @@ class _SocialMessagesState extends State<SocialMessages> {
             ListTile(
               leading: const Icon(Icons.person_add_alt_1_rounded,
                   color: vMuted),
-              title: const Text('Yeni söhbət',
+              title: Text(t('Yeni söhbət'),
                   style: TextStyle(color: Colors.white)),
-              subtitle: const Text('İnsanlar siyahısından seç',
+              subtitle: Text(t('İnsanlar siyahısından seç'),
                   style: TextStyle(color: vMuted, fontSize: 12)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -516,7 +516,7 @@ class _SocialMessagesState extends State<SocialMessages> {
             ListTile(
               leading: const Icon(Icons.notifications_active_rounded,
                   color: vPink),
-              title: const Text('Telefon bildirişlərini aç',
+              title: Text(t('Telefon bildirişlərini aç'),
                   style: TextStyle(color: Colors.white)),
               subtitle: const Text(
                 'Tətbiq bağlı olanda da mesajdan xəbərin olsun',
@@ -541,9 +541,9 @@ class _SocialMessagesState extends State<SocialMessages> {
             ),
             ListTile(
               leading: const Icon(Icons.auto_awesome_rounded, color: vPink),
-              title: const Text('Tanış ol',
+              title: Text(t('Tanış ol'),
                   style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Sənə uyğun adamlara salam de',
+              subtitle: Text(t('Sənə uyğun adamlara salam de'),
                   style: TextStyle(color: vMuted, fontSize: 12)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -553,7 +553,7 @@ class _SocialMessagesState extends State<SocialMessages> {
             ListTile(
               leading: const Icon(Icons.mark_chat_read_outlined,
                   color: vMuted),
-              title: const Text('Hamısını oxunmuş et',
+              title: Text(t('Hamısını oxunmuş et'),
                   style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -570,7 +570,7 @@ class _SocialMessagesState extends State<SocialMessages> {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              subtitle: const Text('Bir neçə söhbəti seçib sil',
+              subtitle: Text(t('Bir neçə söhbəti seçib sil'),
                   style: TextStyle(color: vMuted, fontSize: 12)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -656,10 +656,10 @@ class _SocialMessagesState extends State<SocialMessages> {
       await batch.commit();
 
       messenger.showSnackBar(
-        const SnackBar(content: Text('Hamısı oxunmuş sayıldı.')),
+        SnackBar(content: Text(t('Hamısı oxunmuş sayıldı.'))),
       );
     } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Alınmadı.'))));
     }
   }
 
@@ -729,7 +729,7 @@ class _SocialMessagesState extends State<SocialMessages> {
         SnackBar(content: Text('${ids.length} söhbət silindi.')),
       );
     } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Silinmədi.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Silinmədi.'))));
     }
   }
 
@@ -1513,7 +1513,7 @@ class _MessagesError extends StatelessWidget {
   const _MessagesError();
 
   @override
-  Widget build(BuildContext context) => const Padding(
+  Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.all(32),
     child: Center(
       child: Column(
@@ -1530,7 +1530,7 @@ class _MessagesError extends StatelessWidget {
             ),
           ),
           SizedBox(height: 6),
-          Text('İnternet bağlantını yoxla.', style: TextStyle(color: vMuted)),
+          Text(t('İnternet bağlantını yoxla.'), style: TextStyle(color: vMuted)),
         ],
       ),
     ),

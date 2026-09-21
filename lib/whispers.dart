@@ -275,8 +275,8 @@ class _WhispersPageState extends State<WhispersPage> {
       stream: query.snapshots(),
       builder: (context, snap) {
         if (snap.hasError) {
-          return const Center(
-            child: Text('Yüklənmədi.', style: TextStyle(color: Colors.white70)),
+          return Center(
+            child: Text(t('Yüklənmədi.'), style: TextStyle(color: Colors.white70)),
           );
         }
 
@@ -455,10 +455,10 @@ class _WhispersPageState extends State<WhispersPage> {
       });
 
       messenger.showSnackBar(
-        const SnackBar(content: Text('Şikayət göndərildi.')),
+        SnackBar(content: Text(t('Şikayət göndərildi.'))),
       );
     } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Alınmadı.'))));
     }
   }
 

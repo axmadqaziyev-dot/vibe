@@ -6,6 +6,7 @@ import 'install_app_stub.dart'
     if (dart.library.js_interop) 'install_app_web.dart' as platform;
 
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// Veb versiyanı telefonun ana ekranına "əsl tətbiq" kimi quraşdırmaq.
 ///
@@ -40,9 +41,9 @@ Future<void> showIosInstallHelp(BuildContext context) {
     builder: (dialog) => AlertDialog(
       backgroundColor: vPanel,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('VIBE-ı ana ekrana əlavə et',
+      title: Text(t('VIBE-ı ana ekrana əlavə et'),
           style: TextStyle(color: vInk, fontSize: 18)),
-      content: const Column(
+      content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -53,14 +54,14 @@ Future<void> showIosInstallHelp(BuildContext context) {
           Text('3. «Əlavə et» düyməsini bas',
               style: TextStyle(color: vMuted, height: 1.6)),
           SizedBox(height: 10),
-          Text('VIBE ikonu telefonunda görünəcək və tam ekranda açılacaq.',
+          Text(t('VIBE ikonu telefonunda görünəcək və tam ekranda açılacaq.'),
               style: TextStyle(color: vInk, fontSize: 13, height: 1.5)),
         ],
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialog),
-          child: const Text('Anladım', style: TextStyle(color: vPink)),
+          child: Text(t('Anladım'), style: TextStyle(color: vPink)),
         ),
       ],
     ),

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 Future<void> showVideoReportSheet(
   BuildContext context, {
@@ -56,8 +57,8 @@ Future<void> showVideoReportSheet(
                 if (context.mounted) {
                   Navigator.pop(sheet);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Şikayət göndərildi.'),
+                    SnackBar(
+                      content: Text(t('Şikayət göndərildi.')),
                     ),
                   );
                 }

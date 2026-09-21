@@ -70,7 +70,7 @@ class _VideoUploadButtonState extends State<VideoUploadButton> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Video yayımlandı 💜')),
+          SnackBar(content: Text(t('Video yayımlandı 💜'))),
         );
       }
     } catch (e) {
@@ -111,8 +111,8 @@ class _VideoUploadButtonState extends State<VideoUploadButton> {
           maxLength: 2200,
           maxLines: 4,
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Başlıq, hashtag...',
+          decoration: InputDecoration(
+            hintText: t('Başlıq, hashtag...'),
             hintStyle: TextStyle(color: Colors.white38),
           ),
         ),
@@ -135,7 +135,7 @@ class _VideoUploadButtonState extends State<VideoUploadButton> {
   @override
   Widget build(BuildContext context) {
     return IconButton.filled(
-      tooltip: 'Video paylaş',
+      tooltip: t('Video paylaş'),
       onPressed: uploading ? null : upload,
       icon: uploading
           ? const SizedBox(

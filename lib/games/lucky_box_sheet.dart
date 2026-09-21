@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import '../ui/vibe_design.dart';
 import '../user_profile.dart';
 import 'lucky_box.dart';
+import '../app/i18n.dart';
 
 void showLuckyBox(
   BuildContext context, {
@@ -133,13 +134,13 @@ class _LuckyBoxSheetState extends State<_LuckyBoxSheet>
       if (!mounted) return;
       setState(() => busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sikkən çatmır.')),
+        SnackBar(content: Text(t('Sikkən çatmır.'))),
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Alınmadı. Yenidən sına.')),
+        SnackBar(content: Text(t('Alınmadı. Yenidən sına.'))),
       );
     }
   }

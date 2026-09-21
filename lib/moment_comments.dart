@@ -23,6 +23,7 @@ import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
 import 'server_time.dart';
+import 'app/i18n.dart';
 
 class MomentCommentsSheet extends StatefulWidget {
   const MomentCommentsSheet({
@@ -108,7 +109,7 @@ class _MomentCommentsSheetState extends State<MomentCommentsSheet> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Şərh göndərilmədi.')),
+          SnackBar(content: Text(t('Şərh göndərilmədi.'))),
         );
       }
     } finally {
@@ -185,7 +186,7 @@ class _MomentCommentsSheetState extends State<MomentCommentsSheet> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bəyənmə yazılmadı.')),
+          SnackBar(content: Text(t('Bəyənmə yazılmadı.'))),
         );
       }
     }

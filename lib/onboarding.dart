@@ -9,6 +9,7 @@ import 'media_store.dart';
 import 'telemetry.dart';
 import 'ui/vibe_design.dart';
 import 'ui/vibe_chrome.dart';
+import 'app/i18n.dart';
 
 /// Qeydiyyatdan sonra profili tamamlayan üç addımlı ekran.
 ///
@@ -348,7 +349,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           const SizedBox(height: 6),
           _field(nameController, 'Adın'),
           const SizedBox(height: 16),
-          const Text('Şəhər', style: TextStyle(color: vMuted, fontSize: 13)),
+          Text(t('Şəhər'), style: TextStyle(color: vMuted, fontSize: 13)),
           const SizedBox(height: 6),
           _field(cityController, 'Bakı'),
         ],
@@ -375,7 +376,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             ],
           ),
           const SizedBox(height: 26),
-          const Text('Ölkə', style: TextStyle(color: vMuted, fontSize: 13)),
+          Text(t('Ölkə'), style: TextStyle(color: vMuted, fontSize: 13)),
           const SizedBox(height: 10),
           PressableScale(
             onTap: () async {
@@ -420,7 +421,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             ),
           ),
           const SizedBox(height: 26),
-          const Text('Doğum ili', style: TextStyle(color: vMuted, fontSize: 13)),
+          Text(t('Doğum ili'), style: TextStyle(color: vMuted, fontSize: 13)),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),

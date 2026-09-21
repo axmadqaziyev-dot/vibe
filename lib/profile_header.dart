@@ -154,13 +154,13 @@ class _ProfileCoverHeaderState extends State<ProfileCoverHeader> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profil şəkli yeniləndi ✨')),
+          SnackBar(content: Text(t('Profil şəkli yeniləndi ✨'))),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Şəkil saxlanmadı. Yenidən sına.')),
+          SnackBar(content: Text(t('Şəkil saxlanmadı. Yenidən sına.'))),
         );
       }
     } finally {
@@ -184,13 +184,13 @@ class _ProfileCoverHeaderState extends State<ProfileCoverHeader> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Örtük şəkli yeniləndi.')),
+          SnackBar(content: Text(t('Örtük şəkli yeniləndi.'))),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Örtük şəkli saxlanmadı.')),
+          SnackBar(content: Text(t('Örtük şəkli saxlanmadı.'))),
         );
       }
     } finally {
@@ -241,12 +241,12 @@ class _ProfileCoverHeaderState extends State<ProfileCoverHeader> {
                           icon: uploading
                               ? Icons.hourglass_top_rounded
                               : Icons.photo_camera_rounded,
-                          tooltip: 'Örtük şəklini dəyiş',
+                          tooltip: t('Örtük şəklini dəyiş'),
                           onTap: _changeCover,
                         ),
                         TopIconButton(
                           icon: Icons.ios_share_rounded,
-                          tooltip: 'Profili paylaş',
+                          tooltip: t('Profili paylaş'),
                           onTap: widget.onShare,
                         ),
                         TopIconButton(
@@ -391,7 +391,7 @@ class _ProfileCoverHeaderState extends State<ProfileCoverHeader> {
                           ClipboardData(text: widget.profile.uid),
                         );
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('ID kopyalandı.')),
+                          SnackBar(content: Text(t('ID kopyalandı.'))),
                         );
                       },
                       child: Row(
@@ -669,13 +669,13 @@ class ProfileInfoSection extends StatelessWidget {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Doğum günü yeniləndi.')),
+          SnackBar(content: Text(t('Doğum günü yeniləndi.'))),
         );
       }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Yadda saxlanmadı. Yenidən sına.')),
+          SnackBar(content: Text(t('Yadda saxlanmadı. Yenidən sına.'))),
         );
       }
     }
@@ -719,7 +719,7 @@ class ProfileInfoSection extends StatelessWidget {
           onTap: () {
             Clipboard.setData(ClipboardData(text: uid));
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('ID kopyalandı.')),
+              SnackBar(content: Text(t('ID kopyalandı.'))),
             );
           },
           trailing: Icons.copy_rounded,

@@ -35,7 +35,7 @@ class _FamiliesPageState extends State<FamiliesPage> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Ailə yarat',
+            tooltip: t('Ailə yarat'),
             icon: const Icon(Icons.add_circle_outline_rounded),
             onPressed: _create,
           ),
@@ -439,7 +439,7 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
         children: [
           _field(
             controller: nameController,
-            label: 'Ailənin adı',
+            label: t('Ailənin adı'),
             icon: Icons.shield_rounded,
             maxLength: 20,
           ),
@@ -473,7 +473,7 @@ class _CreateFamilyPageState extends State<CreateFamilyPage> {
           const SizedBox(height: 16),
           _field(
             controller: aboutController,
-            label: 'Təsvir',
+            label: t('Təsvir'),
             icon: Icons.notes_rounded,
             maxLines: 4,
             maxLength: 200,
@@ -586,7 +586,7 @@ class FamilyPage extends StatelessWidget {
       backgroundColor: vBg,
       appBar: AppBar(
         backgroundColor: const Color(0xff0b0711),
-        title: const Text('Ailə', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: Text(t('Ailə'), style: TextStyle(fontWeight: FontWeight.w900)),
       ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: family.snapshots(),
@@ -745,7 +745,7 @@ class FamilyPage extends StatelessWidget {
               children: [
                 Expanded(
                   child: GradientButton(
-                    label: 'Xəzinəyə töhfə',
+                    label: t('Xəzinəyə töhfə'),
                     icon: Icons.savings_rounded,
                     gradient: vSunset,
                     height: 48,
@@ -758,7 +758,7 @@ class FamilyPage extends StatelessWidget {
                     width: 52,
                     height: 48,
                     child: IconButton(
-                      tooltip: 'Ailədən çıx',
+                      tooltip: t('Ailədən çıx'),
                       icon: const Icon(Icons.logout_rounded, color: vMuted),
                       onPressed: () => _leave(context),
                     ),
@@ -769,7 +769,7 @@ class FamilyPage extends StatelessWidget {
           }
 
           return GradientButton(
-            label: 'Ailəyə qoşul',
+            label: t('Ailəyə qoşul'),
             icon: Icons.group_add_rounded,
             gradient: vBrand,
             height: 48,
@@ -807,9 +807,9 @@ class FamilyPage extends StatelessWidget {
 
           final docs = snap.data!.docs;
           if (docs.isEmpty) {
-            return const Padding(
+            return Padding(
               padding: EdgeInsets.all(20),
-              child: Text('Hələ üzv yoxdur.',
+              child: Text(t('Hələ üzv yoxdur.'),
                   style: TextStyle(color: vMuted)),
             );
           }
@@ -927,10 +927,10 @@ class FamilyPage extends StatelessWidget {
               autofocus: true,
               style: const TextStyle(color: Colors.white, fontSize: 18),
               cursorColor: vPink,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 prefixText: '💰  ',
                 prefixStyle: TextStyle(fontSize: 18),
-                hintText: 'Məbləğ',
+                hintText: t('Məbləğ'),
                 hintStyle: TextStyle(color: vMuted),
               ),
             ),
@@ -961,7 +961,7 @@ class FamilyPage extends StatelessWidget {
 
     if (amount <= 0) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Məbləğ sıfırdan böyük olmalıdır.')),
+        SnackBar(content: Text(t('Məbləğ sıfırdan böyük olmalıdır.'))),
       );
       return;
     }
@@ -991,10 +991,10 @@ class FamilyPage extends StatelessWidget {
       );
     } on StateError {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Sikkən çatmır.')),
+        SnackBar(content: Text(t('Sikkən çatmır.'))),
       );
     } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Alınmadı.'))));
     }
   }
 
@@ -1004,7 +1004,7 @@ class FamilyPage extends StatelessWidget {
 
     if (members >= familyMaxMembers) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Ailə doludur.')),
+        SnackBar(content: Text(t('Ailə doludur.'))),
       );
       return;
     }
@@ -1033,13 +1033,13 @@ class FamilyPage extends StatelessWidget {
         }, SetOptions(merge: true));
       });
 
-      messenger.showSnackBar(const SnackBar(content: Text('Ailəyə qoşuldun.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Ailəyə qoşuldun.'))));
     } on StateError {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Artıq bir ailədəsən.')),
+        SnackBar(content: Text(t('Artıq bir ailədəsən.'))),
       );
     } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Alınmadı.'))));
     }
   }
 
@@ -1062,9 +1062,9 @@ class FamilyPage extends StatelessWidget {
 
       await batch.commit();
 
-      messenger.showSnackBar(const SnackBar(content: Text('Ailədən çıxdın.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Ailədən çıxdın.'))));
     } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Alınmadı.'))));
     }
   }
 }

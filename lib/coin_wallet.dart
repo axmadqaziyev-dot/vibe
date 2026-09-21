@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 
 import 'ui/vibe_design.dart';
 import 'ui/vibe_chrome.dart';
+import 'app/i18n.dart';
 
 class InsufficientCoins implements Exception {
   const InsufficientCoins(this.balance, this.needed);
@@ -179,8 +180,8 @@ class CoinHistoryPage extends StatelessWidget {
         }
         final docs = snapshot.data!.docs;
         if (docs.isEmpty) {
-          return const Center(
-            child: Text('Hələ hərəkət yoxdur.', style: TextStyle(color: vMuted)),
+          return Center(
+            child: Text(t('Hələ hərəkət yoxdur.'), style: TextStyle(color: vMuted)),
           );
         }
 

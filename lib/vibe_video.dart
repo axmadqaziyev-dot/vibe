@@ -211,12 +211,12 @@ class _VibeVideoPageState extends State<VibeVideoPage> {
           children: [
             ListTile(
               leading: const Icon(Icons.video_call_rounded, color: Color(0xffff2bd6)),
-              title: const Text('Video yüklə', style: TextStyle(color: Colors.white)),
+              title: Text(t('Video yüklə'), style: TextStyle(color: Colors.white)),
               trailing: VideoUploadButton(profile: widget.profile),
             ),
             ListTile(
               leading: const Icon(Icons.bookmark_rounded, color: Color(0xff8b5cff)),
-              title: const Text('Saxlanılanlar', style: TextStyle(color: Colors.white)),
+              title: Text(t('Saxlanılanlar'), style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(sheet);
                 setState(() => mode = 2);
@@ -224,7 +224,7 @@ class _VibeVideoPageState extends State<VibeVideoPage> {
             ),
             ListTile(
               leading: const Icon(Icons.tag_rounded, color: Color(0xff22a7ff)),
-              title: const Text('Hashtag kəşfi', style: TextStyle(color: Colors.white)),
+              title: Text(t('Hashtag kəşfi'), style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(sheet);
                 Navigator.push(
@@ -914,7 +914,7 @@ class _VideoCardState extends State<_VideoCard>
             if (owner)
               ListTile(
                 leading: const Icon(Icons.edit_rounded, color: Color(0xff8b5cff)),
-                title: const Text('Videonu düzəlt', style: TextStyle(color: Colors.white)),
+                title: Text(t('Videonu düzəlt'), style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(sheet);
                   Navigator.push(
@@ -930,7 +930,7 @@ class _VideoCardState extends State<_VideoCard>
               ),
             ListTile(
               leading: const Icon(Icons.tune_rounded, color: Color(0xff22a7ff)),
-              title: const Text('Video seçimləri', style: TextStyle(color: Colors.white)),
+              title: Text(t('Video seçimləri'), style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(sheet);
                 showVideoManageSheet(

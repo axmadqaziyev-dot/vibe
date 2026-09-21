@@ -5,6 +5,7 @@ import '../ui/vibe_design.dart';
 import '../user_profile.dart';
 import 'domino_engine.dart';
 import 'domino_tile.dart';
+import '../app/i18n.dart';
 
 /// İki nəfərlik domino oyunu.
 ///
@@ -172,8 +173,8 @@ class _DominoPageState extends State<DominoPage> {
         stream: match.snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return const Center(
-              child: Text('Oyun yüklənmədi.',
+            return Center(
+              child: Text(t('Oyun yüklənmədi.'),
                   style: TextStyle(color: vMuted)),
             );
           }
@@ -185,8 +186,8 @@ class _DominoPageState extends State<DominoPage> {
 
           final data = snapshot.data!.data();
           if (data == null) {
-            return const Center(
-              child: Text('Oyun tapılmadı.', style: TextStyle(color: vMuted)),
+            return Center(
+              child: Text(t('Oyun tapılmadı.'), style: TextStyle(color: vMuted)),
             );
           }
 
@@ -376,8 +377,8 @@ class _DominoPageState extends State<DominoPage> {
     return SizedBox(
       height: 96,
       child: hand.isEmpty
-          ? const Center(
-              child: Text('Daşın qalmadı.',
+          ? Center(
+              child: Text(t('Daşın qalmadı.'),
                   style: TextStyle(color: vMuted, fontSize: 13)),
             )
           : ListView.builder(
@@ -413,7 +414,7 @@ class _DominoPageState extends State<DominoPage> {
       return Padding(
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
         child: GradientButton(
-          label: 'Yenidən oyna',
+          label: t('Yenidən oyna'),
           icon: Icons.refresh_rounded,
           gradient: vBrand,
           onPressed: busy ? null : () => _restart(data),
@@ -443,7 +444,7 @@ class _DominoPageState extends State<DominoPage> {
                 ),
               ),
               icon: const Icon(Icons.download_rounded, size: 18),
-              label: const Text('Bazardan çək'),
+              label: Text(t('Bazardan çək')),
             ),
           ),
           const SizedBox(width: 10),
@@ -461,7 +462,7 @@ class _DominoPageState extends State<DominoPage> {
                 ),
               ),
               icon: const Icon(Icons.skip_next_rounded, size: 18),
-              label: const Text('Ötür'),
+              label: Text(t('Ötür')),
             ),
           ),
         ],

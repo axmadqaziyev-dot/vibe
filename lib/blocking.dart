@@ -10,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// İki nəfər arasındakı blok vəziyyəti.
 class BlockState {
@@ -272,10 +273,10 @@ class BlockedListPage extends StatelessWidget {
                   await unblockUser(myUid: myUid, targetUid: docs[index].id);
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Blok götürüldü.')),
+                    SnackBar(content: Text(t('Blok götürüldü.'))),
                   );
                 },
-                child: const Text('Blokdan çıxar', style: TextStyle(color: vPink)),
+                child: Text(t('Blokdan çıxar'), style: TextStyle(color: vPink)),
               ),
             );
           },

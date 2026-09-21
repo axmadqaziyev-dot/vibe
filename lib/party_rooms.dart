@@ -285,9 +285,9 @@ class _PartyRoomsPageState extends State<PartyRoomsPage> {
           children: [
             ListTile(
               leading: const Icon(Icons.login_rounded, color: _pink),
-              title: const Text('Otağa gir',
+              title: Text(t('Otağa gir'),
                   style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Siyahıda görünürsən, danışa bilərsən',
+              subtitle: Text(t('Siyahıda görünürsən, danışa bilərsən'),
                   style: TextStyle(color: _muted, fontSize: 12)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -298,7 +298,7 @@ class _PartyRoomsPageState extends State<PartyRoomsPage> {
               leading: const Icon(Icons.headphones_rounded, color: _blue),
               title: const Text('Gizli qulaq as',
                   style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Heç kim səni görmür, sonra üzə çıxa bilərsən',
+              subtitle: Text(t('Heç kim səni görmür, sonra üzə çıxa bilərsən'),
                   style: TextStyle(color: _muted, fontSize: 12)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -1134,7 +1134,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
       if (!mounted) return;
       message.text = text;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mesaj göndərilmədi. Yenidən sına.')),
+        SnackBar(content: Text(t('Mesaj göndərilmədi. Yenidən sına.'))),
       );
     }
   }
@@ -1299,7 +1299,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Hədiyyə göndərilmədi.')),
+          SnackBar(content: Text(t('Hədiyyə göndərilmədi.'))),
         );
       }
     }
@@ -1485,8 +1485,8 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
 
     if (targets.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Hədiyyə göndərmək üçün mikrofonda kimsə olmalıdır.'),
+        SnackBar(
+          content: Text(t('Hədiyyə göndərmək üçün mikrofonda kimsə olmalıdır.')),
         ),
       );
       return;
@@ -2250,7 +2250,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           TopIconButton(
             icon: Icons.more_horiz_rounded,
             color: _muted,
-            tooltip: 'Daha çox',
+            tooltip: t('Daha çox'),
             onTap: _openRoomMenu,
           ),
         ],
@@ -2609,8 +2609,8 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
 
     if (speakers.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Döyüş üçün mikrofonda ən azı iki nəfər olmalıdır.'),
+        SnackBar(
+          content: Text(t('Döyüş üçün mikrofonda ən azı iki nəfər olmalıdır.')),
         ),
       );
       return;
@@ -2687,7 +2687,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Döyüş başlamadı.')),
+          SnackBar(content: Text(t('Döyüş başlamadı.'))),
         );
       }
     }
@@ -3044,7 +3044,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PK başlamadı.')),
+          SnackBar(content: Text(t('PK başlamadı.'))),
         );
       }
     }
@@ -3131,7 +3131,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
 
     if (ids.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Çağıracaq adam yoxdur.')),
+        SnackBar(content: Text(t('Çağıracaq adam yoxdur.'))),
       );
       return;
     }
@@ -3216,7 +3216,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                         );
                       } catch (_) {
                         messenger.showSnackBar(
-                          const SnackBar(content: Text('Çağırış getmədi.')),
+                          SnackBar(content: Text(t('Çağırış getmədi.'))),
                         );
                       }
                     },
@@ -3305,7 +3305,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                   ));
                   Navigator.pop(sheet);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Kopyalandı.')),
+                    SnackBar(content: Text(t('Kopyalandı.'))),
                   );
                 },
               ),
@@ -3665,7 +3665,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialog, next),
-              child: const Text('Tətbiq et'),
+              child: Text(t('Tətbiq et')),
             ),
           ],
         ),
@@ -3698,7 +3698,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Dəyişiklik saxlanmadı.')),
+          SnackBar(content: Text(t('Dəyişiklik saxlanmadı.'))),
         );
       }
     }
@@ -3764,8 +3764,8 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           maxLength: 160,
           maxLines: 3,
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Xoş gəlmisiniz! Qaydalar, mövzu, salamlama…',
+          decoration: InputDecoration(
+            hintText: t('Xoş gəlmisiniz! Qaydalar, mövzu, salamlama…'),
           ),
         ),
         actions: [
@@ -3791,7 +3791,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Təqdimat saxlanmadı.')),
+          SnackBar(content: Text(t('Təqdimat saxlanmadı.'))),
         );
       }
     }
@@ -3834,7 +3834,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                       ),
                     );
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Dəvət kopyalandı.')),
+                      SnackBar(content: Text(t('Dəvət kopyalandı.'))),
                     );
                   }),
                   _tool(Icons.mic_external_on_rounded, 'Söz döyüşü',
@@ -3911,7 +3911,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                     Navigator.pop(sheet);
                     Clipboard.setData(ClipboardData(text: widget.roomId));
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Otaq ID kopyalandı.')),
+                      SnackBar(content: Text(t('Otaq ID kopyalandı.'))),
                     );
                   }),
                   _tool(Icons.logout_rounded, 'Çıxış', const Color(0xffff657b), () {
@@ -4344,7 +4344,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           children: [
             ListTile(
               leading: const Icon(Icons.pan_tool_alt_rounded, color: _purple),
-              title: const Text('Mikrofon istəkləri',
+              title: Text(t('Mikrofon istəkləri'),
                   style: TextStyle(color: Colors.white)),
               onTap: () async {
                 Navigator.pop(sheet);
@@ -4355,19 +4355,19 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
             ),
             ListTile(
               leading: const Icon(Icons.copy_rounded, color: _blue),
-              title: const Text('Otaq ID-sini kopyala',
+              title: Text(t('Otaq ID-sini kopyala'),
                   style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(sheet);
                 Clipboard.setData(ClipboardData(text: widget.roomId));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Otaq ID kopyalandı.')),
+                  SnackBar(content: Text(t('Otaq ID kopyalandı.'))),
                 );
               },
             ),
             ListTile(
               leading: const Icon(Icons.logout_rounded, color: Color(0xffff657b)),
-              title: const Text('Otaqdan çıx',
+              title: Text(t('Otaqdan çıx'),
                   style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -4908,7 +4908,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           ),
           const SizedBox(width: 10),
           IconButton.filledTonal(
-            tooltip: 'Kameranı çevir',
+            tooltip: t('Kameranı çevir'),
             onPressed: instance.switchCamera,
             icon: const Icon(Icons.cameraswitch_rounded),
           ),
@@ -5015,7 +5015,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                 children: [
                   Expanded(
                     child: GradientButton(
-                      label: 'Şəkil seç',
+                      label: t('Şəkil seç'),
                       icon: Icons.add_photo_alternate_rounded,
                       gradient: vHot,
                       height: 46,
@@ -5215,14 +5215,14 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           ),
           // Səs səviyyəsi hər kəs üçün öz cihazında.
           IconButton(
-            tooltip: 'Musiqini kıs',
+            tooltip: t('Musiqini kıs'),
             onPressed: () => music?.setVolume(.2),
             icon: const Icon(Icons.volume_down_rounded,
                 color: _muted, size: 19),
           ),
           if (_isModerator(roomData))
             IconButton(
-              tooltip: 'Musiqini dayandır',
+              tooltip: t('Musiqini dayandır'),
               onPressed: () => music?.stopForEveryone(),
               icon: const Icon(Icons.stop_circle_outlined,
                   color: Color(0xffff657b), size: 19),
@@ -5364,7 +5364,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                   const SizedBox(height: 22),
                   FilledButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Geri qayıt'),
+                    child: Text(t('Geri qayıt')),
                   ),
                 ],
               ),
@@ -5420,7 +5420,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
             ),
             ListTile(
               leading: const Icon(Icons.person_rounded, color: _purple),
-              title: const Text('Profilə bax',
+              title: Text(t('Profilə bax'),
                   style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -5450,7 +5450,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
               leading: const Icon(Icons.block_rounded, color: Color(0xffff657b)),
               title: const Text('Blokla',
                   style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Yazdıqlarını bir daha görməzsən',
+              subtitle: Text(t('Yazdıqlarını bir daha görməzsən'),
                   style: TextStyle(color: _muted, fontSize: 12)),
               onTap: () async {
                 Navigator.pop(sheet);
@@ -5503,7 +5503,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                     color: Color(0xffff657b)),
                 title: const Text('Otaqdan at',
                     style: TextStyle(color: Colors.white)),
-                subtitle: const Text('Bu otağa bir daha girə bilməz',
+                subtitle: Text(t('Bu otağa bir daha girə bilməz'),
                     style: TextStyle(color: _muted, fontSize: 12)),
                 onTap: () {
                   Navigator.pop(sheet);
@@ -5741,7 +5741,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
       child: Row(
         children: [
           IconButton(
-            tooltip: 'Mic istə',
+            tooltip: t('Mic istə'),
             onPressed: _requestMic,
             icon: const Icon(Icons.pan_tool_alt_rounded, color: _purple),
           ),
@@ -5766,7 +5766,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           PopupMenuButton<String>(
             tooltip: t('Oyunlar'),
             color: const Color(0xff171121),
-            icon: const Icon(Icons.sports_esports_rounded, color: _blue),
+            icon: Icon(Icons.sports_esports_rounded, color: _blue),
             onSelected: (value) {
               if (value == 'room') {
                 _openGames();
@@ -5783,10 +5783,10 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                 );
               }
             },
-            itemBuilder: (_) => const [
+            itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'domino',
-                child: Text('Domino (2 nəfər)',
+                child: Text(t('Domino (2 nəfər)'),
                     style: TextStyle(color: Colors.white)),
               ),
               PopupMenuItem(
@@ -5796,7 +5796,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
               ),
               PopupMenuItem(
                 value: 'room',
-                child: Text('Room oyunları', style: TextStyle(color: Colors.white)),
+                child: Text(t('Room oyunları'), style: TextStyle(color: Colors.white)),
               ),
               PopupMenuItem(
                 value: 'center',
@@ -5839,7 +5839,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           ),
           const SizedBox(width: 4),
           IconButton(
-            tooltip: 'Ürək göndər',
+            tooltip: t('Ürək göndər'),
             onPressed: _sendHeart,
             icon: const Icon(Icons.favorite_rounded, color: _pink),
           ),
@@ -5907,7 +5907,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                       trailing: Wrap(
                         children: [
                           IconButton(
-                            tooltip: 'Qəbul et',
+                            tooltip: t('Qəbul et'),
                             onPressed: () => _approveRequest(req, roomData),
                             icon: const Icon(
                               Icons.check_circle_rounded,
@@ -5915,7 +5915,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Rədd et',
+                            tooltip: t('Rədd et'),
                             onPressed: req.reference.delete,
                             icon: const Icon(
                               Icons.cancel_rounded,
@@ -5981,14 +5981,14 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
               controller: title,
               style: const TextStyle(color: Colors.white),
               maxLength: 40,
-              decoration: const InputDecoration(hintText: 'Otağın adı'),
+              decoration: InputDecoration(hintText: t('Otağın adı')),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: topic,
               style: const TextStyle(color: Colors.white),
               maxLength: 80,
-              decoration: const InputDecoration(hintText: 'Mövzu'),
+              decoration: InputDecoration(hintText: t('Mövzu')),
             ),
             const SizedBox(height: 14),
             const Align(
@@ -6142,7 +6142,7 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
                 controller: password,
                 obscureText: true,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(hintText: 'Otaq şifrəsi'),
+                decoration: InputDecoration(hintText: t('Otaq şifrəsi')),
               ),
           ],
         ),
@@ -6198,13 +6198,13 @@ class _PasswordDialogState extends State<_PasswordDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: const Color(0xff151020),
-      title: const Text('Şifrəli otaq', style: TextStyle(color: Colors.white)),
+      title: Text(t('Şifrəli otaq'), style: TextStyle(color: Colors.white)),
       content: TextField(
         controller: controller,
         obscureText: true,
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
-          hintText: 'Şifrə',
+          hintText: t('Şifrə'),
           errorText: wrong ? 'Şifrə yanlışdır' : null,
         ),
       ),

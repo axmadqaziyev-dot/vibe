@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'app/i18n.dart';
 
 class VideoEditPage extends StatefulWidget {
   const VideoEditPage({
@@ -81,7 +82,7 @@ class _VideoEditPageState extends State<VideoEditPage> {
             maxLength: 2200,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              labelText: 'Başlıq',
+              labelText: t('Başlıq'),
               labelStyle: const TextStyle(color: Colors.white70),
               filled: true,
               fillColor: const Color(0xff151020),
@@ -97,7 +98,7 @@ class _VideoEditPageState extends State<VideoEditPage> {
             dropdownColor: const Color(0xff151020),
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              labelText: 'Görünürlük',
+              labelText: t('Görünürlük'),
               labelStyle: const TextStyle(color: Colors.white70),
               filled: true,
               fillColor: const Color(0xff151020),

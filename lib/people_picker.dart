@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 class PickedPerson {
   const PickedPerson({
@@ -184,7 +185,7 @@ class _PeoplePickerState extends State<_PeoplePicker> {
                 style: const TextStyle(color: Colors.white, fontSize: 14),
                 cursorColor: vPink,
                 decoration: InputDecoration(
-                  hintText: 'Ad ilə axtar',
+                  hintText: t('Ad ilə axtar'),
                   hintStyle: const TextStyle(color: vMuted, fontSize: 13),
                   prefixIcon:
                       const Icon(Icons.search_rounded, color: vMuted, size: 20),

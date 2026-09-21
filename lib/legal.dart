@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// Dəstək üçün əlaqə. App Store Connect-dəki "Support URL/Email" ilə
 /// eyni olmalıdır.
@@ -225,7 +226,7 @@ class LegalPage extends StatelessWidget {
           onTap: () {
             Clipboard.setData(const ClipboardData(text: supportEmail));
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('E-poçt kopyalandı.')),
+              SnackBar(content: Text(t('E-poçt kopyalandı.'))),
             );
           },
           child: Container(

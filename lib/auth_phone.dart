@@ -8,6 +8,7 @@ import 'auth_social.dart';
 import 'auth_tiktok.dart';
 import 'ui/google_mark.dart';
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// TELEFON NÖMRƏSİ İLƏ GİRİŞ VƏ BƏRPA.
 ///
@@ -545,7 +546,7 @@ class _NewPasswordDialogState extends State<_NewPasswordDialog> {
     return AlertDialog(
       backgroundColor: vPanel,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Yeni şifrə', style: TextStyle(color: vInk)),
+      title: Text(t('Yeni şifrə'), style: TextStyle(color: vInk)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,7 +565,7 @@ class _NewPasswordDialogState extends State<_NewPasswordDialog> {
               if (error != null) setState(() => error = null);
             },
             decoration: InputDecoration(
-              hintText: 'Ən az 6 simvol',
+              hintText: t('Ən az 6 simvol'),
               hintStyle: const TextStyle(color: vMuted),
               errorText: error,
               filled: true,
@@ -993,7 +994,7 @@ class _PhoneAuthPageState extends State<PhoneAuthPage> {
               ),
               const Spacer(),
               GradientButton(
-                label: 'SMS ilə davam et',
+                label: t('SMS ilə davam et'),
                 icon: Icons.sms_rounded,
                 height: 56,
                 fontSize: 16,

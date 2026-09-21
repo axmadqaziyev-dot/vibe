@@ -402,7 +402,7 @@ class VibeWalletCard extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: () => _dailyGift(context),
                       icon: const Icon(Icons.card_giftcard_rounded),
-                      label: const Text('Gündəlik +25'),
+                      label: Text(t('Gündəlik +25')),
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xff6f4cff),
                         foregroundColor: Colors.white,
@@ -506,7 +506,7 @@ class _ProfileGalleryCardState extends State<ProfileGalleryCard> {
           children: [
             ListTile(
               leading: const Icon(Icons.account_circle_rounded, color: vibePink),
-              title: const Text('Profil şəkli et', style: TextStyle(color: Colors.white)),
+              title: Text(t('Profil şəkli et'), style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(sheet);
                 _setProfilePhoto(docId, thumb, full);
@@ -514,7 +514,7 @@ class _ProfileGalleryCardState extends State<ProfileGalleryCard> {
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline_rounded, color: Color(0xffff6b7d)),
-              title: const Text('Şəkli sil', style: TextStyle(color: Colors.white)),
+              title: Text(t('Şəkli sil'), style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(sheet);
                 _removePhoto(docId);
@@ -551,13 +551,13 @@ class _ProfileGalleryCardState extends State<ProfileGalleryCard> {
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Foto qalereya', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                         SizedBox(height: 3),
-                        Text('Şəkilə basıb profil şəkli edə bilərsən', style: TextStyle(color: mutedInk, fontSize: 12)),
+                        Text(t('Şəkilə basıb profil şəkli edə bilərsən'), style: TextStyle(color: mutedInk, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -580,7 +580,7 @@ class _ProfileGalleryCardState extends State<ProfileGalleryCard> {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: const Color(0xff2c2039)),
                   ),
-                  child: const Text('Hələ şəkil əlavə edilməyib', style: TextStyle(color: mutedInk)),
+                  child: Text(t('Hələ şəkil əlavə edilməyib'), style: TextStyle(color: mutedInk)),
                 ),
               ] else ...[
                 const SizedBox(height: 14),
@@ -679,7 +679,7 @@ class SocialProfile extends StatelessWidget {
                     child: Icon(Icons.admin_panel_settings_rounded, color: Colors.white),
                   ),
                   title: const Text('Admin panel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-                  subtitle: const Text('Şikayətləri yoxla və idarə et', style: TextStyle(color: mutedInk)),
+                  subtitle: Text(t('Şikayətləri yoxla və idarə et'), style: TextStyle(color: mutedInk)),
                   trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white70),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VibeAdminPanel())),
                 ),
@@ -852,7 +852,7 @@ class SocialProfile extends StatelessWidget {
             children: [
               ListTile(
                 leading: const Icon(Icons.person_outline),
-                title: const Text('Haqqımda'),
+                title: Text(t('Haqqımda')),
                 subtitle: Text(
                   profile.about.isEmpty
                       ? 'Özün haqqında bir az danış'
@@ -870,7 +870,7 @@ class SocialProfile extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.location_on_outlined),
                 title: Text(profile.city),
-                subtitle: const Text('Şəhər'),
+                subtitle: Text(t('Şəhər')),
               ),
             ],
           ),
@@ -1132,7 +1132,7 @@ class _EditSocialProfileState extends State<EditSocialProfile> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.cake_outlined, color: vibePink),
-                title: const Text('Doğum günü'),
+                title: Text(t('Doğum günü')),
                 subtitle: Text(
                   birthDate == null
                       ? 'Seçilməyib — bürcün profilində görünəcək'
@@ -1190,14 +1190,14 @@ class _EditSocialProfileState extends State<EditSocialProfile> {
               TextField(
                 controller: city,
                 maxLength: 60,
-                decoration: const InputDecoration(labelText: 'Şəhər'),
+                decoration: InputDecoration(labelText: t('Şəhər')),
               ),
               const SizedBox(height: 14),
               TextField(
                 controller: about,
                 maxLength: 240,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Haqqımda'),
+                decoration: InputDecoration(labelText: t('Haqqımda')),
               ),
               const SizedBox(height: 20),
               FilledButton(
@@ -1307,8 +1307,8 @@ class _SocialSettingsState extends State<SocialSettings> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Hesabdan çıxılsın?'),
-        content: const Text('Yenidən daxil olmaq üçün şifrən lazım olacaq.'),
+        title: Text(t('Hesabdan çıxılsın?')),
+        content: Text(t('Yenidən daxil olmaq üçün şifrən lazım olacaq.')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1497,7 +1497,7 @@ class _SocialSettingsState extends State<SocialSettings> {
                   ),
                 ),
                 icon: const Icon(Icons.logout_rounded, size: 19),
-                label: const Text('Hesabdan çıxış'),
+                label: Text(t('Hesabdan çıxış')),
               ),
             ),
             const SizedBox(height: 14),
@@ -1823,7 +1823,7 @@ class _SocialSettingsState extends State<SocialSettings> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialog),
-            child: const Text('Anladım',
+            child: Text(t('Anladım'),
                 style: TextStyle(color: Color(0xffff2bd6))),
           ),
         ],
@@ -1904,7 +1904,7 @@ class _SocialFeedState extends State<SocialFeed> {
                   stream: ref.collection('comments').orderBy('createdAt', descending: true).limit(100).snapshots(),
                   builder: (_, snap) {
                     if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: vibePink));
-                    if (snap.data!.docs.isEmpty) return const Center(child: Text('İlk şərhi sən yaz 💜', style: TextStyle(color: mutedInk)));
+                    if (snap.data!.docs.isEmpty) return Center(child: Text(t('İlk şərhi sən yaz 💜'), style: TextStyle(color: mutedInk)));
                     return ListView.builder(
                       reverse: true,
                       itemCount: snap.data!.docs.length,
@@ -1922,7 +1922,7 @@ class _SocialFeedState extends State<SocialFeed> {
               ),
               Row(
                 children: [
-                  Expanded(child: TextField(controller: controller, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Şərh yaz...'))),
+                  Expanded(child: TextField(controller: controller, style: TextStyle(color: Colors.white), decoration: InputDecoration(hintText: t('Şərh yaz...')))),
                   const SizedBox(width: 8),
                   IconButton.filled(
                     onPressed: () async {
@@ -2027,12 +2027,12 @@ class _SocialFeedState extends State<SocialFeed> {
                               if (!widget.rooms &&
                                   doc.data()['owner'] == widget.profile.uid)
                                 IconButton(
-                                  tooltip: 'Paylaşımı sil',
+                                  tooltip: t('Paylaşımı sil'),
                                   onPressed: () async {
                                     final yes = await showDialog<bool>(
                                       context: context,
                                       builder: (context) => AlertDialog(
-                                        title: const Text('Paylaşım silinsin?'),
+                                        title: Text(t('Paylaşım silinsin?')),
                                         actions: [
                                           TextButton(
                                             onPressed: () =>
@@ -2087,7 +2087,7 @@ class _SocialFeedState extends State<SocialFeed> {
                                   TextButton.icon(
                                     onPressed: () => _openMomentComments(doc.reference),
                                     icon: const Icon(Icons.chat_bubble_outline_rounded, color: mutedInk),
-                                    label: const Text('Şərh', style: TextStyle(color: Colors.white70)),
+                                    label: Text(t('Şərh'), style: TextStyle(color: Colors.white70)),
                                   ),
                                   const Spacer(),
                                   IconButton(
@@ -2113,7 +2113,7 @@ class _SocialFeedState extends State<SocialFeed> {
                                 ),
                               ),
                               icon: const Icon(Icons.chat_bubble_outline),
-                              label: const Text('Söhbətə qoşul'),
+                              label: Text(t('Söhbətə qoşul')),
                             ),
                           ],
                         ],

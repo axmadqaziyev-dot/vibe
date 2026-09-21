@@ -20,6 +20,7 @@ import 'telemetry.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 /// Yeni an paylaşma ekranı.
 ///
@@ -395,8 +396,8 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
                               fontSize: 15.5,
                               height: 1.45,
                             ),
-                            decoration: const InputDecoration(
-                              hintText: 'Bu an haqqında yaz…',
+                            decoration: InputDecoration(
+                              hintText: t('Bu an haqqında yaz…'),
                               hintStyle: TextStyle(color: vMuted),
                               border: InputBorder.none,
                               counterStyle: TextStyle(color: vMuted),
@@ -670,7 +671,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
           ),
           if (!recording)
             IconButton(
-              tooltip: 'Səsi sil',
+              tooltip: t('Səsi sil'),
               icon: const Icon(Icons.close_rounded, color: vMuted),
               onPressed: _removeAudio,
             ),

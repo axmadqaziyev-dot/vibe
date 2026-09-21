@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'hashtag_feed.dart';
 import 'main.dart' show PersonPage;
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 /// `#söz` — həmin hashtagın lenti.
 void openHashtag(BuildContext context, UserProfile me, String tag) {
@@ -60,7 +61,7 @@ Future<void> openMention(
     );
   } catch (_) {
     messenger.showSnackBar(
-      const SnackBar(content: Text('Profil açılmadı.')),
+      SnackBar(content: Text(t('Profil açılmadı.'))),
     );
   }
 }
@@ -80,6 +81,6 @@ Future<void> openPostLink(BuildContext context, String raw) async {
     );
     if (!ok) messenger.showSnackBar(SnackBar(content: Text('Link açılmadı: $url')));
   } catch (_) {
-    messenger.showSnackBar(const SnackBar(content: Text('Link açılmadı.')));
+    messenger.showSnackBar(SnackBar(content: Text(t('Link açılmadı.'))));
   }
 }

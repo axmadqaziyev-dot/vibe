@@ -413,7 +413,7 @@ class _SocialHomeState extends State<SocialHome> {
       ),
     );
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Dəvət mətni kopyalandı — dostuna göndər.')),
+      SnackBar(content: Text(t('Dəvət mətni kopyalandı — dostuna göndər.'))),
     );
   }
 
@@ -425,7 +425,7 @@ class _SocialHomeState extends State<SocialHome> {
       style: const TextStyle(color: Colors.white),
       cursorColor: vPink,
       decoration: InputDecoration(
-        hintText: 'Ad, şəhər, maraq, ID və ya əhval axtar',
+        hintText: t('Ad, şəhər, maraq, ID və ya əhval axtar'),
         hintStyle: const TextStyle(color: vMuted, fontSize: 13),
         prefixIcon: const Icon(Icons.search_rounded, color: vPurple),
         isDense: true,
@@ -509,7 +509,7 @@ class _SocialHomeState extends State<SocialHome> {
                 ),
                 const SizedBox(height: 14),
                 GradientButton(
-                  label: 'İndi kəşf et  →',
+                  label: t('İndi kəşf et  →'),
                   expand: false,
                   height: 36,
                   fontSize: 13,
@@ -577,7 +577,7 @@ class _SocialHomeState extends State<SocialHome> {
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: VibeChip(
-              label: 'Hər əhval',
+              label: t('Hər əhval'),
               emoji: '🌐',
               selected: moodFilter.isEmpty,
               onTap: () => setState(() => moodFilter = ''),
@@ -939,7 +939,7 @@ class EmptyDiscover extends StatelessWidget {
         const SizedBox(height: 20),
         if (filtered && onReset != null)
           GradientButton(
-            label: 'Filtri təmizlə',
+            label: t('Filtri təmizlə'),
             icon: Icons.refresh_rounded,
             expand: false,
             height: 44,
@@ -947,7 +947,7 @@ class EmptyDiscover extends StatelessWidget {
           )
         else if (onInvite != null)
           GradientButton(
-            label: 'Dostunu dəvət et',
+            label: t('Dostunu dəvət et'),
             icon: Icons.ios_share_rounded,
             expand: false,
             height: 44,

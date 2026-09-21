@@ -400,7 +400,7 @@ class _VibePickerSheetState extends State<_VibePickerSheet> {
       if (!mounted) return;
       setState(() => saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Status yadda saxlanmadı. Yenidən sına.')),
+        SnackBar(content: Text(t('Status yadda saxlanmadı. Yenidən sına.'))),
       );
     }
   }
@@ -473,7 +473,7 @@ class _VibePickerSheetState extends State<_VibePickerSheet> {
                 style: const TextStyle(color: Colors.white),
                 cursorColor: vPink,
                 decoration: InputDecoration(
-                  hintText: 'İstəsən bir cümlə yaz: "Film tövsiyəsi axtarıram"',
+                  hintText: t('İstəsən bir cümlə yaz: "Film tövsiyəsi axtarıram"'),
                   hintStyle: const TextStyle(color: Color(0xff8f86a3), fontSize: 13),
                   counterStyle: const TextStyle(color: Color(0xff6f6684), fontSize: 11),
                   filled: true,

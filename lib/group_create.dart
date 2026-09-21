@@ -131,7 +131,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       if (mounted) {
         setState(() => busy = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Qrup yaradılmadı.')),
+          SnackBar(content: Text(t('Qrup yaradılmadı.'))),
         );
       }
     }

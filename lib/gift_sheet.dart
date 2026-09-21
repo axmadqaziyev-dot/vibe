@@ -7,6 +7,7 @@ import 'gifts.dart';
 import 'rankings.dart';
 import 'push_send.dart';
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// ORTAQ HƏDİYYƏ PANELİ.
 ///
@@ -26,7 +27,7 @@ Future<bool> showGiftSheet(
 }) async {
   if (fromUid == toUid) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Özünə hədiyyə göndərə bilməzsən.')),
+      SnackBar(content: Text(t('Özünə hədiyyə göndərə bilməzsən.'))),
     );
     return false;
   }
@@ -173,7 +174,7 @@ class _GiftSheetState extends State<_GiftSheet> {
     } catch (_) {
       setState(() => sending = false);
       messenger.showSnackBar(
-        const SnackBar(content: Text('Hədiyyə göndərilmədi. Yenidən sına.')),
+        SnackBar(content: Text(t('Hədiyyə göndərilmədi. Yenidən sına.'))),
       );
     }
   }

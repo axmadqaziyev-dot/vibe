@@ -210,7 +210,7 @@ class _MomentsPageState extends State<MomentsPage> {
                 ),
                 TopIconButton(
                   icon: Icons.blur_on_rounded,
-                  tooltip: 'Pıçıltı — anonim səs',
+                  tooltip: t('Pıçıltı — anonim səs'),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -882,9 +882,9 @@ class _MomentCardState extends State<MomentCard> {
             ),
             ListTile(
               leading: const Icon(Icons.format_quote_rounded, color: vBlue),
-              title: const Text('Sitat gətir',
+              title: Text(t('Sitat gətir'),
                   style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Öz sözünü əlavə et',
+              subtitle: Text(t('Öz sözünü əlavə et'),
                   style: TextStyle(color: vMuted, fontSize: 12)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -893,9 +893,9 @@ class _MomentCardState extends State<MomentCard> {
             ),
             ListTile(
               leading: const Icon(Icons.repeat_rounded, color: vMint),
-              title: const Text('Olduğu kimi paylaş',
+              title: Text(t('Olduğu kimi paylaş'),
                   style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Söz əlavə etmədən',
+              subtitle: Text(t('Söz əlavə etmədən'),
                   style: TextStyle(color: vMuted, fontSize: 12)),
               onTap: () {
                 Navigator.pop(sheet);
@@ -943,11 +943,11 @@ class _MomentCardState extends State<MomentCard> {
       );
 
       messenger.showSnackBar(
-        const SnackBar(content: Text('Yenidən paylaşıldı.')),
+        SnackBar(content: Text(t('Yenidən paylaşıldı.'))),
       );
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Alınmadı. Bağlantını yoxla.')),
+        SnackBar(content: Text(t('Alınmadı. Bağlantını yoxla.'))),
       );
     }
   }
@@ -971,8 +971,8 @@ class _MomentCardState extends State<MomentCard> {
           maxLength: 200,
           style: const TextStyle(color: Colors.white),
           cursorColor: vPink,
-          decoration: const InputDecoration(
-            hintText: 'Nə demək istəyirsən?',
+          decoration: InputDecoration(
+            hintText: t('Nə demək istəyirsən?'),
             hintStyle: TextStyle(color: vMuted),
             counterStyle: TextStyle(color: vMuted, fontSize: 11),
           ),
@@ -1022,10 +1022,10 @@ class _MomentCardState extends State<MomentCard> {
         SetOptions(merge: true),
       );
 
-      messenger.showSnackBar(const SnackBar(content: Text('Paylaşıldı.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Paylaşıldı.'))));
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Alınmadı. Bağlantını yoxla.')),
+        SnackBar(content: Text(t('Alınmadı. Bağlantını yoxla.'))),
       );
     }
   }
@@ -1321,14 +1321,14 @@ class _MomentCardState extends State<MomentCard> {
               _menuItem(
                 sheet,
                 icon: Icons.visibility_off_outlined,
-                label: 'Maraqlandırmır',
+                label: t('Maraqlandırmır'),
                 note: 'Bu an lentindən çıxsın',
                 onTap: _notInterested,
               ),
               _menuItem(
                 sheet,
                 icon: Icons.volume_off_rounded,
-                label: 'Səssizə al',
+                label: t('Səssizə al'),
                 note: 'Paylaşımları görünməsin, xəbəri olmasın',
                 onTap: () => _mute(ownerUid, ownerName),
               ),
@@ -1398,7 +1398,7 @@ class _MomentCardState extends State<MomentCard> {
       if (saved) {
         await _savedRef.delete();
         messenger.showSnackBar(
-          const SnackBar(content: Text('Yaddaşdan çıxarıldı.')),
+          SnackBar(content: Text(t('Yaddaşdan çıxarıldı.'))),
         );
       } else {
         // Ad və şəkil burada saxlanılır ki, siyahını göstərmək üçün
@@ -1412,11 +1412,11 @@ class _MomentCardState extends State<MomentCard> {
           'createdAt': Timestamp.now(),
         });
         messenger.showSnackBar(
-          const SnackBar(content: Text('Yadda saxlanıldı.')),
+          SnackBar(content: Text(t('Yadda saxlanıldı.'))),
         );
       }
     } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Alınmadı.'))));
     }
   }
 
@@ -1436,10 +1436,10 @@ class _MomentCardState extends State<MomentCard> {
           .set({'createdAt': Timestamp.now()});
 
       messenger.showSnackBar(
-        const SnackBar(content: Text('Bu an bir daha göstərilməyəcək.')),
+        SnackBar(content: Text(t('Bu an bir daha göstərilməyəcək.'))),
       );
     } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Alınmadı.'))));
     }
   }
 
@@ -1461,7 +1461,7 @@ class _MomentCardState extends State<MomentCard> {
         SnackBar(content: Text('$ownerName səssizə alındı.')),
       );
     } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Alınmadı.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Alınmadı.'))));
     }
   }
 
@@ -1514,7 +1514,7 @@ class _MomentCardState extends State<MomentCard> {
 
     await Clipboard.setData(ClipboardData(text: text));
     messenger.showSnackBar(
-      const SnackBar(content: Text('Kopyalandı.')),
+      SnackBar(content: Text(t('Kopyalandı.'))),
     );
   }
 
@@ -1527,7 +1527,7 @@ class _MomentCardState extends State<MomentCard> {
       messenger.showSnackBar(SnackBar(content: Text(done)));
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Alınmadı. Bağlantını yoxla.')),
+        SnackBar(content: Text(t('Alınmadı. Bağlantını yoxla.'))),
       );
     }
   }
@@ -1602,7 +1602,7 @@ class _MomentCardState extends State<MomentCard> {
       messenger.showSnackBar(const SnackBar(content: Text('An silindi.')));
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Silinmədi. Bağlantını yoxla.')),
+        SnackBar(content: Text(t('Silinmədi. Bağlantını yoxla.'))),
       );
     }
   }
@@ -1654,11 +1654,11 @@ class _MomentCardState extends State<MomentCard> {
                       'createdAt': Timestamp.now(),
                     });
                     messenger.showSnackBar(
-                      const SnackBar(content: Text('Şikayət göndərildi.')),
+                      SnackBar(content: Text(t('Şikayət göndərildi.'))),
                     );
                   } catch (_) {
                     messenger.showSnackBar(
-                      const SnackBar(content: Text('Şikayət göndərilmədi.')),
+                      SnackBar(content: Text(t('Şikayət göndərilmədi.'))),
                     );
                   }
                 },
@@ -1684,7 +1684,7 @@ class _MomentCardState extends State<MomentCard> {
         SnackBar(content: Text('$ownerName bloklandı.')),
       );
     } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Bloklanmadı.')));
+      messenger.showSnackBar(SnackBar(content: Text(t('Bloklanmadı.'))));
     }
   }
 
@@ -1821,7 +1821,7 @@ class _MomentsError extends StatelessWidget {
   const _MomentsError();
 
   @override
-  Widget build(BuildContext context) => const Padding(
+  Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.all(32),
     child: Center(
       child: Column(
@@ -1838,7 +1838,7 @@ class _MomentsError extends StatelessWidget {
             ),
           ),
           SizedBox(height: 6),
-          Text('Bağlantını yoxla və yenidən aç.', style: TextStyle(color: vMuted)),
+          Text(t('Bağlantını yoxla və yenidən aç.'), style: TextStyle(color: vMuted)),
         ],
       ),
     ),
@@ -1958,7 +1958,7 @@ class SavedMomentsPage extends StatelessWidget {
                   trailing: IconButton(
                     icon: const Icon(Icons.bookmark_remove_outlined,
                         color: vMuted),
-                    tooltip: 'Yaddaşdan çıxar',
+                    tooltip: t('Yaddaşdan çıxar'),
                     onPressed: () => docs[index].reference.delete(),
                   ),
                   onTap: () => Navigator.push(

@@ -6,6 +6,7 @@ import 'main.dart' show isReallyOnline;
 import 'suggest_people.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 /// "Sənə uyğun olanlar" pəncərəsi.
 ///
@@ -167,7 +168,7 @@ class _SuggestionsDialogState extends State<_SuggestionsDialog> {
       if (!mounted) return;
       setState(() => sending = false);
       messenger.showSnackBar(
-        const SnackBar(content: Text('Göndərilmədi. Bağlantını yoxla.')),
+        SnackBar(content: Text(t('Göndərilmədi. Bağlantını yoxla.'))),
       );
     }
   }

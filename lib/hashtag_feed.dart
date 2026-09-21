@@ -14,6 +14,7 @@ import 'rich_post_text.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 class HashtagFeedPage extends StatelessWidget {
   const HashtagFeedPage({
@@ -54,8 +55,8 @@ class HashtagFeedPage extends StatelessWidget {
             .snapshots(),
         builder: (context, snap) {
           if (snap.hasError) {
-            return const Center(
-              child: Text('Lent açılmadı.', style: TextStyle(color: vMuted)),
+            return Center(
+              child: Text(t('Lent açılmadı.'), style: TextStyle(color: vMuted)),
             );
           }
 

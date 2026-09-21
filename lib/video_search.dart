@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 class VideoSearchPage extends StatefulWidget {
   const VideoSearchPage({
@@ -29,8 +30,8 @@ class _VideoSearchPageState extends State<VideoSearchPage> {
             () => query = value.trim().toLowerCase(),
           ),
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Video, istifadəçi, hashtag axtar...',
+          decoration: InputDecoration(
+            hintText: t('Video, istifadəçi, hashtag axtar...'),
             hintStyle: TextStyle(color: Colors.white38),
             border: InputBorder.none,
           ),

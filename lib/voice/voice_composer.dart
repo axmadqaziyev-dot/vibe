@@ -5,6 +5,7 @@ import 'package:record/record.dart';
 import 'audio_file.dart';
 import 'voice_message_service.dart';
 import 'voice_player.dart';
+import '../app/i18n.dart';
 
 class VoiceComposer extends StatefulWidget {
   const VoiceComposer({
@@ -257,7 +258,7 @@ class _VoiceComposerState extends State<VoiceComposer>
               Row(
                 children: [
                   IconButton(
-                    tooltip: 'Səsi ləğv et',
+                    tooltip: t('Səsi ləğv et'),
                     onPressed: busy ? null : widget.onClose,
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -279,19 +280,19 @@ class _VoiceComposerState extends State<VoiceComposer>
                   ),
                   if (recording)
                     IconButton.filled(
-                      tooltip: 'Yazmanı bitir',
+                      tooltip: t('Yazmanı bitir'),
                       onPressed: busy ? null : stop,
                       icon: const Icon(Icons.stop_rounded),
                     )
                   else if (draft != null)
                     IconButton.filled(
-                      tooltip: 'Səsi göndər',
+                      tooltip: t('Səsi göndər'),
                       onPressed: busy ? null : send,
                       icon: const Icon(Icons.send_rounded),
                     )
                   else
                     IconButton.filled(
-                      tooltip: 'Yenidən yaz',
+                      tooltip: t('Yenidən yaz'),
                       onPressed: busy ? null : start,
                       icon: const Icon(Icons.mic_rounded),
                     ),

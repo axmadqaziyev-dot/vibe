@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'countries.dart';
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// Ölkə seçimi ekranı.
 ///
@@ -96,8 +97,8 @@ class _CountryPickerState extends State<_CountryPicker> {
           ),
           Expanded(
             child: results.isEmpty
-                ? const Center(
-                    child: Text('Tapılmadı',
+                ? Center(
+                    child: Text(t('Tapılmadı'),
                         style: TextStyle(color: vMuted, fontSize: 13)),
                   )
                 : ListView(

@@ -462,7 +462,7 @@ class _IncomingCallScreenState extends State<_IncomingCallScreen>
                       _bigButton(
                         color: const Color(0xffff3b4e),
                         icon: Icons.call_end_rounded,
-                        label: 'Rədd et',
+                        label: t('Rədd et'),
                         onTap: () async => widget.onDecline(),
                       ),
                       _bigButton(
@@ -552,13 +552,13 @@ class _IncomingCallScreenState extends State<_IncomingCallScreen>
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cavab göndərildi.')),
+          SnackBar(content: Text(t('Cavab göndərildi.'))),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cavab göndərilmədi.')),
+          SnackBar(content: Text(t('Cavab göndərilmədi.'))),
         );
       }
     }
@@ -1221,7 +1221,7 @@ class _CallPageState extends State<CallPage> {
       movingToRoom = false;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Otaq yaradılmadı. Yenidən sına.')),
+          SnackBar(content: Text(t('Otaq yaradılmadı. Yenidən sına.'))),
         );
       }
     }
@@ -1459,7 +1459,7 @@ class _CallPageState extends State<CallPage> {
                             backgroundColor: const Color(0xff21142f),
                             foregroundColor: Colors.white,
                           ),
-                          tooltip: 'Dostu əlavə et',
+                          tooltip: t('Dostu əlavə et'),
                           onPressed: movingToRoom ? null : _convertToRoom,
                           icon: const Icon(Icons.group_add_rounded),
                         ),

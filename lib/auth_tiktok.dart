@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// TIKTOK İLƏ GİRİŞ.
 ///
@@ -42,7 +43,7 @@ void showTiktokNotReady(BuildContext context) {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialog),
-          child: const Text('Anladım', style: TextStyle(color: vPink)),
+          child: Text(t('Anladım'), style: TextStyle(color: vPink)),
         ),
       ],
     ),

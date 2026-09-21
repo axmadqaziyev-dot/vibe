@@ -135,8 +135,8 @@ class _StoryEditorPageState extends State<StoryEditorPage> {
           maxLines: 3,
           maxLength: 120,
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Nə yazırsan?',
+          decoration: InputDecoration(
+            hintText: t('Nə yazırsan?'),
             hintStyle: TextStyle(color: vMuted),
             counterStyle: TextStyle(color: vMuted),
           ),
@@ -148,7 +148,7 @@ class _StoryEditorPageState extends State<StoryEditorPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialog, controller.text.trim()),
-            child: const Text('Əlavə et'),
+            child: Text(t('Əlavə et')),
           ),
         ],
       ),
@@ -206,7 +206,7 @@ class _StoryEditorPageState extends State<StoryEditorPage> {
 
     if (photo == null && sharedImage.isEmpty && overlays.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Şəkil seç və ya bir yazı əlavə et.')),
+        SnackBar(content: Text(t('Şəkil seç və ya bir yazı əlavə et.'))),
       );
       return;
     }
@@ -242,7 +242,7 @@ class _StoryEditorPageState extends State<StoryEditorPage> {
       if (mounted) {
         setState(() => sending = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Stori paylaşılmadı.')),
+          SnackBar(content: Text(t('Stori paylaşılmadı.'))),
         );
       }
     }

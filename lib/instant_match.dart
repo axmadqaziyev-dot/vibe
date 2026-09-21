@@ -261,11 +261,11 @@ class _InstantMatchPageState extends State<InstantMatchPage>
             children: [
               Expanded(
                 child: SegmentedButton<bool>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                       value: false,
                       icon: Icon(Icons.call_rounded),
-                      label: Text('Səsli'),
+                      label: Text(t('Səsli')),
                     ),
                     ButtonSegment(
                       value: true,
@@ -292,10 +292,10 @@ class _InstantMatchPageState extends State<InstantMatchPage>
                   ),
                   items: [
                     DropdownMenuItem(value: 'all', child: Text(t('Hamısı'))),
-                    const DropdownMenuItem(
-                        value: 'female', child: Text('Qızlar')),
-                    const DropdownMenuItem(
-                        value: 'male', child: Text('Oğlanlar')),
+                    DropdownMenuItem(
+                        value: 'female', child: Text(t('Qızlar'))),
+                    DropdownMenuItem(
+                        value: 'male', child: Text(t('Oğlanlar'))),
                   ],
                   onChanged: (v) => setState(() => gender = v ?? 'all'),
                 ),
@@ -305,13 +305,13 @@ class _InstantMatchPageState extends State<InstantMatchPage>
                 child: DropdownButtonFormField<String>(
                   initialValue: city,
                   dropdownColor: const Color(0xff171121),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Yer',
                     isDense: true,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Hər yerdən')),
-                    DropdownMenuItem(value: 'same', child: Text('Şəhərim')),
+                  items: [
+                    DropdownMenuItem(value: 'all', child: Text(t('Hər yerdən'))),
+                    DropdownMenuItem(value: 'same', child: Text(t('Şəhərim'))),
                   ],
                   onChanged: (v) => setState(() => city = v ?? 'all'),
                 ),
@@ -382,7 +382,7 @@ class _InstantMatchPageState extends State<InstantMatchPage>
               OutlinedButton.icon(
                 onPressed: _findMatch,
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Yenidən'),
+                label: Text(t('Yenidən')),
               ),
             ],
           ),
@@ -605,7 +605,7 @@ class _InstantMatchPageState extends State<InstantMatchPage>
                             child: OutlinedButton.icon(
                               onPressed: _findMatch,
                               icon: const Icon(Icons.skip_next_rounded),
-                              label: const Text('Keç'),
+                              label: Text(t('Keç')),
                             ),
                           ),
                           const SizedBox(width: 8),

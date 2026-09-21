@@ -176,7 +176,7 @@ class _AgencyEmpty extends StatelessWidget {
 
     if (!isValidAgencyCode(code)) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Kod altı simvol olmalıdır.')),
+        SnackBar(content: Text(t('Kod altı simvol olmalıdır.'))),
       );
       return;
     }
@@ -190,7 +190,7 @@ class _AgencyEmpty extends StatelessWidget {
 
       if (found.docs.isEmpty) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Belə agentlik tapılmadı.')),
+          SnackBar(content: Text(t('Belə agentlik tapılmadı.'))),
         );
         return;
       }
@@ -222,7 +222,7 @@ class _AgencyEmpty extends StatelessWidget {
       );
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Qoşulmaq alınmadı.')),
+        SnackBar(content: Text(t('Qoşulmaq alınmadı.'))),
       );
     }
   }
@@ -243,8 +243,8 @@ class _AgencyEmpty extends StatelessWidget {
           autofocus: true,
           maxLength: 30,
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Məsələn: VIBE Stars',
+          decoration: InputDecoration(
+            hintText: t('Məsələn: VIBE Stars'),
             hintStyle: TextStyle(color: vMuted),
             counterStyle: TextStyle(color: vMuted),
           ),
@@ -287,7 +287,7 @@ class _AgencyEmpty extends StatelessWidget {
       );
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Agentlik yaradılmadı.')),
+        SnackBar(content: Text(t('Agentlik yaradılmadı.'))),
       );
     }
   }
@@ -398,7 +398,7 @@ class _AgencyView extends StatelessWidget {
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: agency.code));
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Kod kopyalandı.')),
+                    SnackBar(content: Text(t('Kod kopyalandı.'))),
                   );
                 },
                 child: Container(

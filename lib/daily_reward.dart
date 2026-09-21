@@ -149,7 +149,7 @@ class _DailyRewardSheetState extends State<DailyRewardSheet> {
       if (!mounted) return;
       setState(() => busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mükafat alınmadı. Yenidən sına.')),
+        SnackBar(content: Text(t('Mükafat alınmadı. Yenidən sına.'))),
       );
     }
   }

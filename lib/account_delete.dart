@@ -96,7 +96,7 @@ Future<bool> showDeleteAccountFlow(BuildContext context, String uid) async {
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: vRose),
           onPressed: () => Navigator.pop(dialog, true),
-          child: const Text('Bəli, sil'),
+          child: Text(t('Bəli, sil')),
         ),
       ],
     ),
@@ -125,7 +125,7 @@ Future<bool> showDeleteAccountFlow(BuildContext context, String uid) async {
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: vRose),
           onPressed: () => Navigator.pop(dialog, true),
-          child: const Text('Hesabı sil'),
+          child: Text(t('Hesabı sil')),
         ),
       ],
     ),
@@ -165,7 +165,7 @@ Future<bool> showDeleteAccountFlow(BuildContext context, String uid) async {
           actions: [
             FilledButton(
               onPressed: () => Navigator.pop(dialog),
-              child: const Text('Başa düşdüm'),
+              child: Text(t('Başa düşdüm')),
             ),
           ],
         ),
@@ -181,7 +181,7 @@ Future<bool> showDeleteAccountFlow(BuildContext context, String uid) async {
     if (!context.mounted) return false;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Hesab silinmədi. Yenidən sına.')),
+      SnackBar(content: Text(t('Hesab silinmədi. Yenidən sına.'))),
     );
     return false;
   }

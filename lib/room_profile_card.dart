@@ -100,7 +100,7 @@ class _RoomProfileCard extends StatelessWidget {
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Alınmadı. Yenidən sına.')),
+          SnackBar(content: Text(t('Alınmadı. Yenidən sına.'))),
         );
       }
     }
@@ -186,7 +186,7 @@ class _RoomProfileCard extends StatelessWidget {
                         onTap: () {
                           Clipboard.setData(ClipboardData(text: uid));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('ID kopyalandı.')),
+                            SnackBar(content: Text(t('ID kopyalandı.'))),
                           );
                         },
                         child: Row(
@@ -273,7 +273,7 @@ class _RoomProfileCard extends StatelessWidget {
                         Expanded(
                           child: _smallAction(
                             icon: Icons.record_voice_over_rounded,
-                            label: 'Masaya dəvət',
+                            label: t('Masaya dəvət'),
                             color: vMint,
                             onTap: () {
                               Navigator.pop(context);
@@ -357,7 +357,7 @@ class _RoomProfileCard extends StatelessWidget {
                       Expanded(
                         child: _action(
                           icon: Icons.chat_bubble_rounded,
-                          label: 'Söhbət',
+                          label: t('Söhbət'),
                           color: vBlue,
                           onTap: () {
                             Navigator.pop(context);
