@@ -290,18 +290,46 @@ class VibePhoto extends StatelessWidget {
   final BoxFit fit;
   final String emoji;
 
+  /// Şəkli olmayanlar üçün rəng cütləri.
+  ///
+  /// Əvvəl burada tam doymuş neon rənglər var idi (parlaq çəhrayı,
+  /// firuzəyi, yaşıl). Şəbəkədə yan-yana düzüləndə kartlar bir-biri
+  /// ilə yarışırdı və siyahı kobud görünürdü. İndi hər cüt tünd
+  /// tondan açıq tona keçir: kart fonla eyni ailədən olur, ad və
+  /// düymələr isə üstündə rahat oxunur.
   static const _palette = [
-    [Color(0xff7b3cff), Color(0xffff2bd6)],
-    [Color(0xff22a7ff), Color(0xff7b3cff)],
-    [Color(0xffff5f6d), Color(0xffffc371)],
-    [Color(0xff11998e), Color(0xff38ef7d)],
-    [Color(0xfff857a6), Color(0xffff5858)],
-    [Color(0xff4568dc), Color(0xffb06ab3)],
+    [Color(0xff6a48c9), Color(0xff2b1b4f)],
+    [Color(0xff3a6fb5), Color(0xff172a4d)],
+    [Color(0xff9c4779), Color(0xff3a1832)],
+    [Color(0xff2a7a70), Color(0xff11302d)],
+    [Color(0xff3f5f9c), Color(0xff17233f)],
+    [Color(0xff56497f), Color(0xff1e1a2f)],
+    [Color(0xff2f6f8f), Color(0xff13262f)],
+    [Color(0xff6b4a8f), Color(0xff251a38)],
   ];
 
+  /// Ada görə sabit rəng seçir.
+  ///
+  /// Əvvəl yalnız ilk hərfə baxılırdı — "Asif", "Aysel", "Ayan"
+  /// eyni rəngi alırdı və ekran tək rəngdən ibarət görünürdü.
+  /// İndi bütün ad hesaba qatılır.
+  int get _seed {
+    var hash = 7;
+    for (final rune in name.runes) {
+      hash = (hash * 31 + rune) % 100000;
+    }
+    return hash;
+  }
+
   Widget _fallback() {
-    final seed = name.isEmpty ? 0 : name.codeUnitAt(0);
-    final colors = _palette[seed % _palette.length];
+    final colors = _palette[_seed % _palette.length];
+
+    final letter = emoji.isNotEmpty
+        ? emoji
+        : (name.isEmpty
+            ? '?'
+            : String.fromCharCode(name.runes.first).toUpperCase());
+
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -310,25 +338,44 @@ class VibePhoto extends StatelessWidget {
           colors: colors,
         ),
       ),
-      child: Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Text(
-              emoji.isNotEmpty
-                  ? emoji
-                  : (name.isEmpty
-                        ? '?'
-                        : String.fromCharCode(name.runes.first).toUpperCase()),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 44,
-                fontWeight: FontWeight.w900,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Yuxarı küncdən yumşaq işıq — düz rəng yastı görünür.
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(-.55, -.75),
+                radius: 1.1,
+                colors: [Color(0x26ffffff), Color(0x00ffffff)],
               ),
             ),
           ),
-        ),
+          Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Text(
+                  letter,
+                  style: TextStyle(
+                    // Hərf tam ağ olanda diqqəti adın üstündən alırdı.
+                    // İndi fon nişanı kimi davranır.
+                    color: emoji.isNotEmpty
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: .78),
+                    fontSize: 44,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .5,
+                    shadows: const [
+                      Shadow(color: Color(0x40000000), blurRadius: 12),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -633,11 +680,19 @@ class PlaceLabel extends StatelessWidget {
     required this.text,
     this.fontSize = 10.5,
     this.color = vMuted,
+    this.showIcon = true,
   });
 
   final String text;
   final double fontSize;
   final Color color;
+
+  /// Nişanı gizlət.
+  ///
+  /// Dar yerdə — məsələn üç sütunlu kart şəbəkəsində — nişan 12 px
+  /// yeyir və şəhər adı "Ba..." halına düşür. Yerin özü nişandan
+  /// vacibdir.
+  final bool showIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -645,8 +700,10 @@ class PlaceLabel extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.place_rounded, size: fontSize + 2, color: color),
-        const SizedBox(width: 2),
+        if (showIcon) ...[
+          Icon(Icons.place_rounded, size: fontSize + 2, color: color),
+          const SizedBox(width: 2),
+        ],
         Flexible(
           child: Text(
             text,

@@ -553,10 +553,22 @@ class _SocialHomeState extends State<SocialHome> {
   }
 
   /// Əhvala görə süzgəc (VIBE statusu).
+  ///
+  /// Zolaq ekranın kənarına qədər uzanır. Əvvəl ana siyahının 16 px
+  /// kənarının içində qalırdı: sonuncu çip boşluqda yarımçıq kəsilirdi
+  /// və sürüşdürülə bildiyi bilinmirdi. `OverflowBox` həmin kənarı
+  /// keçir — çip ekranın öz kənarında kəsilir, bu isə hər kəsə tanış
+  /// "sürüşdür" işarəsidir.
+  ///
+  /// Hündürlük 34-dən 40-a qaldırıldı: seçilmiş çipin işığı və
+  /// haşiyəsi 34-də kəsilirdi.
   Widget _moodRow() => SizedBox(
-    height: 34,
-    child: ListView.builder(
+    height: 40,
+    child: OverflowBox(
+      maxWidth: MediaQuery.sizeOf(context).width,
+      child: ListView.builder(
       scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: vibeMoods.length + 2,
       itemBuilder: (context, index) {
         if (index == 0) return _countryChip();
@@ -585,6 +597,7 @@ class _SocialHomeState extends State<SocialHome> {
           ),
         );
       },
+    ),
     ),
   );
 }
@@ -629,30 +642,32 @@ class DiscoverCard extends StatelessWidget {
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: matched
                 ? const Color(0xffffd458)
                 : online
-                    ? const Color(0xff3ddc97).withValues(alpha: .55)
+                    ? const Color(0xff3ddc97).withValues(alpha: .45)
                     : const Color(0xff2a2340),
-            width: matched ? 1.6 : 1,
+            width: matched ? 1.4 : 1,
           ),
           boxShadow: matched
               ? [
                   BoxShadow(
-                    color: const Color(0xffffd458).withValues(alpha: .28),
+                    color: const Color(0xffffd458).withValues(alpha: .22),
                     blurRadius: 16,
                   ),
                 ]
               : online
                   ? [
                       BoxShadow(
-                        color: const Color(0xff2de28a).withValues(alpha: .18),
+                        color: const Color(0xff2de28a).withValues(alpha: .14),
                         blurRadius: 14,
                       ),
                     ]
-                  : null,
+                  : const [
+                      BoxShadow(color: Color(0x33000000), blurRadius: 10),
+                    ],
         ),
         child: Stack(
           fit: StackFit.expand,
@@ -663,48 +678,88 @@ class DiscoverCard extends StatelessWidget {
               emoji: '${data['avatarEmoji'] ?? ''}',
             ),
 
-            // aşağıdan yuxarı qaralma — mətn oxunaqlı olsun
+            // Asagidan yuxari qaralma.
+            //
+            // Evvel kartin tam ortasindan baslayirdi ve herf
+            // avatarlarinda keskin serhed gorunurdu. Indi uc
+            // dayanacaqla yumsaq kecir.
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.center,
+                  begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xd9000000)],
+                  colors: [
+                    Colors.transparent,
+                    Color(0x14000000),
+                    Color(0x8f000000),
+                    Color(0xe8000000),
+                  ],
+                  stops: [0, .44, .76, 1],
                 ),
               ),
             ),
 
-            // online nişanı
-            if (online)
-              const Positioned(
-                left: 8,
-                top: 8,
-                child: _OnlineDot(),
-              ),
-
-            // əhval nişanı
-            if (status != null)
-              Positioned(
-                right: 7,
-                top: 7,
-                child: Container(
-                  padding: const EdgeInsets.all(3.5),
-                  decoration: BoxDecoration(
-                    color: status.mood.color.withValues(alpha: .95),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    status.mood.emoji,
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                ),
-              ),
-
-            // ad + yer
+            // Ust sira: solda veziyyet, sagda favorit.
+            //
+            // Evvel urek kartin ortasindan sagda tek dayanirdi ve
+            // hec neye baglanmirdi.
             Positioned(
-              left: 9,
-              right: 9,
-              bottom: 8,
+              left: 7,
+              right: 6,
+              top: 7,
+              child: Row(
+                children: [
+                  if (online) const _OnlineDot(),
+                  if (status != null) ...[
+                    if (online) const SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.all(3.5),
+                      decoration: BoxDecoration(
+                        color: status.mood.color.withValues(alpha: .92),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: status.mood.color.withValues(alpha: .45),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        status.mood.emoji,
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  if (onFavorite != null)
+                    PressableScale(
+                      onTap: onFavorite,
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: .34),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          favorite
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          size: 14,
+                          color: favorite ? vPink : Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // Alt sira: ad, yas/yer ve sohbet duymesi.
+            Positioned(
+              left: 10,
+              right: 8,
+              bottom: 9,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -720,15 +775,17 @@ class DiscoverCard extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,
-                            fontWeight: FontWeight.w900,
+                            height: 1.15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: .1,
                           ),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 4),
                         Row(
                           children: [
                             if (gender != 0)
                               Padding(
-                                padding: const EdgeInsets.only(right: 3),
+                                padding: const EdgeInsets.only(right: 4),
                                 child: Icon(
                                   gender == 1
                                       ? Icons.female_rounded
@@ -741,18 +798,23 @@ class DiscoverCard extends StatelessWidget {
                               Text(
                                 age,
                                 style: const TextStyle(
-                                  color: Color(0xffcfc6dd),
+                                  color: Color(0xffe2dcee),
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 5),
                             ],
+                            // Uc sutunlu sebekede kart ~110 px enindedir.
+                            // Ayirici noqte ve boyuk olcu seher adini
+                            // "Ba..." halina salirdi — yer mena dasiyir,
+                            // ona gore bosluq ona verilir.
                             Flexible(
                               child: PlaceLabel(
                                 text: place,
                                 fontSize: 9.5,
-                                color: const Color(0xffcfc6dd),
+                                showIcon: false,
+                                color: const Color(0xffb9b1cb),
                               ),
                             ),
                           ],
@@ -760,14 +822,23 @@ class DiscoverCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 6),
                   PressableScale(
                     onTap: onChat,
                     child: Container(
-                      width: 26,
-                      height: 26,
+                      width: 30,
+                      height: 30,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
                         gradient: vHot,
-                        borderRadius: BorderRadius.circular(9),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: vPink.withValues(alpha: .38),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: const Icon(
                         Icons.chat_bubble_rounded,
@@ -779,26 +850,6 @@ class DiscoverCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            // favorit
-            if (onFavorite != null)
-              Positioned(
-                right: 4,
-                bottom: 40,
-                child: PressableScale(
-                  onTap: onFavorite,
-                  child: Padding(
-                    padding: const EdgeInsets.all(5),
-                    child: Icon(
-                      favorite
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      size: 17,
-                      color: favorite ? vPink : Colors.white70,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -806,38 +857,34 @@ class DiscoverCard extends StatelessWidget {
   }
 }
 
+/// Onlayn nişanı.
+///
+/// Əvvəl bu, içində "online" yazısı olan qutu idi. Üç sütunlu
+/// şəbəkədə kart 88 px enində olur — qutu, əhval nişanı və ürək bir
+/// sıraya sığmırdı və dar telefonda sıra daşırdı.
+///
+/// Yazı onsuz da təkrar idi: onlayn adamın kartı yaşıl haşiyə və
+/// yaşıl işıq alır. İndi yalnız işıqlı nöqtə qalır.
 class _OnlineDot extends StatelessWidget {
   const _OnlineDot();
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
+    width: 16,
+    height: 16,
+    alignment: Alignment.center,
     decoration: BoxDecoration(
-      color: Colors.black.withValues(alpha: .45),
-      borderRadius: BorderRadius.circular(8),
+      color: Colors.black.withValues(alpha: .34),
+      shape: BoxShape.circle,
     ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: const BoxDecoration(
-            color: Color(0xff2de28a),
-            shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: Color(0xaa2de28a), blurRadius: 6)],
-          ),
-        ),
-        const SizedBox(width: 4),
-        const Text(
-          'online',
-          style: TextStyle(
-            color: Color(0xff9dffd4),
-            fontSize: 8,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
+    child: Container(
+      width: 7,
+      height: 7,
+      decoration: const BoxDecoration(
+        color: Color(0xff2de28a),
+        shape: BoxShape.circle,
+        boxShadow: [BoxShadow(color: Color(0xaa2de28a), blurRadius: 6)],
+      ),
     ),
   );
 }
