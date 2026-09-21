@@ -46,9 +46,24 @@ final _local = FlutterLocalNotificationsPlugin();
 
 bool _started = false;
 
+/// Veb push üçün açıq açar.
+///
+/// Firebase Console → Project settings → Cloud Messaging →
+/// "Web Push certificates" → Generate key pair.
+///
+/// Açar gizli deyil: hər cihazda tətbiqin içindədir. Boş olduqda
+/// vebdə bildiriş sadəcə qurulmur, tətbiq normal işləyir.
+const String webPushKey =
+    'BDUqKFVsREnGu7Ou-xGLaWjiFqkVWbJgA3Ik9_pIi_mSE-eR4BPmnjyiK0Iys_o8vKd35s4BmrtHySBjHKOnXQA';
+
 /// Giriş edəndən sonra çağırılır.
 Future<void> startPushNotifications(String uid) async {
-  if (kIsWeb) return; // web üçün ayrıca VAPID quraşdırması lazımdır
+  // Vebdə başqa yol var: yerli bildiriş kitabxanası işləmir, bildirişi
+  // xidmət işçisi (firebase-messaging-sw.js) özü göstərir.
+  if (kIsWeb) {
+    await _startWeb(uid);
+    return;
+  }
   if (_started) {
     await _saveToken(uid);
     return;
@@ -146,6 +161,48 @@ void _handleTap(RemoteMessage message) {
     uid: uid,
     name: '${message.data['fromName'] ?? 'İstifadəçi'}',
   );
+}
+
+
+/// Vebdə bildirişi qurur.
+///
+/// İki şərt var: səhifə HTTPS olmalıdır və istifadəçi icazə verməlidir.
+/// iPhone-da əlavə şərt: tətbiq ana ekrana əlavə edilməlidir — Apple
+/// brauzer sekməsində veb bildirişə icazə vermir.
+Future<void> _startWeb(String uid) async {
+  if (webPushKey.isEmpty) return;
+
+  try {
+    final messaging = FirebaseMessaging.instance;
+
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.denied) return;
+
+    final token = await messaging.getToken(vapidKey: webPushKey);
+    if (token != null && token.isNotEmpty) await _writeToken(uid, token);
+
+    // Açar cihazda dəyişə bilər (brauzer yenilənəndə) — izləyirik.
+    messaging.onTokenRefresh.listen((fresh) => _writeToken(uid, fresh));
+
+    // Tətbiq açıq olanda gələn bildiriş: burada ayrıca göstərmirik,
+    // çünki mesaj səsi (`message_chime.dart`) onsuz da xəbər verir və
+    // iki bildiriş üst-üstə düşərdi.
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      final data = message.data;
+      final from = '${data['fromUid'] ?? ''}';
+      final name = '${data['fromName'] ?? ''}';
+      if (from.isNotEmpty) {
+        pendingPushTarget.value = PushTarget(uid: from, name: name);
+      }
+    });
+  } catch (_) {
+    // Bildiriş qurulmasa da tətbiq normal işləməlidir.
+  }
 }
 
 Future<void> _saveToken(String uid) async {
