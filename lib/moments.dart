@@ -12,6 +12,7 @@ import 'moment_ranking.dart';
 import 'voice/moment_voice.dart';
 import 'voice/waveform.dart';
 import 'share_sheet.dart';
+import 'whispers.dart';
 import 'moment_detail.dart';
 import 'blocking.dart';
 import 'gift_sheet.dart';
@@ -190,6 +191,16 @@ class _MomentsPageState extends State<MomentsPage> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => VideoSearchPage(profile: widget.profile),
+                    ),
+                  ),
+                ),
+                TopIconButton(
+                  icon: Icons.blur_on_rounded,
+                  tooltip: 'Pıçıltı — anonim səs',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => WhispersPage(profile: widget.profile),
                     ),
                   ),
                 ),

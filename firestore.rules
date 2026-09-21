@@ -244,6 +244,29 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // PICILTI (anonim ses divari)
+    //
+    // Anonimlik oxuyan ucundur: ad ekranda gorunmur, amma authorUid
+    // senedde qalir ki, sikayet olunanda moderator kimi tapa bilsin.
+    match /whispers/{whisperId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.authorUid == request.auth.uid;
+
+      // Herkes yalniz sayğaclari arttira biler: begenme ve sikayet.
+      // Melumatin ozunu deyisdirmek olmur.
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['likeCount', 'reportCount'])
+        && request.resource.data.get('likeCount', 0) >= resource.data.get('likeCount', 0)
+        && request.resource.data.get('reportCount', 0) >= resource.data.get('reportCount', 0);
+
+      // Sahibi ve ya moderator silir / gizledir.
+      allow delete: if signedIn()
+        && (resource.data.authorUid == request.auth.uid || isAdmin());
+    }
+
     // AILELER (klan)
     match /families/{familyId} {
       allow read: if signedIn();
