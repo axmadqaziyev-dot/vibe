@@ -18,6 +18,7 @@ import 'social_ui.dart';
 import 'preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
 import 'voice/voice_composer.dart';
+import 'voice/voice_hold.dart';
 import 'voice/voice_message_service.dart';
 import 'voice/voice_player.dart';
 import 'user_profile.dart';
@@ -5651,29 +5652,73 @@ class _RealChatPageState extends State<RealChatPage> {
               ),
               child: Row(
               children: [
+                // Başlıqdakı avatar.
+                //
+                // Əvvəl burada yalnız adın ilk hərfi vardı — şəkil
+                // göstərilmirdi. Onlayn nişanı isə ümumiyyətlə yox
+                // idi: yanında "İndi aktivdir" yazılsa da yaşıl nöqtə
+                // görünmürdü.
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    CircleAvatar(
-                      radius: 19,
-                      backgroundColor: const Color(0xff2a183f),
-                      child: Text(
-                        widget.targetName.isNotEmpty
-                            ? widget.targetName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: online
+                              ? const Color(0xff2de28a)
+                              : Colors.transparent,
+                          width: 1.6,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: VibePhoto(
+                          url:
+                              '${userSnapshot.data?.data()?['photoUrl'] ?? ''}',
+                          name: widget.targetName,
+                        ),
                       ),
                     ),
+
+                    if (online)
+                      Positioned(
+                        right: -1,
+                        bottom: -1,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: const Color(0xff2de28a),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: theme.background.last,
+                              width: 2,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0xaa2de28a),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                    // Əhval nişanı yuxarı keçdi ki, yaşıl nöqtə ilə
+                    // üst-üstə düşməsin.
                     if (peerVibe != null)
                       Positioned(
                         right: -4,
-                        bottom: -3,
+                        top: -3,
                         child: Container(
                           padding: const EdgeInsets.all(3),
                           decoration: BoxDecoration(
                             color: peerVibe.mood.color,
                             shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xff0d0917), width: 2),
+                            border: Border.all(
+                                color: const Color(0xff0d0917), width: 2),
                           ),
                           child: Text(
                             peerVibe.mood.emoji,
@@ -6598,17 +6643,27 @@ class _RealChatPageState extends State<RealChatPage> {
                           icon: const Icon(Icons.emoji_emotions_outlined, color: Color(0xffc8b9dd)),
                         ),
 
-                        IconButton(
-                          tooltip: 'Səsli mesaj',
-                          onPressed: sending
-                              ? null
-                              : () {
-                                  messageFocusNode.unfocus();
-                                  setState(() {
-                                    voiceOpen = true;
-                                  });
-                                },
-                          icon: const Icon(Icons.mic_none_rounded, color: Color(0xff9d7dff)),
+                        // Basıb saxla, danış, burax.
+                        //
+                        // Əvvəl mikrofon ayrıca panel açırdı: bas,
+                        // panel gəlsin, yaz, dayandır, göndər — dörd
+                        // toxunuş. İndi bir hərəkətdir.
+                        VoiceHoldButton(
+                          enabled: !sending,
+                          newId: () => FirebaseFirestore.instance
+                              .collection('chats')
+                              .doc(chatId)
+                              .collection('messages')
+                              .doc()
+                              .id,
+                          send: (draft) => voiceService.send(
+                            draft: draft,
+                            chatId: chatId,
+                            senderId: widget.currentProfile.uid,
+                            senderName: widget.currentProfile.name,
+                            recipientId: widget.targetUid,
+                            recipientName: widget.targetName,
+                          ),
                         ),
 
                         Expanded(
