@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 
 import 'user_profile.dart';
 import 'moment_create.dart';
+import 'stories.dart';
+import 'stories_view.dart';
 import 'moment_ranking.dart';
 import 'voice/moment_voice.dart';
 import 'voice/waveform.dart';
@@ -52,6 +54,11 @@ class _MomentsPageState extends State<MomentsPage> {
   /// Öz ölkəm — eyni ölkədən paylaşım tövsiyədə yuxarı qalxır.
   String myCountry = '';
 
+  /// Baxılmış storilər — halqanın rəngi buna görədir.
+  final Set<String> seenStories = <String>{};
+
+  FirebaseFirestore get db => FirebaseFirestore.instance;
+
   /// Firestore kompozit indeksi hazır deyilsə, sadə sorğuya keçirik —
   /// ekran xəta vermir, sıralama kodda aparılır.
   bool fallback = false;
@@ -80,6 +87,7 @@ class _MomentsPageState extends State<MomentsPage> {
       following = ids;
       _loadFriendsOfFriends(ids);
     });
+    _loadSeenStories();
     _watch(me.collection('hiddenMoments'), (ids) => hiddenMoments = ids);
     _watch(me.collection('mutedUsers'), (ids) => mutedUsers = ids);
 
@@ -376,75 +384,122 @@ class _MomentsPageState extends State<MomentsPage> {
   );
 
   /// Yuxarıdakı hekayə zolağı: "Anını paylaş" + son paylaşanlar.
-  Widget _storyRow(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
-    final seen = <String>{};
-    final owners = <Map<String, dynamic>>[];
-
-    for (final doc in docs) {
-      final d = doc.data();
-      final uid = '${d['ownerUid'] ?? ''}';
-      if (uid.isEmpty || uid == widget.profile.uid) continue;
-      if (!seen.add(uid)) continue;
-      owners.add({
-        'uid': uid,
-        'name': '${d['ownerName'] ?? 'VIBE'}',
-        'image': '${d['imageUrl'] ?? ''}',
-      });
-      if (owners.length >= 14) break;
-    }
-
+  /// Hekayə zolağı — canlı storilər.
+  ///
+  /// Əvvəl bu zolaq sadəcə son paylaşanların siyahısı idi və basanda
+  /// profil açırdı. İndi həqiqi storidir: 24 saat yaşayır, baxılmamış
+  /// halqa rəngli olur, basanda tam ekran açılır.
+  Widget _storyRow(List<QueryDocumentSnapshot<Map<String, dynamic>>> _) {
     return SizedBox(
       height: 96,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-        itemCount: owners.length + 2,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return _story(
-              label: 'Anını paylaş',
-              onTap: _create,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xff1b1430),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: vPurple, width: 1.6),
-                ),
-                child: const Icon(Icons.add_rounded, color: vPink, size: 26),
-              ),
-              ring: false,
-            );
-          }
+      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: db
+            .collection('stories')
+            .orderBy('createdAt', descending: true)
+            .limit(100)
+            .snapshots(),
+        builder: (context, snap) {
+          final groups = snap.hasData
+              ? groupStories(
+                  snap.data!.docs.map((d) => Story.from(d.id, d.data())),
+                  me: widget.profile.uid,
+                  seen: seenStories,
+                )
+              : const <StoryGroup>[];
 
-          if (index == 1) {
-            return _story(
-              label: 'Sən',
-              onTap: _create,
-              child: _StoryAvatar(
-                uid: widget.profile.uid,
-                name: widget.profile.name,
-              ),
-            );
-          }
+          return ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+            itemCount: groups.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _story(
+                  label: 'Stori paylaş',
+                  onTap: _createStory,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xff1b1430),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: vPurple, width: 1.6),
+                    ),
+                    child:
+                        const Icon(Icons.add_rounded, color: vPink, size: 26),
+                  ),
+                  ring: false,
+                );
+              }
 
-          final owner = owners[index - 2];
-          return _story(
-            label: '${owner['name']}',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => PersonPage(
-                  currentProfile: widget.profile,
-                  targetUid: '${owner['uid']}',
+              final group = groups[index - 1];
+
+              return _story(
+                label: group.ownerUid == widget.profile.uid
+                    ? 'Sən'
+                    : group.ownerName,
+                // Baxılmışda halqa sönük olur — nə qaldığı dərhal görünür.
+                ring: !group.allSeen,
+                onTap: () => _openStories(groups, index - 1),
+                child: _StoryAvatar(
+                  uid: group.ownerUid,
+                  name: group.ownerName,
                 ),
-              ),
-            ),
-            child: _StoryAvatar(uid: '${owner['uid']}', name: '${owner['name']}'),
+              );
+            },
           );
         },
       ),
     );
   }
+
+  Future<void> _createStory() => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CreateMomentPage(
+            profile: widget.profile,
+            asStory: true,
+          ),
+        ),
+      );
+
+  Future<void> _openStories(List<StoryGroup> groups, int index) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StoryViewer(
+          groups: groups,
+          startIndex: index,
+          profile: widget.profile,
+        ),
+      ),
+    );
+
+    // Qayıdanda halqalar yenilənsin.
+    if (mounted) _loadSeenStories();
+  }
+
+  /// Baxılmış storilərin siyahısı.
+  ///
+  /// Hər stori üçün ayrıca sorğu getməsin deyə bir dəfə oxunur və
+  /// baxışdan qayıdanda təzələnir.
+  Future<void> _loadSeenStories() async {
+    try {
+      final snap = await db
+          .collectionGroup('views')
+          .where('uid', isEqualTo: widget.profile.uid)
+          .limit(200)
+          .get();
+
+      if (!mounted) return;
+
+      setState(() {
+        seenStories
+          ..clear()
+          ..addAll(snap.docs.map((d) => d.reference.parent.parent!.id));
+      });
+    } catch (_) {
+      // İndeks hazır deyilsə halqalar sadəcə rəngli qalır.
+    }
+  }
+
 
   Widget _story({
     required String label,

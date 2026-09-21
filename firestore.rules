@@ -244,6 +244,32 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // STORILER — 24 saatliq paylasimlar
+    match /stories/{storyId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+
+      // Baxis sayğaci herkes terefinden artirila biler; qalan sahelere
+      // yalniz sahibi toxuna biler.
+      allow update: if signedIn()
+        && (
+          resource.data.ownerUid == request.auth.uid
+          || request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['viewCount'])
+        );
+
+      allow delete: if signedIn()
+        && (resource.data.ownerUid == request.auth.uid || isAdmin());
+
+      // Kimin baxdigi — yalniz oz qeydini yaza bilersen.
+      match /views/{uid} {
+        allow read: if signedIn();
+        allow write: if isMe(uid);
+      }
+    }
+
     // PICILTI (anonim ses divari)
     //
     // Anonimlik oxuyan ucundur: ad ekranda gorunmur, amma authorUid

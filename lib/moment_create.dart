@@ -24,9 +24,20 @@ import 'user_profile.dart';
 /// isteğe bağlıdır. Şəkillər sənədin içində sıxılmış şəkildə saxlanılır,
 /// video isə Supabase Storage-a yüklənir.
 class CreateMomentPage extends StatefulWidget {
-  const CreateMomentPage({super.key, required this.profile});
+  const CreateMomentPage({
+    super.key,
+    required this.profile,
+    this.asStory = false,
+  });
 
   final UserProfile profile;
+
+  /// Stori rejimi — eyni ekran, başqa kolleksiya.
+  ///
+  /// Ayrıca ekran yazmaq təkrar olardı: şəkil seçmə, video seçmə,
+  /// səs yazma və yükləmə tam eyni işdir. Fərq yalnız sənədin
+  /// hara yazılmasındadır.
+  final bool asStory;
 
   @override
   State<CreateMomentPage> createState() => _CreateMomentPageState();
@@ -170,6 +181,28 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
           bytes: videoBytes!,
           contentType: 'video/mp4',
         );
+      }
+
+      if (widget.asStory) {
+        await FirebaseFirestore.instance.collection('stories').doc(id).set({
+          'id': id,
+          'ownerUid': widget.profile.uid,
+          'ownerName': widget.profile.name,
+          'ownerPhoto': '${(await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(widget.profile.uid)
+                  .get())
+              .data()?['photoUrl'] ?? ''}',
+          'caption': caption.text.trim(),
+          if (photos.isNotEmpty) 'imageUrl': photos.first.full,
+          if (videoUrl != null) 'videoUrl': videoUrl,
+          'viewCount': 0,
+          'createdAt': Timestamp.now(),
+        });
+
+        if (!mounted) return;
+        Navigator.pop(context);
+        return;
       }
 
       await FirebaseFirestore.instance.collection('moments').doc(id).set({
