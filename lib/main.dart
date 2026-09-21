@@ -40,6 +40,7 @@ import 'auth_phone.dart';
 import 'coin_wallet.dart';
 import 'daily_reward.dart';
 import 'chat_themes.dart';
+import 'message_chime.dart';
 import 'whats_new.dart';
 import 'legal.dart';
 import 'push_notifications.dart';
@@ -2789,6 +2790,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     setOnline();
     ensureWelcomeBonus(widget.profile.uid);
     startPushNotifications(widget.profile.uid);
+
+    // Tətbiq açıq olanda push gəlmir — mesajı səslə bildiririk.
+    chime.start(widget.profile.uid);
     Telemetry.setUser(widget.profile.uid);
 
     // Bildirişə toxunanda söhbəti aç.
@@ -2806,6 +2810,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       setOnline();
     });
   }
+
+  /// Yeni mesaj səsi.
+  final MessageChime chime = MessageChime();
 
   /// Gündəlik mükafat hazırdırsa pəncərəni açır.
   ///
@@ -2888,6 +2895,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    chime.dispose();
     heartbeat?.cancel();
     pendingPushTarget.removeListener(_openPushTarget);
     WidgetsBinding.instance.removeObserver(this);
@@ -4042,6 +4050,8 @@ class _PersonPageState extends State<PersonPage> {
           currentProfile.uid: currentProfile.name,
           targetUid: name,
         },
+        // Qarşı tərəfdə oxunmamış sayğacı — siyahıda rəqəm kimi görünür.
+        'unread': {targetUid: FieldValue.increment(1)},
         'lastMessage': text,
         'lastSenderId': currentProfile.uid,
         // "Ən çox yazışılan" süzgəci bu sayğaca görə sıralayır.
@@ -4583,6 +4593,8 @@ class _RealChatPageState extends State<RealChatPage> {
                 .update({
                   'readAt.${widget.currentProfile.uid}':
                       FieldValue.serverTimestamp(),
+                  // Söhbət açıldı — oxunmamış sayğacı sıfırlanır.
+                  'unread.${widget.currentProfile.uid}': 0,
                 })
                 .catchError((Object _) {});
           }
@@ -4863,6 +4875,7 @@ class _RealChatPageState extends State<RealChatPage> {
           widget.currentProfile.uid: widget.currentProfile.name,
           widget.targetUid: widget.targetName,
         },
+        'unread': {widget.targetUid: FieldValue.increment(1)},
         'lastMessage': lastMessage,
         'lastSenderId': widget.currentProfile.uid,
         // "Ən çox yazışılan" süzgəci bu sayğaca görə sıralayır.
@@ -5087,6 +5100,7 @@ class _RealChatPageState extends State<RealChatPage> {
           widget.currentProfile.uid: widget.currentProfile.name,
           widget.targetUid: widget.targetName,
         },
+        'unread': {widget.targetUid: FieldValue.increment(1)},
         'lastMessage': '📷 Şəkil',
         'lastSenderId': widget.currentProfile.uid,
         // "Ən çox yazışılan" süzgəci bu sayğaca görə sıralayır.
@@ -5150,6 +5164,7 @@ class _RealChatPageState extends State<RealChatPage> {
           widget.currentProfile.uid: widget.currentProfile.name,
           widget.targetUid: widget.targetName,
         },
+        'unread': {widget.targetUid: FieldValue.increment(1)},
         'lastMessage': 'Domino oyunu',
         'lastSenderId': widget.currentProfile.uid,
         // "Ən çox yazışılan" süzgəci bu sayğaca görə sıralayır.

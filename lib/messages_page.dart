@@ -703,6 +703,14 @@ class _SocialMessagesState extends State<SocialMessages> {
     final unread = isUnread(d, widget.profile.uid);
     final at = (d['updatedAt'] as Timestamp?)?.toDate();
 
+    // Neçə oxunmamış mesaj var. Sayğac hər göndərişdə artır, söhbət
+    // açılanda sıfırlanır. Köhnə söhbətlərdə sahə yoxdur — o zaman
+    // rəqəm əvəzinə nida işarəsi qalır.
+    final unreadCount = int.tryParse(
+          '${(d['unread'] as Map?)?[widget.profile.uid] ?? 0}',
+        ) ??
+        0;
+
     final typing = d['typing'];
     final typingAt = d['typingAt'];
     final isTyping = typing is Map &&
@@ -795,18 +803,30 @@ class _SocialMessagesState extends State<SocialMessages> {
                   const SizedBox(height: 7),
                   if (unread)
                     Container(
-                      width: 20,
+                      constraints: const BoxConstraints(minWidth: 20),
                       height: 20,
                       alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: Color(0xffff4d5e),
-                        shape: BoxShape.circle,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: unreadCount > 9 ? 6 : 0,
                       ),
-                      child: const Icon(
-                        Icons.priority_high_rounded,
-                        size: 13,
-                        color: Colors.white,
+                      decoration: BoxDecoration(
+                        color: const Color(0xffff4d5e),
+                        borderRadius: BorderRadius.circular(10),
                       ),
+                      child: unreadCount > 0
+                          ? Text(
+                              unreadCount > 99 ? '99+' : '$unreadCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.priority_high_rounded,
+                              size: 13,
+                              color: Colors.white,
+                            ),
                     )
                   else
                     const SizedBox(height: 20),

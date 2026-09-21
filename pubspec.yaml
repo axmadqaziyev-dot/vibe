@@ -43,6 +43,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/sounds/chime.wav
 
 # Tətbiq ikonu: əvvəlcə `flutter test test/app_icon_test.dart`,
 # sonra `dart run flutter_launcher_icons`
