@@ -40,6 +40,7 @@ import 'auth_phone.dart';
 import 'coin_wallet.dart';
 import 'daily_reward.dart';
 import 'chat_themes.dart';
+import 'whats_new.dart';
 import 'legal.dart';
 import 'push_notifications.dart';
 import 'push_send.dart';
@@ -2794,7 +2795,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     pendingPushTarget.addListener(_openPushTarget);
 
     // Gündəlik mükafat — tətbiq açılandan bir az sonra.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _offerDailyReward());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Əvvəl yeniliklər, sonra mükafat: ikisi eyni anda açılsa
+      // biri o birinin üstünü örtür.
+      await maybeShowWhatsNew(context);
+      if (mounted) await _offerDailyReward();
+    });
 
     heartbeat = Timer.periodic(const Duration(seconds: 15), (_) {
       setOnline();

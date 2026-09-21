@@ -819,7 +819,9 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         final roomSnap = await room.get();
         await me.set({
           'activeRoomId': widget.roomId,
-          'activeRoomName': '${roomSnap.data()?['name'] ?? 'Səsli otaq'}',
+          // Otaq "title" ilə yaradılır; "name" yalnız qrup zəngində var.
+          'activeRoomName':
+              '${roomSnap.data()?['title'] ?? roomSnap.data()?['name'] ?? 'Səsli otaq'}',
           'activeRoomAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
@@ -852,7 +854,9 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
       final roomSnap = await room.get();
       await me.set({
         'activeRoomId': widget.roomId,
-        'activeRoomName': '${roomSnap.data()?['name'] ?? 'Səsli otaq'}',
+        // Otaq "title" ilə yaradılır; "name" yalnız qrup zəngində var.
+          'activeRoomName':
+              '${roomSnap.data()?['title'] ?? roomSnap.data()?['name'] ?? 'Səsli otaq'}',
         'activeRoomAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (_) {
