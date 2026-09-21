@@ -11,6 +11,7 @@ import 'ui/vibe_design.dart';
 import 'user_profile.dart';
 import 'voice/audio_file.dart';
 import 'voice/moment_voice.dart';
+import 'voice/voice_fx.dart';
 import 'voice/waveform.dart';
 
 /// Pıçıltı — anonim səs divarı.
@@ -95,6 +96,9 @@ class _WhispersPageState extends State<WhispersPage> {
   bool recording = false;
   bool sending = false;
   int elapsed = 0;
+
+  /// Səs maskası — anonimliyi gücləndirir və əylənclidir.
+  VoiceFx fx = VoiceFx.none;
 
   @override
   void dispose() {
@@ -183,8 +187,13 @@ class _WhispersPageState extends State<WhispersPage> {
     }
   }
 
-  Future<void> _publish(Uint8List bytes, int durationMs) async {
+  Future<void> _publish(Uint8List raw, int durationMs) async {
     final id = db.collection('whispers').doc().id;
+
+    // Maska tətbiq olunur; ton dəyişəndə uzunluq da dəyişir,
+    // ona görə müddət yenidən hesablanır.
+    final bytes = applyVoiceFx(raw, fx);
+    final length = fx == VoiceFx.none ? durationMs : wavDurationMs(bytes);
 
     final url = await MediaUpload.upload(
       bucket: MediaUpload.videoBucket,
@@ -195,7 +204,7 @@ class _WhispersPageState extends State<WhispersPage> {
 
     await db.collection('whispers').doc(id).set({
       'audioUrl': url,
-      'audioMs': durationMs,
+      'audioMs': length,
       'audioWave': waveformFromWav(bytes),
       // Anonimlik oxuyan üçündür: ad ekranda görünmür, amma sənəddə
       // qalır ki, şikayət olunanda moderator kimi tapa bilsin.
@@ -463,7 +472,12 @@ class _WhispersPageState extends State<WhispersPage> {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _fxRow(),
+            const SizedBox(height: 12),
+            Row(
           children: [
             Expanded(
               child: Text(
@@ -509,8 +523,55 @@ class _WhispersPageState extends State<WhispersPage> {
               ),
             ),
           ],
+            ),
+          ],
         ),
       ),
     );
   }
+
+  /// Maska seçimi.
+  Widget _fxRow() => SizedBox(
+        height: 32,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            for (final value in VoiceFx.values)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: recording ? null : () => setState(() => fx = value),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: fx == value
+                          ? vPink.withValues(alpha: .18)
+                          : Colors.white.withValues(alpha: .05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: fx == value ? vPink : Colors.white12,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(value.emoji,
+                            style: const TextStyle(fontSize: 13)),
+                        const SizedBox(width: 6),
+                        Text(
+                          value.label,
+                          style: TextStyle(
+                            color: fx == value ? Colors.white : vMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
 }
