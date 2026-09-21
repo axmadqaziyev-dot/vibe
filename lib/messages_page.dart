@@ -12,6 +12,7 @@ import 'social_ui.dart' show SocialSurface, openChat, isUnread;
 import 'suggest_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'families_page.dart';
+import 'push_prompt.dart';
 import 'blocking.dart';
 import 'notifications_center.dart';
 import 'user_profile.dart';
@@ -325,6 +326,7 @@ class _SocialMessagesState extends State<SocialMessages> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             children: [
+              PushPrompt(uid: widget.profile.uid),
               _shortcut(
                 icon: Icons.notifications_rounded,
                 colors: const [Color(0xff8b5cff), Color(0xff5c3bd6)],

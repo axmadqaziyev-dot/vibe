@@ -164,22 +164,58 @@ void _handleTap(RemoteMessage message) {
 }
 
 
+
+/// Vebdə bildiriş icazəsi hansı haldadır?
+///
+/// `null` — hələ soruşulmayıb (düymə göstərilməlidir).
+/// `true` — icazə var. `false` — rədd edilib, artıq soruşmaq olmaz.
+Future<bool?> webPushStatus() async {
+  if (!kIsWeb || webPushKey.isEmpty) return true;
+
+  try {
+    final settings =
+        await FirebaseMessaging.instance.getNotificationSettings();
+
+    return switch (settings.authorizationStatus) {
+      AuthorizationStatus.notDetermined => null,
+      AuthorizationStatus.denied => false,
+      _ => true,
+    };
+  } catch (_) {
+    return true;
+  }
+}
+
+/// İstifadəçi düyməyə basanda icazə soruşur.
+Future<bool> askWebPush(String uid) async {
+  await _startWeb(uid, ask: true);
+  return (await webPushStatus()) == true;
+}
+
 /// Vebdə bildirişi qurur.
 ///
 /// İki şərt var: səhifə HTTPS olmalıdır və istifadəçi icazə verməlidir.
 /// iPhone-da əlavə şərt: tətbiq ana ekrana əlavə edilməlidir — Apple
 /// brauzer sekməsində veb bildirişə icazə vermir.
-Future<void> _startWeb(String uid) async {
+Future<void> _startWeb(String uid, {bool ask = false}) async {
   if (webPushKey.isEmpty) return;
 
   try {
     final messaging = FirebaseMessaging.instance;
 
-    final settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    // iPhone icazə pəncərəsini yalnız istifadəçi toxunanda açır.
+    // Avtomatik çağırış Safari tərəfindən sakitcə rədd edilir, ona görə
+    // açılışda yalnız mövcud vəziyyətə baxırıq; soruşmaq düymədən gəlir.
+    var settings = await messaging.getNotificationSettings();
+
+    if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+      if (!ask) return;
+      settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
 
     if (settings.authorizationStatus == AuthorizationStatus.denied) return;
 
