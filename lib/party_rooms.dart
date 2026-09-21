@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'user_profile.dart';
 import 'battle.dart';
+import 'spoken.dart';
 import 'rankings.dart';
 import 'vibe_ranking.dart';
 import 'game_center.dart';
@@ -94,11 +95,92 @@ class PartyRoomsPage extends StatefulWidget {
 }
 
 class _PartyRoomsPageState extends State<PartyRoomsPage> {
+  /// Mənim danışıq dilim — profil sənədindən oxunur.
+  Spoken? myLang;
+
+  /// Seçilmiş süzgəc. null = bütün dillər.
+  Spoken? langFilter;
+
+  @override
+  void initState() {
+    super.initState();
+
+    FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.profile.uid)
+        .get()
+        .then((snap) {
+      if (!mounted) return;
+      final lang = spokenFrom(snap.data()?['lang']);
+      setState(() {
+        myLang = lang;
+        // Açılışda öz dilin seçilmiş gəlir: başa düşmədiyin otaqla
+        // qarşılaşmaq ən tez bezdirən şeydir.
+        langFilter = lang;
+      });
+    }).catchError((Object _) {});
+  }
+
   final rooms = FirebaseFirestore.instance
       .collection('partyRooms')
       .orderBy('createdAt', descending: true)
       .limit(100)
       .snapshots();
+
+
+  /// Dil süzgəci sırası.
+  Widget _langRow() => Padding(
+        padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+        child: SizedBox(
+          height: 32,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              _langChip(null, '🌐', 'Hamısı'),
+              for (final lang in Spoken.values)
+                _langChip(lang, lang.flag, lang.label),
+            ],
+          ),
+        ),
+      );
+
+  Widget _langChip(Spoken? value, String flag, String label) {
+    final selected = langFilter == value;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: PressableScale(
+        onTap: () => setState(() => langFilter = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: selected
+                ? _pink.withValues(alpha: .18)
+                : Colors.white.withValues(alpha: .05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? _pink : Colors.white12,
+            ),
+          ),
+          child: Row(
+            children: [
+              Text(flag, style: const TextStyle(fontSize: 13)),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : _muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _createRoom() async {
     final result = await showDialog<_RoomDraft>(
@@ -112,6 +194,8 @@ class _PartyRoomsPageState extends State<PartyRoomsPage> {
       await ref.set({
         'title': result.title,
         'topic': result.topic,
+        // Otağın dili yaradanın dilidir; siyahı buna görə süzülür.
+        'lang': (myLang ?? Spoken.az).id,
         'hostId': widget.profile.uid,
         'hostName': widget.profile.name,
         'locked': result.locked,
@@ -271,6 +355,7 @@ class _PartyRoomsPageState extends State<PartyRoomsPage> {
               ),
             ),
           ),
+          _langRow(),
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: rooms,
@@ -288,7 +373,17 @@ class _PartyRoomsPageState extends State<PartyRoomsPage> {
                     child: CircularProgressIndicator(color: _pink),
                   );
                 }
-                final docs = snapshot.data!.docs;
+                // Dil süzgəci: yaxın dillər (AZ/TR) birlikdə gəlir,
+                // çünki iki tərəf bir-birini başa düşür.
+                final docs = langFilter == null
+                    ? snapshot.data!.docs
+                    : snapshot.data!.docs.where((doc) {
+                        final lang = spokenFrom(doc.data()['lang']);
+                        // Nişanı olmayan köhnə otaqlar gizlədilmir.
+                        if (lang == null) return true;
+                        return spokenClose(langFilter!, lang);
+                      }).toList();
+
                 if (docs.isEmpty) {
                   return Center(
                     child: Padding(

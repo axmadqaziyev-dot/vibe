@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'countries.dart';
+import 'spoken.dart';
 import 'country_picker.dart';
 import 'media_store.dart';
 import 'telemetry.dart';
@@ -162,6 +163,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
         'gender': gender,
         if (country != null) 'country': country!.name,
         if (country != null) 'countryCode': country!.code,
+        // Danışıq dili ölkədən çıxarılır: adam ayrıca seçmir, amma
+        // otaqlar və tanışlıq siyahısı ona görə süzülür. Boş nişan
+        // heç kimə fayda vermir.
+        if (country != null) 'lang': spokenForCountry(country!.code).id,
         'age': age,
         'birthDate': Timestamp.fromDate(DateTime(birthYear, 1, 1)),
         'interests': interests.toList(),
