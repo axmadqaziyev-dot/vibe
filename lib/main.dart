@@ -51,6 +51,9 @@ import 'legal.dart';
 import 'push_notifications.dart';
 import 'server_time.dart';
 import 'image_save.dart';
+import 'location_share.dart';
+import 'post_links.dart' show openPostLink;
+import 'map_tile.dart';
 import 'push_send.dart';
 import 'moment_create.dart';
 import 'photo_pick.dart';
@@ -4900,6 +4903,9 @@ class _RealChatPageState extends State<RealChatPage> {
     if (type == 'sticker') return '${data['text'] ?? ''} Stiker';
     if (type == 'domino') return 'Domino oyunu';
     if (type == 'photo') return 'Şəkil';
+    if (type == 'location') {
+      return data['live'] == true ? '📍 Canlı konum' : '📍 Konum';
+    }
     return '${data['text'] ?? ''}';
   }
 
@@ -5388,6 +5394,126 @@ class _RealChatPageState extends State<RealChatPage> {
     ));
   }
 
+  /// Konum göndərir.
+  ///
+  /// Canlı konumda əvvəlcə müddət soruşulur: sonsuz paylaşım
+  /// təhlükəlidir, adam bağlamağı unuda bilər.
+  Future<void> _sendLocation({required bool live}) async {
+    if (sending || chatLock != null) return;
+
+    Duration? duration;
+
+    if (live) {
+      duration = await showModalBottomSheet<Duration>(
+        context: context,
+        backgroundColor: const Color(0xff151020),
+        showDragHandle: true,
+        builder: (sheet) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(4, 0, 4, 12),
+                  child: Text(
+                    'Nə qədər paylaşılsın?',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                for (final value in liveDurations)
+                  ListTile(
+                    leading: const Icon(Icons.schedule_rounded, color: vBlue),
+                    title: Text(
+                      durationLabel(value),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    onTap: () => Navigator.pop(sheet, value),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      if (duration == null || !mounted) return;
+    }
+
+    setState(() => sending = true);
+    notifySocial(context, 'Konum alınır…');
+
+    try {
+      final position = await currentPosition();
+
+      if (position == null) {
+        if (mounted) {
+          notifySocial(
+            context,
+            'Konum alınmadı. Brauzerdən və ya telefondan icazə ver.',
+          );
+        }
+        return;
+      }
+
+      final chat = FirebaseFirestore.instance.collection('chats').doc(chatId);
+      final message = chat.collection('messages').doc();
+      final batch = FirebaseFirestore.instance.batch();
+
+      final label = live ? '📍 Canlı konum' : '📍 Konum';
+
+      batch.set(chat, {
+        'members': [widget.currentProfile.uid, widget.targetUid],
+        'memberNames': {
+          widget.currentProfile.uid: widget.currentProfile.name,
+          widget.targetUid: widget.targetName,
+        },
+        'unread': {widget.targetUid: FieldValue.increment(1)},
+        'lastMessage': label,
+        'lastSenderId': widget.currentProfile.uid,
+        'messageCount': FieldValue.increment(1),
+        'updatedAt': Timestamp.now(),
+      }, SetOptions(merge: true));
+
+      batch.set(message, {
+        'senderId': widget.currentProfile.uid,
+        'text': '',
+        'type': 'location',
+        'lat': position.latitude,
+        'lng': position.longitude,
+        'live': live,
+        if (live && duration != null)
+          'liveUntil': Timestamp.fromDate(DateTime.now().add(duration)),
+        'createdAt': Timestamp.now(),
+        'clientCreatedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      await batch.commit();
+
+      if (live && duration != null) {
+        LiveLocationSender.instance.start(
+          message: message,
+          duration: duration,
+        );
+      }
+
+      unawaited(sendPushToUser(
+        toUid: widget.targetUid,
+        title: widget.currentProfile.name,
+        body: label,
+        fromName: widget.currentProfile.name,
+      ));
+    } catch (_) {
+      if (mounted) notifySocial(context, 'Konum göndərilmədi.');
+    } finally {
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
   /// Söhbətə şəkil göndərir.
   ///
   /// Şəkil sıxılıb Firestore-da data URI kimi saxlanılır (pullu Storage
@@ -5622,6 +5748,30 @@ class _RealChatPageState extends State<RealChatPage> {
                 //
                 // Açılandan sonra silinir — qarşı tərəf yenidən baxa
                 // bilmir, siyahıda da önizləmə qalmır.
+                ListTile(
+                  leading: const Icon(Icons.location_on_rounded,
+                      color: Color(0xff2de28a)),
+                  title: const Text('Konum göndər',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('İndiki yerin — bir dəfəlik',
+                      style: TextStyle(color: vMuted, fontSize: 12)),
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    _sendLocation(live: false);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.share_location_rounded,
+                      color: Color(0xff22a7ff)),
+                  title: const Text('Canlı konum',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('Hərəkət etdikcə yenilənir',
+                      style: TextStyle(color: vMuted, fontSize: 12)),
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    _sendLocation(live: true);
+                  },
+                ),
                 ListTile(
                   leading: const Icon(Icons.looks_one_rounded, color: vPink),
                   title: const Text('Bir dəfəlik şəkil',
@@ -6317,6 +6467,37 @@ class _RealChatPageState extends State<RealChatPage> {
                           ));
                         }
 
+                        // --- konum ---
+                        if (type == 'location') {
+                          final spot = LiveLocation.from(data);
+                          if (spot == null) return const SizedBox.shrink();
+
+                          return decorate(Align(
+                            alignment: mine
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: _LocationBubble(
+                              spot: spot,
+                              mine: mine,
+                              onOpen: () => openPostLink(
+                                context,
+                                mapOpenUrl(spot.latitude, spot.longitude),
+                              ),
+                              onStop: mine && spot.live
+                                  ? () {
+                                      LiveLocationSender.instance.stop();
+                                      messageRef.set(
+                                        {'stopped': true},
+                                        SetOptions(merge: true),
+                                      );
+                                    }
+                                  : null,
+                              onLongPress: () => _openMessageActions(
+                                  messageRef, mine, data),
+                            ),
+                          ));
+                        }
+
                         // --- bir dəfəlik şəkil ---
                         //
                         // Açılandan sonra şəkil silinir: sənəd qalır,
@@ -6918,6 +7099,162 @@ class _RealChatPageState extends State<RealChatPage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Konum mesajının balonu.
+///
+/// Xəritə lövhəsi OpenStreetMap-dən gəlir — açar və ödəniş tələb
+/// etmir. Üstündə nişan var, altında vəziyyət yazısı.
+class _LocationBubble extends StatefulWidget {
+  const _LocationBubble({
+    required this.spot,
+    required this.mine,
+    required this.onOpen,
+    required this.onLongPress,
+    this.onStop,
+  });
+
+  final LiveLocation spot;
+  final bool mine;
+  final VoidCallback onOpen;
+  final VoidCallback onLongPress;
+  final VoidCallback? onStop;
+
+  @override
+  State<_LocationBubble> createState() => _LocationBubbleState();
+}
+
+class _LocationBubbleState extends State<_LocationBubble> {
+  Timer? ticker;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Qalan vaxt saniyə-saniyə deyil, dəqiqə-dəqiqə dəyişir —
+    // on saniyəlik addım kifayətdir və ekranı yormur.
+    if (widget.spot.live) {
+      ticker = Timer.periodic(
+        const Duration(seconds: 10),
+        (_) {
+          if (mounted) setState(() {});
+        },
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final spot = widget.spot;
+    final active = spot.activeAt(DateTime.now());
+
+    return GestureDetector(
+      onTap: widget.onOpen,
+      onLongPress: widget.onLongPress,
+      child: Container(
+        width: 250,
+        margin: const EdgeInsets.only(bottom: 8),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: const Color(0xff1b1426),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: active ? const Color(0xff2de28a) : const Color(0xff352447),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 130,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    mapTileUrl(spot.latitude, spot.longitude),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, _, _) => const ColoredBox(
+                      color: Color(0xff241a33),
+                      child: Center(
+                        child: Icon(Icons.map_rounded, color: vMuted),
+                      ),
+                    ),
+                  ),
+                  Center(
+                    child: Icon(
+                      Icons.location_on_rounded,
+                      size: 34,
+                      color: active ? const Color(0xff2de28a) : vPink,
+                      shadows: const [
+                        Shadow(color: Colors.black54, blurRadius: 8),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          spot.live ? 'Canlı konum' : 'Konum',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          spot.live
+                              ? (active
+                                  ? liveLeftText(
+                                      spot.until!.difference(DateTime.now()))
+                                  : 'Bitdi')
+                              : coordinateText(spot.latitude, spot.longitude),
+                          style: TextStyle(
+                            color: active ? const Color(0xff45f0a8) : vMuted,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (active && widget.onStop != null)
+                    TextButton(
+                      onPressed: widget.onStop,
+                      child: const Text(
+                        'Dayandır',
+                        style: TextStyle(
+                          color: Color(0xffff8a9b),
+                          fontSize: 12,
+                        ),
+                      ),
+                    )
+                  else
+                    const Icon(Icons.open_in_new_rounded,
+                        size: 16, color: vMuted),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
