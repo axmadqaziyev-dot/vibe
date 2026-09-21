@@ -707,6 +707,17 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         await room.collection('members').doc(widget.profile.uid).set({
           'lastSeen': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+
+        // Profildəki "otaqdadır" nişanı da təzələnir.
+        //
+        // Əvvəl yalnız girişdə yazılırdı: tətbiq düzgün bağlanmasa
+        // (səhifə bağlandı, proqram öldürüldü) nişan əbədi qalırdı və
+        // adam çıxsa da "səsli söhbətdə" görünürdü.
+        if (!hidden) {
+          await me.set({
+            'activeRoomAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
       } catch (_) {}
     });
   }

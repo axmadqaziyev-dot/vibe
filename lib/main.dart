@@ -5464,8 +5464,24 @@ class _RealChatPageState extends State<RealChatPage> {
                                       .difference((typingAt[widget.targetUid] as Timestamp).toDate())
                                       .inSeconds
                                   .abs() < 8;
-                          final roomId =
-                              '${userSnapshot.data?.data()?['activeRoomId'] ?? ''}';
+                          // Nişan yalnız təzə olanda göstərilir.
+                          //
+                          // Tətbiq düzgün bağlanmasa sahə silinmir; belə
+                          // halda adam çıxsa da "səsli söhbətdə" görünürdü.
+                          // Otaqdakı ürək döyüntüsü hər 25 saniyədə
+                          // activeRoomAt-ı təzələyir, ona görə 90 saniyə
+                          // kifayət qədər geniş hədddir.
+                          final roomAt =
+                              userSnapshot.data?.data()?['activeRoomAt'];
+                          final roomFresh = roomAt is Timestamp &&
+                              DateTime.now()
+                                      .difference(roomAt.toDate())
+                                      .inSeconds <
+                                  90;
+
+                          final roomId = roomFresh
+                              ? '${userSnapshot.data?.data()?['activeRoomId'] ?? ''}'
+                              : '';
 
                           // Qarşı tərəf səsli otaqdadırsa, oraya keçid göstəririk.
                           if (roomId.isNotEmpty && !isTyping) {
@@ -5899,23 +5915,69 @@ class _RealChatPageState extends State<RealChatPage> {
                                 margin: const EdgeInsets.only(bottom: 10),
                                 constraints: const BoxConstraints(
                                   maxWidth: 240,
-                                  maxHeight: 300,
+                                  maxHeight: 360,
                                 ),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(18),
                                   border: Border.all(color: vLine),
                                 ),
                                 clipBehavior: Clip.antiAlias,
+                                // contain, cover deyil: uzun ekran şəkli
+                                // cover ilə ortadan kəsilir və boş bloka
+                                // oxşayır. contain nisbəti saxlayır.
                                 child: thumb.isEmpty
                                     ? const SizedBox(
                                         width: 180,
-                                        height: 180,
-                                        child: Icon(Icons.broken_image_rounded,
-                                            color: vMuted),
+                                        height: 140,
+                                        child: Center(
+                                          child: Icon(
+                                            Icons.broken_image_rounded,
+                                            color: vMuted,
+                                          ),
+                                        ),
                                       )
                                     : Image(
                                         image: vibeImageProvider(thumb)!,
-                                        fit: BoxFit.cover,
+                                        fit: BoxFit.contain,
+                                        loadingBuilder:
+                                            (context, child, progress) {
+                                          if (progress == null) return child;
+                                          return const SizedBox(
+                                            width: 180,
+                                            height: 140,
+                                            child: Center(
+                                              child:
+                                                  CircularProgressIndicator(
+                                                color: vPink,
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        errorBuilder: (context, _, _) =>
+                                            const SizedBox(
+                                          width: 180,
+                                          height: 140,
+                                          child: Center(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.broken_image_rounded,
+                                                  color: vMuted,
+                                                ),
+                                                SizedBox(height: 6),
+                                                Text(
+                                                  'Şəkil açılmadı',
+                                                  style: TextStyle(
+                                                    color: vMuted,
+                                                    fontSize: 11.5,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ),
                               ),
                             ),
