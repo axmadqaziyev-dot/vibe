@@ -201,16 +201,46 @@ class _IncomingCallsState extends State<IncomingCalls> {
             await _stopRingtone();
 
             if (accepted == true && mounted) {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => CallPage(
-                    ref: doc.reference,
-                    caller: false,
-                    video: isVideo,
-                    name: callerName,
+              // Qrup zəngi: çağırış otağa aiddirsə birbaşa ora keçirik.
+              final roomId = '${data['roomId'] ?? ''}';
+
+              if (roomId.isNotEmpty) {
+                try {
+                  await doc.reference.update({'status': 'accepted'});
+                } catch (_) {}
+
+                Map<String, dynamic> mine = const {};
+                try {
+                  final snap = await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(widget.uid)
+                      .get();
+                  mine = snap.data() ?? const {};
+                } catch (_) {}
+
+                if (!mounted) return;
+
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PartyRoomPage(
+                      profile:
+                          UserProfile.fromMap({...mine, 'uid': widget.uid}),
+                      roomId: roomId,
+                    ),
                   ),
-                ),
-              );
+                );
+              } else {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CallPage(
+                      ref: doc.reference,
+                      caller: false,
+                      video: isVideo,
+                      name: callerName,
+                    ),
+                  ),
+                );
+              }
             }
           } finally {
             await _stopRingtone();
@@ -1061,11 +1091,13 @@ class _CallPageState extends State<CallPage> {
     return '$minutes:$seconds';
   }
 
-  /// Zəngi səsli otağa çevirir.
+  /// Zəngi qrup zənginə çevirir.
   ///
-  /// 1-ə-1 zəngə üçüncü adamı birbaşa qoşmaq mümkün deyil — bunun üçün
-  /// otaq quruluşu lazımdır. Ona görə zəng otağa çevrilir: hər iki tərəf
-  /// otağa keçir, oradan istənilən sayda dost dəvət oluna bilər.
+  /// 1-ə-1 zəngə üçüncü adamı birbaşa qoşmaq mümkün deyil — qrup üçün
+  /// otaq quruluşu lazımdır. Amma bu otaq **gizlidir**: siyahıda
+  /// görünmür, adı "Qrup zəngi"dir və içindəkilər üçün adi zəng kimi
+  /// davranır. Əvvəl açıq party otağı yaradılırdı və hamı içəri girə
+  /// bilirdi — zəng gizli söhbətdir, belə olmamalıdır.
   Future<void> _convertToRoom() async {
     final me = FirebaseAuth.instance.currentUser;
     if (me == null || movingToRoom) return;
@@ -1080,12 +1112,15 @@ class _CallPageState extends State<CallPage> {
 
       final roomRef = FirebaseFirestore.instance.collection('partyRooms').doc();
       await roomRef.set({
-        'name': '$myName və dostları',
+        'name': 'Qrup zəngi',
+        'title': 'Qrup zəngi',
         'hostId': me.uid,
         'hostName': myName,
         'seatCount': 6,
         'memberCount': 0,
-        'private': false,
+        // Gizli otaq: otaqlar siyahısında görünmür.
+        'private': true,
+        'isCall': true,
         'seats': {
           '0': {'uid': me.uid, 'name': myName, 'muted': false, 'locked': false},
           for (var i = 1; i < 6; i++)
@@ -1397,3 +1432,29 @@ class _CallPageState extends State<CallPage> {
         ),
       );
 }
+
+/// Gizli otağa (qrup zənginə) adam çağırır.
+///
+/// Adi dəvətdən fərqi: qarşı tərəfdə **zəng çalır**. WhatsApp-da da belədir —
+/// əlavə edilən adam bildiriş yox, zəng alır və qəbul edəndə birbaşa
+/// söhbətin içinə düşür.
+Future<void> ringToRoom({
+  required String roomId,
+  required String fromUid,
+  required String fromName,
+  required String toUid,
+  bool video = false,
+}) async {
+  await FirebaseFirestore.instance.collection('calls').add({
+    'caller': fromUid,
+    'callerName': fromName,
+    'callee': toUid,
+    'members': [fromUid, toUid],
+    'video': video,
+    'status': 'ringing',
+    // Bu sahə olanda qəbul edən CallPage yox, otağa keçir.
+    'roomId': roomId,
+    'createdAt': FieldValue.serverTimestamp(),
+  });
+}
+

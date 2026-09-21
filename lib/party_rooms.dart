@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'user_profile.dart';
 import 'battle.dart';
+import 'calls.dart' show ringToRoom;
 import 'spoken.dart';
 import 'rankings.dart';
 import 'vibe_ranking.dart';
@@ -392,9 +393,14 @@ class _PartyRoomsPageState extends State<PartyRoomsPage> {
                 }
                 // Dil süzgəci: yaxın dillər (AZ/TR) birlikdə gəlir,
                 // çünki iki tərəf bir-birini başa düşür.
+                // Gizli otaqlar (qrup zəngləri) siyahıda görünmür.
+                final open = snapshot.data!.docs
+                    .where((doc) => doc.data()['private'] != true)
+                    .toList();
+
                 final docs = langFilter == null
-                    ? snapshot.data!.docs
-                    : snapshot.data!.docs.where((doc) {
+                    ? open
+                    : open.where((doc) {
                         final lang = spokenFrom(doc.data()['lang']);
                         // Nişanı olmayan köhnə otaqlar gizlədilmir.
                         if (lang == null) return true;
@@ -2967,6 +2973,144 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
   }
 
 
+
+  /// Otağa adam çağırır — qarşı tərəfdə zəng çalır.
+  ///
+  /// Adi dəvətdən fərqi budur: bildiriş gözlənilmir, telefon zəng edir.
+  /// Qəbul edən birbaşa bu otağa düşür.
+  Future<void> _ringSomeone() async {
+    final db = FirebaseFirestore.instance;
+    final me = db.collection('users').doc(widget.profile.uid);
+    final ids = <String>{};
+
+    try {
+      final following = await me.collection('following').limit(100).get();
+      ids.addAll(following.docs.map((e) => e.id));
+    } catch (_) {}
+
+    try {
+      final chats = await db
+          .collection('chats')
+          .where('members', arrayContains: widget.profile.uid)
+          .limit(50)
+          .get();
+      for (final doc in chats.docs) {
+        ids.addAll(List<String>.from(doc.data()['members'] ?? const []));
+      }
+    } catch (_) {}
+
+    ids.remove(widget.profile.uid);
+
+    if (!mounted) return;
+
+    if (ids.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Çağıracaq adam yoxdur.')),
+      );
+      return;
+    }
+
+    final people = <MapEntry<String, String>>[];
+    for (final chunk in _chunks(ids.toList(), 30)) {
+      try {
+        final snap = await db
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+        for (final doc in snap.docs) {
+          people.add(MapEntry(doc.id, '${doc.data()['name'] ?? 'VIBE'}'));
+        }
+      } catch (_) {}
+    }
+
+    if (!mounted || people.isEmpty) return;
+    people.sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xff151020),
+      showDragHandle: true,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .7,
+      ),
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 0, 18, 10),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Kimi çağırırsan?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: people.length,
+                itemBuilder: (context, i) {
+                  final person = people[i];
+
+                  return ListTile(
+                    leading: SizedBox(
+                      width: 38,
+                      height: 38,
+                      child: ClipOval(
+                        child: _UserPhoto(uid: person.key, name: person.value),
+                      ),
+                    ),
+                    title: Text(
+                      person.value,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    trailing: const Icon(Icons.call_rounded, color: _pink),
+                    onTap: () async {
+                      Navigator.pop(sheet);
+                      final messenger = ScaffoldMessenger.of(context);
+
+                      try {
+                        await ringToRoom(
+                          roomId: widget.roomId,
+                          fromUid: widget.profile.uid,
+                          fromName: widget.profile.name,
+                          toUid: person.key,
+                        );
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('${person.value} çağırıldı.'),
+                          ),
+                        );
+                      } catch (_) {
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('Çağırış getmədi.')),
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Firestore `whereIn` bir sorğuda 30 sənəd verir.
+  Iterable<List<T>> _chunks<T>(List<T> list, int size) sync* {
+    for (var i = 0; i < list.length; i += size) {
+      yield list.sublist(i, (i + size).clamp(0, list.length));
+    }
+  }
+
   /// Səsin hansı həlqədə kəsildiyini göstərir.
   ///
   /// "Səs gəlmir" şikayətini təxminlə həll etmək olmur: problem ya
@@ -3600,6 +3744,11 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                       Navigator.pop(sheet);
                       _changeSeatCount(d);
                     }),
+                  _tool(Icons.add_ic_call_rounded, 'Zəngə çağır',
+                      const Color(0xff2de28a), () {
+                    Navigator.pop(sheet);
+                    _ringSomeone();
+                  }),
                   _tool(Icons.monitor_heart_rounded, 'Səs diaqnostikası',
                       const Color(0xff48e08a), () {
                     Navigator.pop(sheet);
