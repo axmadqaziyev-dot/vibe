@@ -12,7 +12,8 @@ import 'package:http/http.dart' as http;
 /// qədər tətbiq normal işləyir, sadəcə bildiriş getmir.
 ///
 /// Deploy etdikdən sonra alınan URL-i buraya yaz.
-const String pushFunctionUrl = '';
+const String pushFunctionUrl =
+    'https://txjqqohqownpfcokscep.supabase.co/functions/v1/send-push';
 
 /// [toUid] istifadəçisinin bütün cihazlarına bildiriş göndərir.
 ///
