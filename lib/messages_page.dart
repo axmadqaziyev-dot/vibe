@@ -12,6 +12,7 @@ import 'social_ui.dart' show SocialSurface, openChat, isUnread;
 import 'suggest_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'families_page.dart';
+import 'push_notifications.dart' show askWebPush;
 import 'push_prompt.dart';
 import 'blocking.dart';
 import 'notifications_center.dart';
@@ -478,6 +479,32 @@ class _SocialMessagesState extends State<SocialMessages> {
               onTap: () {
                 Navigator.pop(sheet);
                 setState(() => tab = 1);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.notifications_active_rounded,
+                  color: vPink),
+              title: const Text('Telefon bildirişlərini aç',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text(
+                'Tətbiq bağlı olanda da mesajdan xəbərin olsun',
+                style: TextStyle(color: vMuted, fontSize: 12),
+              ),
+              onTap: () async {
+                Navigator.pop(sheet);
+                final messenger = ScaffoldMessenger.of(context);
+                final ok = await askWebPush(widget.profile.uid);
+
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? 'Bildirişlər açıldı.'
+                          : 'İcazə alınmadı. Tətbiq ana ekrana əlavə '
+                              'olunmalıdır — Safari sekməsində işləmir.',
+                    ),
+                  ),
+                );
               },
             ),
             ListTile(
