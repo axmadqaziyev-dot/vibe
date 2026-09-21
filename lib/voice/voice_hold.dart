@@ -24,6 +24,7 @@ import 'package:flutter/services.dart';
 import 'package:record/record.dart';
 
 import 'audio_file.dart';
+import 'mic_keepalive.dart';
 import 'voice_message_service.dart';
 import 'voice_player.dart';
 
@@ -108,8 +109,11 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Tətbiq arxa plana keçdi — yarımçıq yazını saxlamırıq.
-    if (state != AppLifecycleState.resumed && stage != VoiceStage.idle) {
-      unawaited(_discard());
+    if (state != AppLifecycleState.resumed) {
+      if (stage != VoiceStage.idle) unawaited(_discard());
+
+      // Mikrofon açıq qalmasın: iOS ekranda narıncı nöqtə göstərir.
+      releaseMic();
     }
   }
 
@@ -131,13 +135,20 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton>
     try {
       await VoicePlayer.pauseActive();
 
-      // `hasPermission()` QƏSDƏN çağırılmır.
+      // İcazə pəncərəsi ilə iki ayrı mübarizə var.
       //
-      // O, əvvəlcə brauzerin icazə sorğusuna baxır; iOS Safari bu
-      // sorğunu mikrofon üçün dəstəkləmir, ona görə paket birbaşa
-      // `getUserMedia` çağırır — yəni icazə pəncərəsi açılır. Sonra
-      // `start()` bir də açır. Nəticədə hər səs yazısında pəncərə iki
-      // dəfə çıxırdı.
+      // BİRİNCİ: `hasPermission()` qəsdən çağırılmır. O, əvvəlcə
+      // brauzerin icazə sorğusuna baxır; iOS Safari bu sorğunu
+      // mikrofon üçün dəstəkləmir, ona görə paket birbaşa
+      // `getUserMedia` çağırır — yəni pəncərə açılır. Sonra `start()`
+      // bir də açırdı.
+      //
+      // İKİNCİ: brauzer icazəni yalnız AÇIQ AXIN varkən qüvvədə
+      // saxlayır. Paket yazını bitirəndə axını bağlayır və növbəti
+      // dəfə hər şey sıfırdan başlayır. Öz axınımızı açıq saxlayırıq
+      // (trek söndürülü) — paketin sorğusu pəncərəsiz keçir.
+      await warmMic();
+
       recordingFile = await newRecordingPath();
 
       await recorder.start(
