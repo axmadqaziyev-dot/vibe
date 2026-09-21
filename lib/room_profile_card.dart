@@ -9,6 +9,7 @@ import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
 import 'vip.dart';
+import 'app/i18n.dart';
 
 /// OTAQDA PROFİL KARTI.
 ///
@@ -338,7 +339,7 @@ class _RoomProfileCard extends StatelessWidget {
                       Expanded(
                         child: _action(
                           icon: Icons.card_giftcard_rounded,
-                          label: 'Hədiyyə',
+                          label: t('Hədiyyə'),
                           color: vPink,
                           onTap: () {
                             Navigator.pop(context);

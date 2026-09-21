@@ -1088,7 +1088,7 @@ class _EditSocialProfileState extends State<EditSocialProfile> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Profili düzəlt')),
+    appBar: AppBar(title: Text(t('Profili düzəlt'))),
     body: !loaded
         ? const Center(child: CircularProgressIndicator())
         : ListView(
@@ -1312,11 +1312,11 @@ class _SocialSettingsState extends State<SocialSettings> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Ləğv et'),
+            child: Text(t('Ləğv et')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Çıxış'),
+            child: Text(t('Çıxış')),
           ),
         ],
       ),
@@ -1897,7 +1897,7 @@ class _SocialFeedState extends State<SocialFeed> {
             children: [
               Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8))),
               const SizedBox(height: 14),
-              const Text('Şərhlər', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+              Text(t('Şərhlər'), style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 10),
               Expanded(
                 child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -2037,12 +2037,12 @@ class _SocialFeedState extends State<SocialFeed> {
                                           TextButton(
                                             onPressed: () =>
                                                 Navigator.pop(context, false),
-                                            child: const Text('Ləğv et'),
+                                            child: Text(t('Ləğv et')),
                                           ),
                                           FilledButton(
                                             onPressed: () =>
                                                 Navigator.pop(context, true),
-                                            child: const Text('Sil'),
+                                            child: Text(t('Sil')),
                                           ),
                                         ],
                                       ),
@@ -2091,7 +2091,7 @@ class _SocialFeedState extends State<SocialFeed> {
                                   ),
                                   const Spacer(),
                                   IconButton(
-                                    tooltip: 'Paylaş',
+                                    tooltip: t('Paylaş'),
                                     onPressed: () => _shareMoment('${doc.data()['text'] ?? ''}'),
                                     icon: const Icon(Icons.ios_share_rounded, color: mutedInk),
                                   ),
@@ -2160,7 +2160,7 @@ class _ComposeSocialState extends State<ComposeSocial> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Ləğv et'),
+        child: Text(t('Ləğv et')),
       ),
       FilledButton(
         onPressed: () {
@@ -2168,7 +2168,7 @@ class _ComposeSocialState extends State<ComposeSocial> {
             Navigator.pop(context, controller.text.trim());
           }
         },
-        child: const Text('Paylaş'),
+        child: Text(t('Paylaş')),
       ),
     ],
   );

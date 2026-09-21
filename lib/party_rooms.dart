@@ -18,6 +18,7 @@ import 'coin_wallet.dart';
 import 'invite.dart';
 import 'server_time.dart';
 import 'room_background.dart';
+import 'agency.dart';
 import 'room_contributors.dart';
 import 'ui/vibe_badge.dart';
 import 'room_profile_card.dart';
@@ -35,6 +36,7 @@ import 'main.dart' show PersonPage;
 import 'ui/vibe_design.dart';
 import 'ui/room_effects.dart';
 import 'ui/vibe_chrome.dart';
+import 'app/i18n.dart';
 
 const _pink = Color(0xffff2bd6);
 const _purple = Color(0xff8b5cff);
@@ -1219,6 +1221,20 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
+        // Agentliyin payı.
+        //
+        // Yayımçının qazancından ÇIXMIR — ayrıca yazılır. Çıxsaydı,
+        // yayımçı agentliyə qoşulmaqdan zərər görərdi və sistem
+        // işləməzdi.
+        final agencyId = '${targetData['agencyId'] ?? ''}';
+        if (agencyId.isNotEmpty) {
+          tx.set(
+            FirebaseFirestore.instance.collection('agencies').doc(agencyId),
+            {'earned': FieldValue.increment(agencyCut(total))},
+            SetOptions(merge: true),
+          );
+        }
+
         // Otağın töhfə sıralaması.
         //
         // Eyni əməliyyatda yazılır: hədiyyə keçib sıralama keçməsə,
@@ -1666,7 +1682,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                     ),
                     const Spacer(),
                     GradientButton(
-                      label: 'Göndər',
+                      label: t('Göndər'),
                       icon: Icons.card_giftcard_rounded,
                       expand: false,
                       height: 44,
@@ -1987,12 +2003,12 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         TopIconButton(
           icon: Icons.emoji_events_rounded,
           color: const Color(0xffffd86b),
-          tooltip: 'Töhfə sıralaması',
+          tooltip: t('Töhfə sıralaması'),
           onTap: () => showRoomContributors(context, widget.roomId),
         ),
         TopIconButton(
           icon: Icons.format_list_bulleted_rounded,
-          tooltip: 'Otaq menyusu',
+          tooltip: t('Otaq menyusu'),
           onTap: () => _openRoomMenu(),
         ),
       ],
@@ -2037,7 +2053,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
               const SizedBox(height: 10),
               TextButton(
                 onPressed: () => Navigator.pop(sheet),
-                child: const Text('Ləğv et', style: TextStyle(color: _muted)),
+                child: Text(t('Ləğv et'), style: TextStyle(color: _muted)),
               ),
             ],
           ),
@@ -3277,7 +3293,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
                 ),
               const SizedBox(height: 10),
               GradientButton(
-                label: 'Kopyala',
+                label: t('Kopyala'),
                 icon: Icons.copy_rounded,
                 gradient: vBrand,
                 height: 46,
@@ -3645,7 +3661,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialog),
-              child: const Text('Ləğv et'),
+              child: Text(t('Ləğv et')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialog, next),
@@ -3755,11 +3771,11 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialog),
-            child: const Text('Ləğv et'),
+            child: Text(t('Ləğv et')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialog, controller.text.trim()),
-            child: const Text('Yadda saxla'),
+            child: Text(t('Yadda saxla')),
           ),
         ],
       ),
@@ -5421,7 +5437,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
             ),
             ListTile(
               leading: const Icon(Icons.flag_rounded, color: Color(0xffffb347)),
-              title: const Text('Şikayət et',
+              title: Text(t('Şikayət et'),
                   style: TextStyle(color: Colors.white)),
               subtitle: const Text('Moderatorlar baxacaq',
                   style: TextStyle(color: _muted, fontSize: 12)),
@@ -5470,7 +5486,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
               ListTile(
                 leading: const Icon(Icons.delete_outline_rounded,
                     color: Color(0xff9d94ae)),
-                title: const Text('Mesajı sil',
+                title: Text(t('Mesajı sil'),
                     style: TextStyle(color: Colors.white)),
                 onTap: () async {
                   Navigator.pop(sheet);
@@ -5748,7 +5764,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
             ),
           ),
           PopupMenuButton<String>(
-            tooltip: 'Oyunlar',
+            tooltip: t('Oyunlar'),
             color: const Color(0xff171121),
             icon: const Icon(Icons.sports_esports_rounded, color: _blue),
             onSelected: (value) {
@@ -5789,12 +5805,12 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
             ],
           ),
           IconButton(
-            tooltip: 'Otaq alətləri',
+            tooltip: t('Otaq alətləri'),
             onPressed: () => _openTools(roomData),
             icon: const Icon(Icons.apps_rounded, color: Color(0xff9d7dff)),
           ),
           IconButton(
-            tooltip: 'Hədiyyə',
+            tooltip: t('Hədiyyə'),
             onPressed: () => _openGifts(roomData),
             icon: const Icon(Icons.card_giftcard_rounded, color: _pink),
           ),
@@ -5805,7 +5821,7 @@ class _PartyRoomPageState extends State<PartyRoomPage> {
               cursorColor: _pink,
               onSubmitted: (_) => _sendMessage(),
               decoration: InputDecoration(
-                hintText: 'Mesaj yaz...',
+                hintText: t('Mesaj yaz...'),
                 hintStyle: const TextStyle(color: Color(0xff8f86a3), fontSize: 13),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(
@@ -6134,7 +6150,7 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Ləğv et'),
+          child: Text(t('Ləğv et')),
         ),
         FilledButton(
           onPressed: () {
@@ -6195,7 +6211,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Ləğv et'),
+          child: Text(t('Ləğv et')),
         ),
         FilledButton(
           onPressed: () {

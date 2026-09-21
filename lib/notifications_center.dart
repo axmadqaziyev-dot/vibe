@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'user_profile.dart';
 import 'server_time.dart';
+import 'app/i18n.dart';
 
 const _bg = Color(0xff070510);
 const _panel = Color(0xff151020);
@@ -48,11 +49,11 @@ class NotificationCenterPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialog, false),
-            child: const Text('Ləğv et', style: TextStyle(color: _muted)),
+            child: Text(t('Ləğv et'), style: TextStyle(color: _muted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialog, true),
-            child: const Text('Sil', style: TextStyle(color: Color(0xffff657b))),
+            child: Text(t('Sil'), style: TextStyle(color: Color(0xffff657b))),
           ),
         ],
       ),
@@ -83,10 +84,10 @@ class NotificationCenterPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: _markAllRead,
-            child: const Text('Hamısını oxu'),
+            child: Text(t('Hamısını oxu')),
           ),
           IconButton(
-            tooltip: 'Hamısını sil',
+            tooltip: t('Hamısını sil'),
             onPressed: () => _clearAll(context),
             icon: const Icon(Icons.delete_sweep_rounded, color: _muted),
           ),
@@ -296,7 +297,7 @@ class NotificationBadge extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             IconButton(
-              tooltip: 'Bildirişlər',
+              tooltip: t('Bildirişlər'),
               onPressed: onPressed,
               icon: const Icon(Icons.notifications_none_rounded, size: 28),
             ),

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// E-poçtu təsdiqlənməmiş istifadəçiyə göstərilən zolaq.
 ///
@@ -129,7 +130,7 @@ class _EmailVerifyBannerState extends State<EmailVerifyBanner> {
               ),
             ),
             IconButton(
-              tooltip: 'Bağla',
+              tooltip: t('Bağla'),
               onPressed: () => setState(() => hidden = true),
               icon: const Icon(Icons.close_rounded, color: vMuted, size: 18),
             ),

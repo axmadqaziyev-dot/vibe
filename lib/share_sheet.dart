@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'blocking.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 /// Paylaşımı dostlara yönləndirmək üçün vərəq.
 ///
@@ -430,7 +431,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                     children: [
                       _action(
                         icon: Icons.link_rounded,
-                        label: 'Kopyala',
+                        label: t('Kopyala'),
                         onTap: () async {
                           await Clipboard.setData(
                             ClipboardData(text: _shareText),
@@ -444,7 +445,7 @@ class _ShareSheetState extends State<_ShareSheet> {
                       ),
                       _action(
                         icon: Icons.ios_share_rounded,
-                        label: 'Paylaş',
+                        label: t('Paylaş'),
                         onTap: () async {
                           // Telefonun öz pəncərəsi: WhatsApp, Telegram və s.
                           await SharePlus.instance.share(

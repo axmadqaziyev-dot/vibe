@@ -2276,11 +2276,11 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Ləğv et', style: TextStyle(color: vMuted)),
+          child: Text(t('Ləğv et'), style: TextStyle(color: vMuted)),
         ),
         TextButton(
           onPressed: _submit,
-          child: const Text('Göndər', style: TextStyle(color: vPink)),
+          child: Text(t('Göndər'), style: TextStyle(color: vPink)),
         ),
       ],
     );
@@ -3176,7 +3176,7 @@ class _VibeVideoFeedState extends State<VibeVideoFeed> {
               children: [
                 Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8))),
                 const SizedBox(height: 14),
-                const Text('Şərhlər', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                Text(t('Şərhlər'), style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 12),
                 Expanded(
                   child: comments.isEmpty
@@ -3308,7 +3308,7 @@ class _VibeVideoFeedState extends State<VibeVideoFeed> {
                             onTap: () => _toggleVideoLike(index),
                           ),
                           _videoAction(icon: Icons.chat_bubble_outline_rounded, label: '${item['comments']}', onTap: () => _openVideoComments(index)),
-                          _videoAction(icon: Icons.share_rounded, label: 'Paylaş', onTap: () => _shareVideo(index)),
+                          _videoAction(icon: Icons.share_rounded, label: t('Paylaş'), onTap: () => _shareVideo(index)),
                           _videoAction(icon: saved.contains(index) ? Icons.bookmark_rounded : Icons.bookmark_border_rounded, label: saved.contains(index) ? 'Saxlanıb' : 'Yadda saxla', active: saved.contains(index), onTap: () => _toggleVideoSave(index)),
                         ],
                       ),
@@ -4978,7 +4978,7 @@ class _RealChatPageState extends State<RealChatPage> {
                 sheet,
                 icon: Icons.reply_rounded,
                 color: const Color(0xff9d7dff),
-                label: 'Cavab ver',
+                label: t('Cavab ver'),
                 onTap: () => _startReply(
                   ref.id,
                   mine ? 'Sən' : widget.targetName,
@@ -4990,7 +4990,7 @@ class _RealChatPageState extends State<RealChatPage> {
                 sheet,
                 icon: Icons.forward_rounded,
                 color: const Color(0xff2de28a),
-                label: 'Yönləndir',
+                label: t('Yönləndir'),
                 onTap: () => _forward(data),
               ),
 
@@ -4999,7 +4999,7 @@ class _RealChatPageState extends State<RealChatPage> {
                   sheet,
                   icon: Icons.copy_rounded,
                   color: const Color(0xff8fd4ff),
-                  label: 'Mətni kopyala',
+                  label: t('Mətni kopyala'),
                   onTap: () {
                     Clipboard.setData(
                       ClipboardData(text: '${data['text'] ?? ''}'),
@@ -5015,7 +5015,7 @@ class _RealChatPageState extends State<RealChatPage> {
                   sheet,
                   icon: Icons.download_rounded,
                   color: const Color(0xffffd458),
-                  label: 'Yadda saxla',
+                  label: t('Yadda saxla'),
                   onTap: () => _saveMessagePhoto(ref, data),
                 ),
 
@@ -5025,7 +5025,7 @@ class _RealChatPageState extends State<RealChatPage> {
                   sheet,
                   icon: Icons.edit_rounded,
                   color: const Color(0xff9d7dff),
-                  label: 'Yenidən düzəlt',
+                  label: t('Yenidən düzəlt'),
                   onTap: () => _editMessage(ref, '${data['text'] ?? ''}'),
                 ),
 
@@ -5033,7 +5033,7 @@ class _RealChatPageState extends State<RealChatPage> {
                 sheet,
                 icon: Icons.push_pin_rounded,
                 color: const Color(0xff22a7ff),
-                label: 'Söhbətin başına sancaqla',
+                label: t('Söhbətin başına sancaqla'),
                 onTap: () => _pinMessage(ref.id, data),
               ),
 
@@ -5042,7 +5042,7 @@ class _RealChatPageState extends State<RealChatPage> {
                 sheet,
                 icon: Icons.visibility_off_rounded,
                 color: const Color(0xff9d94ae),
-                label: 'Özümdən sil',
+                label: t('Özümdən sil'),
                 onTap: () => _hideForMe(ref),
               ),
 
@@ -5051,7 +5051,7 @@ class _RealChatPageState extends State<RealChatPage> {
                   sheet,
                   icon: Icons.delete_outline_rounded,
                   color: const Color(0xffff657b),
-                  label: 'Hər kəsdən sil',
+                  label: t('Hər kəsdən sil'),
                   onTap: () => _deleteMessage(ref),
                 ),
 
@@ -5060,7 +5060,7 @@ class _RealChatPageState extends State<RealChatPage> {
                   sheet,
                   icon: Icons.flag_rounded,
                   color: const Color(0xffff657b),
-                  label: 'Şikayət et',
+                  label: t('Şikayət et'),
                   onTap: () => _reportMessage(ref, data),
                 ),
             ],
@@ -5167,11 +5167,11 @@ class _RealChatPageState extends State<RealChatPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialog),
-            child: const Text('Ləğv et', style: TextStyle(color: vMuted)),
+            child: Text(t('Ləğv et'), style: TextStyle(color: vMuted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialog, controller.text.trim()),
-            child: const Text('Saxla'),
+            child: Text(t('Saxla')),
           ),
         ],
       ),
@@ -6001,7 +6001,7 @@ class _RealChatPageState extends State<RealChatPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.photo_camera_rounded, color: Color(0xff22a7ff)),
-                  title: const Text('Şəkil çək', style: TextStyle(color: Colors.white)),
+                  title: Text(t('Şəkil çək'), style: TextStyle(color: Colors.white)),
                   subtitle: const Text('Kamera ilə indi çək', style: TextStyle(color: vMuted, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(sheet);
@@ -6015,7 +6015,7 @@ class _RealChatPageState extends State<RealChatPage> {
                 ListTile(
                   leading: const Icon(Icons.location_on_rounded,
                       color: Color(0xff2de28a)),
-                  title: const Text('Konum göndər',
+                  title: Text(t('Konum göndər'),
                       style: TextStyle(color: Colors.white)),
                   subtitle: const Text('İndiki yerin — bir dəfəlik',
                       style: TextStyle(color: vMuted, fontSize: 12)),
@@ -6027,7 +6027,7 @@ class _RealChatPageState extends State<RealChatPage> {
                 ListTile(
                   leading: const Icon(Icons.share_location_rounded,
                       color: Color(0xff22a7ff)),
-                  title: const Text('Canlı konum',
+                  title: Text(t('Canlı konum'),
                       style: TextStyle(color: Colors.white)),
                   subtitle: const Text('Hərəkət etdikcə yenilənir',
                       style: TextStyle(color: vMuted, fontSize: 12)),
@@ -6038,7 +6038,7 @@ class _RealChatPageState extends State<RealChatPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.looks_one_rounded, color: vPink),
-                  title: const Text('Bir dəfəlik şəkil',
+                  title: Text(t('Bir dəfəlik şəkil'),
                       style: TextStyle(color: Colors.white)),
                   subtitle: const Text('Bir dəfə baxılır, sonra itir',
                       style: TextStyle(color: vMuted, fontSize: 12)),
@@ -6385,7 +6385,7 @@ class _RealChatPageState extends State<RealChatPage> {
                     false,
                   );
                 },
-                tooltip: 'Səsli zəng',
+                tooltip: t('Səsli zəng'),
                 icon: const Icon(Icons.call_outlined),
               ),
               IconButton(
@@ -6399,7 +6399,7 @@ class _RealChatPageState extends State<RealChatPage> {
                     true,
                   );
                 },
-                tooltip: 'Video zəng',
+                tooltip: t('Video zəng'),
                 icon: const Icon(Icons.videocam_outlined),
               ),
               IconButton(
@@ -6408,7 +6408,7 @@ class _RealChatPageState extends State<RealChatPage> {
                   chatId: chatId,
                   current: theme,
                 ),
-                tooltip: 'Söhbət mövzusu',
+                tooltip: t('Söhbət mövzusu'),
                 icon: const Icon(Icons.palette_outlined),
               ),
             ],
@@ -7355,12 +7355,12 @@ class _RealChatPageState extends State<RealChatPage> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         IconButton(
-                          tooltip: 'Stiker və oyunlar',
+                          tooltip: t('Stiker və oyunlar'),
                           onPressed: openMoreSheet,
                           icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xffff5bd6)),
                         ),
                         IconButton(
-                          tooltip: 'Emoji',
+                          tooltip: t('Emoji'),
                           onPressed: openEmojiPicker,
                           icon: const Icon(Icons.emoji_emotions_outlined, color: Color(0xffc8b9dd)),
                         ),
@@ -7398,7 +7398,7 @@ class _RealChatPageState extends State<RealChatPage> {
                             maxLines: 5,
                             textInputAction: TextInputAction.newline,
                             decoration: InputDecoration(
-                              hintText: 'Mesaj yaz...',
+                              hintText: t('Mesaj yaz...'),
                               hintStyle: const TextStyle(color: Color(0xff8f86a3)),
                               isDense: true,
                               contentPadding: const EdgeInsets.symmetric(

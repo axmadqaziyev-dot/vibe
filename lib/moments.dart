@@ -31,6 +31,7 @@ import 'vibe_levels.dart';
 import 'video_search.dart';
 import 'ui/vibe_design.dart';
 import 'ui/vibe_chrome.dart';
+import 'app/i18n.dart';
 
 class MomentsPage extends StatefulWidget {
   const MomentsPage({super.key, required this.profile});
@@ -199,7 +200,7 @@ class _MomentsPageState extends State<MomentsPage> {
               actions: [
                 TopIconButton(
                   icon: Icons.search_rounded,
-                  tooltip: 'Axtar',
+                  tooltip: t('Axtar'),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -423,7 +424,7 @@ class _MomentsPageState extends State<MomentsPage> {
             itemBuilder: (context, index) {
               if (index == 0) {
                 return _story(
-                  label: 'Stori paylaş',
+                  label: t('Stori paylaş'),
                   onTap: _createStory,
                   child: Container(
                     decoration: BoxDecoration(
@@ -1226,7 +1227,7 @@ class _MomentCardState extends State<MomentCard> {
             _menuItem(
               sheet,
               icon: Icons.link_rounded,
-              label: 'Bağlantını kopyala',
+              label: t('Bağlantını kopyala'),
               onTap: () => _copyLink(ownerName),
             ),
             _menuItem(
@@ -1245,7 +1246,7 @@ class _MomentCardState extends State<MomentCard> {
             _menuItem(
               sheet,
               icon: Icons.add_to_photos_rounded,
-              label: 'Storinə at',
+              label: t('Storinə at'),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -1311,7 +1312,7 @@ class _MomentCardState extends State<MomentCard> {
               _menuItem(
                 sheet,
                 icon: Icons.delete_outline_rounded,
-                label: 'Sil',
+                label: t('Sil'),
                 note: 'Geri qaytarmaq olmur',
                 danger: true,
                 onTap: _confirmDelete,
@@ -1334,7 +1335,7 @@ class _MomentCardState extends State<MomentCard> {
               _menuItem(
                 sheet,
                 icon: Icons.flag_outlined,
-                label: 'Şikayət et',
+                label: t('Şikayət et'),
                 danger: true,
                 onTap: () => _report(ownerUid),
               ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// Dostları VIBE-a dəvət etmək.
 ///
@@ -89,7 +90,7 @@ Future<void> showInviteSheet(
             ),
             const SizedBox(height: 16),
             GradientButton(
-              label: 'Mətni kopyala',
+              label: t('Mətni kopyala'),
               icon: Icons.copy_rounded,
               gradient: vBrand,
               height: 50,

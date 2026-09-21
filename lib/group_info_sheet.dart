@@ -15,6 +15,7 @@ import 'people_picker.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 void showGroupInfo(
   BuildContext context, {
@@ -82,13 +83,13 @@ class _GroupInfoSheet extends StatelessWidget {
                 _tile(
                   icon: Icons.drive_file_rename_outline_rounded,
                   color: vPurple,
-                  label: 'Adı dəyiş',
+                  label: t('Adı dəyiş'),
                   onTap: () => _rename(context, group),
                 ),
                 _tile(
                   icon: Icons.add_a_photo_rounded,
                   color: const Color(0xff22a7ff),
-                  label: 'Şəkli dəyiş',
+                  label: t('Şəkli dəyiş'),
                   onTap: () => _changePhoto(context),
                 ),
               ],
@@ -97,14 +98,14 @@ class _GroupInfoSheet extends StatelessWidget {
                 _tile(
                   icon: Icons.person_add_alt_1_rounded,
                   color: const Color(0xff2de28a),
-                  label: 'Üzv əlavə et',
+                  label: t('Üzv əlavə et'),
                   onTap: () => _invite(context, group),
                 ),
 
               _tile(
                 icon: Icons.sports_esports_rounded,
                 color: vPink,
-                label: 'Oyunlar',
+                label: t('Oyunlar'),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -159,7 +160,7 @@ class _GroupInfoSheet extends StatelessWidget {
                 _tile(
                   icon: Icons.logout_rounded,
                   color: const Color(0xffff657b),
-                  label: 'Qrupdan çıx',
+                  label: t('Qrupdan çıx'),
                   onTap: () => _leave(context, group),
                 ),
             ],
@@ -395,11 +396,11 @@ class _GroupInfoSheet extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialog),
-            child: const Text('Ləğv et', style: TextStyle(color: vMuted)),
+            child: Text(t('Ləğv et'), style: TextStyle(color: vMuted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialog, controller.text),
-            child: const Text('Saxla'),
+            child: Text(t('Saxla')),
           ),
         ],
       ),

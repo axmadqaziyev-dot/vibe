@@ -18,6 +18,7 @@ import 'creator_dashboard.dart';
 import 'video_manage.dart';
 import 'video_share.dart';
 import 'ui/vibe_chrome.dart';
+import 'app/i18n.dart';
 
 class VibeVideoPage extends StatefulWidget {
   const VibeVideoPage({super.key, required this.profile});
@@ -942,7 +943,7 @@ class _VideoCardState extends State<_VideoCard>
             ),
             ListTile(
               leading: const Icon(Icons.flag_outlined, color: Color(0xffffb24a)),
-              title: const Text('Şikayət et', style: TextStyle(color: Colors.white)),
+              title: Text(t('Şikayət et'), style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(sheet);
                 showVideoReportSheet(

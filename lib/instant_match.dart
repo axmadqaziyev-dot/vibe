@@ -6,6 +6,7 @@ import 'ui/vibe_chrome.dart';
 import 'main.dart' show PersonPage, RealChatPage;
 import 'calls.dart';
 import 'server_time.dart';
+import 'app/i18n.dart';
 
 const _bg = Color(0xff070510);
 const _panel = Color(0xff151020);
@@ -289,10 +290,12 @@ class _InstantMatchPageState extends State<InstantMatchPage>
                     labelText: 'Kim?',
                     isDense: true,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Hamısı')),
-                    DropdownMenuItem(value: 'female', child: Text('Qızlar')),
-                    DropdownMenuItem(value: 'male', child: Text('Oğlanlar')),
+                  items: [
+                    DropdownMenuItem(value: 'all', child: Text(t('Hamısı'))),
+                    const DropdownMenuItem(
+                        value: 'female', child: Text('Qızlar')),
+                    const DropdownMenuItem(
+                        value: 'male', child: Text('Oğlanlar')),
                   ],
                   onChanged: (v) => setState(() => gender = v ?? 'all'),
                 ),

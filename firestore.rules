@@ -426,6 +426,27 @@ service cloud.firestore {
       }
     }
 
+    // AGENTLIKLER
+    //
+    // Siyahi aciqdir: adam agentliye kodla qosulur, ona gore kodu
+    // yoxlamaq ucun oxuya bilmelidir. Yazma huququ mehduddur:
+    // sahib deyisdirile bilmez ve qazanc saygaci azaldila bilmez.
+    match /agencies/{agencyId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+
+      allow update: if signedIn()
+        && request.resource.data.get('ownerUid', '')
+           == resource.data.get('ownerUid', '')
+        && request.resource.data.get('earned', 0)
+           >= resource.data.get('earned', 0);
+
+      allow delete: if signedIn()
+        && resource.data.get('ownerUid', '') == request.auth.uid;
+    }
+
     // LEGACY POSTS
     match /posts/{postId} {
       allow read, write: if signedIn();

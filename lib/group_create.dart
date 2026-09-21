@@ -14,6 +14,7 @@ import 'people_picker.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 /// Qrup qurma axını: adam seç → ad ver → yarat.
 Future<void> startGroupCreation(
@@ -195,7 +196,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
             style: const TextStyle(color: Colors.white, fontSize: 15),
             cursorColor: vPink,
             decoration: InputDecoration(
-              labelText: 'Qrupun adı',
+              labelText: t('Qrupun adı'),
               labelStyle: const TextStyle(color: vMuted),
               counterStyle: const TextStyle(color: vMuted),
               filled: true,

@@ -14,6 +14,7 @@ import 'vip.dart';
 import 'vibe_status.dart';
 import 'ui/vibe_design.dart';
 import 'ui/vibe_chrome.dart';
+import 'app/i18n.dart';
 
 // ============================================================
 // ÖRTÜK ŞƏKLİ
@@ -250,7 +251,7 @@ class _ProfileCoverHeaderState extends State<ProfileCoverHeader> {
                         ),
                         TopIconButton(
                           icon: Icons.settings_rounded,
-                          tooltip: 'Ayarlar',
+                          tooltip: t('Ayarlar'),
                           onTap: widget.onSettings,
                         ),
                       ],

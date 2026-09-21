@@ -24,6 +24,7 @@ import 'story_overlay.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 class StoryEditorPage extends StatefulWidget {
   const StoryEditorPage({
@@ -143,7 +144,7 @@ class _StoryEditorPageState extends State<StoryEditorPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialog),
-            child: const Text('Ləğv et', style: TextStyle(color: vMuted)),
+            child: Text(t('Ləğv et'), style: TextStyle(color: vMuted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialog, controller.text.trim()),
@@ -508,7 +509,7 @@ class _StoryEditorPageState extends State<StoryEditorPage> {
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: VibeChip(
-                  label: template.label,
+                  label: t(template.label),
                   emoji: template.emoji,
                   onTap: () => setState(() {
                     overlays

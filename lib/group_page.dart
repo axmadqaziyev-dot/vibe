@@ -30,6 +30,7 @@ import 'server_time.dart';
 import 'ui/vibe_chrome.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 class GroupPage extends StatefulWidget {
   const GroupPage({
@@ -295,7 +296,7 @@ class _GroupPageState extends State<GroupPage> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Qrup haqqında',
+            tooltip: t('Qrup haqqında'),
             onPressed: () => showGroupInfo(
               context,
               profile: widget.profile,
@@ -495,7 +496,7 @@ class _GroupPageState extends State<GroupPage> {
         child: Row(
           children: [
             IconButton(
-              tooltip: 'Şəkil',
+              tooltip: t('Şəkil'),
               onPressed: sending ? null : () => _sendPhoto(group),
               icon: const Icon(Icons.add_photo_alternate_rounded,
                   color: Color(0xffff5bd6)),
@@ -512,7 +513,7 @@ class _GroupPageState extends State<GroupPage> {
                   isDense: true,
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  hintText: 'Qrupa yaz…',
+                  hintText: t('Qrupa yaz…'),
                   hintStyle: const TextStyle(color: vMuted, fontSize: 14),
                   filled: true,
                   fillColor: const Color(0xff1b1426),

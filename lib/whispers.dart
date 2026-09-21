@@ -13,6 +13,7 @@ import 'voice/audio_file.dart';
 import 'voice/moment_voice.dart';
 import 'voice/voice_fx.dart';
 import 'voice/waveform.dart';
+import 'app/i18n.dart';
 
 /// Pıçıltı — anonim səs divarı.
 ///
@@ -350,7 +351,7 @@ class _WhispersPageState extends State<WhispersPage> {
               const Spacer(),
               _likeButton(doc),
               IconButton(
-                tooltip: 'Şikayət et',
+                tooltip: t('Şikayət et'),
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.flag_outlined, size: 17, color: vMuted),
                 onPressed: () => _report(doc),

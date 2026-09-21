@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// GÜNDƏLİK GİRİŞ MÜKAFATI.
 ///
@@ -385,7 +386,7 @@ class _DailyRewardSheetState extends State<DailyRewardSheet> {
         ),
         const SizedBox(height: 18),
         GradientButton(
-          label: 'Bağla',
+          label: t('Bağla'),
           gradient: vBrand,
           height: 52,
           onPressed: () => Navigator.pop(context),

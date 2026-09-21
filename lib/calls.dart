@@ -14,6 +14,7 @@ import 'user_profile.dart';
 import 'voice/ice_servers.dart';
 import 'ui/vibe_design.dart';
 import 'ui/vibe_chrome.dart';
+import 'app/i18n.dart';
 
 bool callOpen = false;
 
@@ -469,7 +470,7 @@ class _IncomingCallScreenState extends State<_IncomingCallScreen>
                         icon: widget.video
                             ? Icons.videocam_rounded
                             : Icons.call_rounded,
-                        label: 'Cavab ver',
+                        label: t('Cavab ver'),
                         onTap: widget.onAccept,
                       ),
                     ],

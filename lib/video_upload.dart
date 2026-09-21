@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'media_upload.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 /// Seçilən video pulsuz yaddaş üçün çox böyükdür.
 class _VideoTooLarge implements Exception {
@@ -118,11 +119,11 @@ class _VideoUploadButtonState extends State<VideoUploadButton> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Ləğv et'),
+            child: Text(t('Ləğv et')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, c.text),
-            child: const Text('Paylaş'),
+            child: Text(t('Paylaş')),
           ),
         ],
       ),

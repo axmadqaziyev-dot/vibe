@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 
 import 'ui/vibe_design.dart';
 import 'server_time.dart';
+import 'app/i18n.dart';
 
 // ============================================================
 // MODEL
@@ -494,7 +495,7 @@ class _VibePickerSheetState extends State<_VibePickerSheet> {
                           minimumSize: const Size(0, 48),
                           side: const BorderSide(color: Color(0xff5c4a78)),
                         ),
-                        child: const Text('Sil'),
+                        child: Text(t('Sil')),
                       ),
                     ),
                     const SizedBox(width: 10),

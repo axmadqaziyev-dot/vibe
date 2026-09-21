@@ -11,6 +11,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// Silinməsi mümkün olan alt kolleksiyalar (müştəri tərəfdən sadalana bilənlər).
 const _subCollections = <String>[
@@ -119,7 +120,7 @@ Future<bool> showDeleteAccountFlow(BuildContext context, String uid) async {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialog, false),
-          child: const Text('Saxla'),
+          child: Text(t('Saxla')),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: vRose),

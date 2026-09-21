@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'families.dart';
 import 'ui/vibe_design.dart';
 import 'user_profile.dart';
+import 'app/i18n.dart';
 
 /// Ailələr meydanı — siyahı, yaratmaq və ailəyə qoşulmaq.
 class FamiliesPage extends StatefulWidget {
@@ -62,7 +63,7 @@ class _FamiliesPageState extends State<FamiliesPage> {
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: VibeChip(
-                  label: 'Hamısı',
+                  label: t('Hamısı'),
                   emoji: '✨',
                   color: vPink,
                   selected: kind == null,

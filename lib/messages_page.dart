@@ -11,6 +11,7 @@ import 'main.dart' show PersonPage, isReallyOnline;
 import 'social_ui.dart' show SocialSurface, openChat, isUnread;
 import 'suggest_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'agency_hub.dart';
 import 'families_page.dart';
 import 'group_chat.dart';
 import 'group_create.dart';
@@ -24,6 +25,7 @@ import 'vibe_status.dart';
 import 'invite.dart';
 import 'ui/vibe_design.dart';
 import 'ui/vibe_chrome.dart';
+import 'app/i18n.dart';
 
 class SocialMessages extends StatefulWidget {
   const SocialMessages({
@@ -181,7 +183,7 @@ class _SocialMessagesState extends State<SocialMessages> {
         ),
         TopIconButton(
           icon: searching ? Icons.close_rounded : Icons.search_rounded,
-          tooltip: 'Axtar',
+          tooltip: t('Axtar'),
           onTap: () => setState(() {
             searching = !searching;
             if (!searching) query = '';
@@ -353,6 +355,21 @@ class _SocialMessagesState extends State<SocialMessages> {
                 title: 'Söhbət otağı',
                 subtitle: 'Otağa gir və dostlarınla danış',
                 onTap: () => widget.navigate(2),
+              ),
+              _shortcut(
+                icon: Icons.apartment_rounded,
+                colors: const [Color(0xffffb03a), Color(0xffff5f6d)],
+                title: 'Agentlik',
+                subtitle: 'Yayımçı yığ, qazancdan pay al',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AgencyHubPage(
+                      profile: widget.profile,
+                      database: widget.database,
+                    ),
+                  ),
+                ),
               ),
               _shortcut(
                 icon: Icons.groups_2_rounded,

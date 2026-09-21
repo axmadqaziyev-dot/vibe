@@ -23,6 +23,7 @@ import 'user_profile.dart';
 import 'vip.dart';
 import 'ui/vibe_design.dart';
 import 'ui/vibe_chrome.dart';
+import 'app/i18n.dart';
 
 class SocialHome extends StatefulWidget {
   const SocialHome({super.key, required this.profile, this.database});
@@ -175,7 +176,7 @@ class _SocialHomeState extends State<SocialHome> {
           actions: [
             TopIconButton(
               icon: searching ? Icons.close_rounded : Icons.search_rounded,
-              tooltip: 'Axtar',
+              tooltip: t('Axtar'),
               onTap: () => setState(() {
                 searching = !searching;
                 if (!searching) query = '';

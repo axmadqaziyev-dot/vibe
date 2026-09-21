@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ui/vibe_design.dart';
+import 'app/i18n.dart';
 
 /// Siyahı dəyişəndə bu rəqəm artırılır — vərəq yenidən göstərilir.
 const int whatsNewVersion = 3;
@@ -196,7 +197,7 @@ Future<void> showWhatsNew(BuildContext context) {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
             child: GradientButton(
-              label: 'Başla',
+              label: t('Başla'),
               icon: Icons.rocket_launch_rounded,
               gradient: vBrand,
               height: 50,
